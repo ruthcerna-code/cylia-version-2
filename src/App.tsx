@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, DailyLog, ChatMessage, MenstrualPhase } from './types';
 import Onboarding from './components/Onboarding';
 import CalendarView from './components/CalendarView';
@@ -8,9 +8,24 @@ import HealthProfileModal from './components/HealthProfileModal';
 import SymptomChart from './components/SymptomChart';
 import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
 import { generateActivityForDay } from './utils/activity';
-import { auth, db, googleProvider, handleFirestoreError, OperationType, validateConnectionToFirestore } from './firebase';
-import { onAuthStateChanged, signInWithPopup, signOut, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import {
+  deleteAccountData,
+  deleteMessages,
+  fetchLogs,
+  fetchMessages,
+  fetchProfile,
+  isSupabaseConfigured,
+  saveLogs,
+  saveMessage,
+  saveProfile,
+  signInAnonymously,
+  signInWithEmail,
+  signOut,
+  signUpWithEmail,
+  subscribeUserData,
+  supabase,
+  type SessionUser,
+} from './supabase';
 
 const SCALE_LABELS = {
   sleep: ["Excelente", "Buena", "Regular", "Mala", "Muy mala"],
@@ -20,8 +35,65 @@ const SCALE_LABELS = {
   mood: ["Muy feliz", "Bien", "Neutral", "Triste", "Muy triste"]
 };
 
+type MigrationResult = 'empty' | 'ok' | 'error';
+
+function listLogs(source: Record<string, DailyLog>): DailyLog[] {
+  return Object.values(source) as DailyLog[];
+}
+
+function withoutAnalysis(log: DailyLog): DailyLog {
+  const next: DailyLog = { ...log };
+  delete next.aiAnalysis;
+  return next;
+}
+
+async function migrateLocalGuestProfile(uid: string): Promise<MigrationResult> {
+  const raw = localStorage.getItem('cyclia_guest_profile');
+  if (!raw) return 'empty';
+  try {
+    const profile = JSON.parse(raw) as UserProfile;
+    await saveProfile(uid, profile);
+    const logsRaw = localStorage.getItem('cyclia_guest_logs');
+    if (logsRaw) {
+      const logs = JSON.parse(logsRaw) as Record<string, DailyLog>;
+      await saveLogs(uid, Object.values(logs));
+    }
+    localStorage.removeItem('cyclia_guest_profile');
+    localStorage.removeItem('cyclia_guest_logs');
+    localStorage.removeItem('cyclia_session_type');
+    return 'ok';
+  } catch (error) {
+    console.error('No se pudo migrar el perfil local:', error);
+    return 'error';
+  }
+}
+
+async function migrateLocalChat(uid: string): Promise<MigrationResult> {
+  const raw = localStorage.getItem(`cyclia_chat_${uid}`) || localStorage.getItem('cyclia_chat_guest_local');
+  if (!raw) return 'empty';
+  try {
+    const parsed = JSON.parse(raw) as ChatMessage[];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.removeItem(`cyclia_chat_${uid}`);
+      localStorage.removeItem('cyclia_chat_guest_local');
+      return 'empty';
+    }
+    const base = Date.now() - parsed.length;
+    for (let index = 0; index < parsed.length; index += 1) {
+      const msg = parsed[index];
+      await saveMessage(uid, { ...msg, createdAt: msg.createdAt ?? base + index });
+    }
+    localStorage.removeItem(`cyclia_chat_${uid}`);
+    localStorage.removeItem('cyclia_chat_guest_local');
+    return 'ok';
+  } catch (error) {
+    console.error('No se pudo migrar el chat local:', error);
+    return 'error';
+  }
+}
+
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [logs, setLogs] = useState<Record<string, DailyLog>>({});
@@ -64,140 +136,161 @@ export default function App() {
   const [authPanelError, setAuthPanelError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
 
-  // Initialize Firebase Connection and Listen to Auth State changes on mount
+  const guestMigrationStarted = useRef(false);
+  const chatMigrationStarted = useRef(false);
+
+  const showNotice = (message: string) => {
+    setNotificationMsg(message);
+    setShowNotification(true);
+    window.setTimeout(() => setShowNotification(false), 4000);
+  };
+
   useEffect(() => {
-    validateConnectionToFirestore();
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setIsLoadingAuth(true);
-      if (firebaseUser) {
-        localStorage.removeItem('cyclia_session_type');
-        setUser(firebaseUser);
-        
-        // Fetch UserProfile from Firestore
-        const profilePath = `users/${firebaseUser.uid}`;
-        try {
-          const profileDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (profileDoc.exists()) {
-            setProfile(profileDoc.data() as UserProfile);
-          } else {
-            setProfile(null);
-          }
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, profilePath);
-        }
-
-        // Fetch DailyLogs from Firestore subcollection using onSnapshot for real-time tracking
-        const logsPath = `users/${firebaseUser.uid}/logs`;
-        const unsubscribeLogs = onSnapshot(collection(db, 'users', firebaseUser.uid, 'logs'), (snapshot) => {
-          const fetchedLogs: Record<string, DailyLog> = {};
-          snapshot.forEach((doc) => {
-            fetchedLogs[doc.id] = doc.data() as DailyLog;
-          });
-          setLogs(fetchedLogs);
-        }, (error) => {
-          handleFirestoreError(error, OperationType.GET, logsPath);
-        });
-
-        // Load chat history from localStorage scoped per user
-        const storedChat = localStorage.getItem(`cyclia_chat_${firebaseUser.uid}`);
-        if (storedChat) {
-          setChatHistory(JSON.parse(storedChat));
-        } else {
-          setChatHistory([]);
-        }
-
-        setIsLoadingAuth(false);
-        return () => {
-          unsubscribeLogs();
-        };
+    if (!supabase) {
+      setIsLoadingAuth(false);
+      return;
+    }
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      const sessionUser = data.session?.user;
+      setUser(sessionUser ? { id: sessionUser.id } : null);
+      if (!sessionUser) setIsLoadingAuth(false);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      if (session?.user) {
+        setUser({ id: session.user.id });
+        setIsLoadingAuth(true);
       } else {
-        const sessionType = localStorage.getItem('cyclia_session_type');
-        if (sessionType === 'guest') {
-          const guestUser = { uid: 'guest_local', email: 'invitada@cyclia.local', displayName: 'Invitada' } as any as User;
-          setUser(guestUser);
-
-          const guestProfileStr = localStorage.getItem('cyclia_guest_profile');
-          if (guestProfileStr) {
-            setProfile(JSON.parse(guestProfileStr));
-          } else {
-            setProfile(null);
-          }
-
-          const guestLogsStr = localStorage.getItem('cyclia_guest_logs');
-          if (guestLogsStr) {
-            setLogs(JSON.parse(guestLogsStr));
-          } else {
-            setLogs({});
-          }
-
-          const storedChat = localStorage.getItem(`cyclia_chat_guest_local`);
-          if (storedChat) {
-            setChatHistory(JSON.parse(storedChat));
-          } else {
-            setChatHistory([]);
-          }
-          setIsLoadingAuth(false);
-        } else {
-          setUser(null);
-          setProfile(null);
-          setLogs({});
-          setChatHistory([]);
-          setIsLoadingAuth(false);
-        }
+        setUser(null);
+        setProfile(null);
+        setLogs({});
+        setChatHistory([]);
+        setIsLoadingAuth(false);
       }
     });
-
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
 
-  // Sync profile to local storage and Firestore
-  const handleSaveProfile = async (newProfile: UserProfile) => {
+  useEffect(() => {
     if (!user) return;
+    const uid = user.id;
+    let cancelled = false;
+    guestMigrationStarted.current = false;
+    chatMigrationStarted.current = false;
+
+    const refresh = async () => {
+      try {
+        const [profileRow, logRows, messageRows] = await Promise.all([
+          fetchProfile(uid),
+          fetchLogs(uid),
+          fetchMessages(uid),
+        ]);
+        if (cancelled) return;
+
+        if (!profileRow && !guestMigrationStarted.current) {
+          guestMigrationStarted.current = true;
+          const result = await migrateLocalGuestProfile(uid);
+          if (cancelled) return;
+          if (result === 'error') showNotice('No se pudieron migrar los datos locales a Supabase.');
+          if (result === 'ok') {
+            await refresh();
+            return;
+          }
+        }
+
+        if (messageRows.length === 0 && !chatMigrationStarted.current) {
+          chatMigrationStarted.current = true;
+          const result = await migrateLocalChat(uid);
+          if (cancelled) return;
+          if (result === 'error') showNotice('No se pudo migrar el chat a Supabase.');
+          if (result === 'ok') {
+            await refresh();
+            return;
+          }
+        }
+
+        setProfile(profileRow);
+        setLogs(logRows);
+        setChatHistory(messageRows);
+        setIsLoadingAuth(false);
+      } catch (error) {
+        console.error('No se pudieron leer los datos de Supabase:', error);
+        if (!cancelled) {
+          setProfile(null);
+          setIsLoadingAuth(false);
+          showNotice('No se pudieron leer los datos en Supabase.');
+        }
+      }
+    };
+
+    void refresh();
+    const unsubscribe = subscribeUserData(uid, () => {
+      void refresh();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [user]);
+
+  const handleSaveProfile = async (newProfile: UserProfile) => {
+    if (!user) return false;
+    const isFirstProfile = !profile;
     setProfile(newProfile);
 
-    if (user.uid === 'guest_local') {
-      localStorage.setItem('cyclia_guest_profile', JSON.stringify(newProfile));
-    } else {
-      const profilePath = `users/${user.uid}`;
-      try {
-        await setDoc(doc(db, 'users', user.uid), newProfile);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, profilePath);
-      }
+    try {
+      await saveProfile(user.id, newProfile);
+    } catch (error) {
+      console.error('No se pudo guardar el perfil:', error);
+      showNotice('No se pudo guardar el perfil en Supabase.');
+      return false;
     }
-    
-    // Automatically trigger a welcome chat message from Cyclia
+
+    if (!isFirstProfile) return true;
+
     const welcomeMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',
       content: `🌸 ¡Hola ${newProfile.name}! He registrado con éxito tu perfil en Cyclia.\n\nHe calculado tu ciclo biológico basándome en tu última fecha menstrual (${newProfile.lastPeriodDate}).\n\nTu calendario ya está actualizado con tus fases. ¿En qué puedo ayudarte hoy?`,
-      timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+      timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: Date.now(),
     };
-    const updatedHistory = [welcomeMsg];
-    setChatHistory(updatedHistory);
-    localStorage.setItem(`cyclia_chat_${user.uid}`, JSON.stringify(updatedHistory));
+    setChatHistory([welcomeMsg]);
+    try {
+      await saveMessage(user.id, welcomeMsg);
+    } catch (error) {
+      console.error('No se pudo guardar el mensaje de bienvenida:', error);
+    }
+    return true;
   };
 
-  // Sync logs to Firestore
+  // Sync logs to Supabase
   const handleSaveLog = async (log: DailyLog) => {
     if (!user) return;
 
-    // Clear old AI analysis to ensure a brand-new analysis is generated and the loading spinner displays
-    const logWithClearedAnalysis = { ...log, aiAnalysis: undefined };
+    const logWithClearedAnalysis = withoutAnalysis(log);
     const updatedLogs = { ...logs, [log.date]: logWithClearedAnalysis };
+    const previousLog = logs[log.date];
     setLogs(updatedLogs);
     setIsCheckinOpen(false);
 
-    if (user.uid === 'guest_local') {
-      localStorage.setItem('cyclia_guest_logs', JSON.stringify(updatedLogs));
-    } else {
-      const logPath = `users/${user.uid}/logs/${log.date}`;
-      try {
-        await setDoc(doc(db, 'users', user.uid, 'logs', log.date), logWithClearedAnalysis);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, logPath);
-      }
+    try {
+      await saveLogs(user.id, [logWithClearedAnalysis]);
+    } catch (error) {
+      console.error('No se pudo guardar el registro:', error);
+      setLogs((current) => {
+        const next = { ...current };
+        if (previousLog) next[log.date] = previousLog;
+        else delete next[log.date];
+        return next;
+      });
+      showNotice('No se pudo guardar el registro en Supabase.');
+      return;
     }
     
     // Show a quick toast notification
@@ -223,7 +316,7 @@ export default function App() {
         body: JSON.stringify({
           profile,
           log: currentLog,
-          history: Object.values(allLogs)
+          history: listLogs(allLogs)
             .filter(l => l.date !== currentLog.date)
             .slice(-4) // Send recent 4 logs
         })
@@ -231,19 +324,13 @@ export default function App() {
 
       if (response.ok) {
         const data = await response.json();
+        if (typeof data.analysis !== 'string' || !data.analysis) return;
         const updatedLog = { ...currentLog, aiAnalysis: data.analysis };
-        
-        if (user.uid === 'guest_local') {
-          const updatedLogs = { ...allLogs, [currentLog.date]: updatedLog };
-          setLogs(updatedLogs);
-          localStorage.setItem('cyclia_guest_logs', JSON.stringify(updatedLogs));
-        } else {
-          const logPath = `users/${user.uid}/logs/${currentLog.date}`;
-          try {
-            await setDoc(doc(db, 'users', user.uid, 'logs', currentLog.date), updatedLog);
-          } catch (error) {
-            handleFirestoreError(error, OperationType.WRITE, logPath);
-          }
+        try {
+          await saveLogs(user.id, [updatedLog]);
+        } catch (error) {
+          console.error('No se pudo guardar el análisis:', error);
+          showNotice('El análisis se generó, pero no se pudo guardar en Supabase.');
         }
       }
     } catch (err) {
@@ -270,7 +357,7 @@ export default function App() {
         body: JSON.stringify({
           profile,
           log: activeLog,
-          history: Object.values(logs)
+          history: listLogs(logs)
             .filter(l => l.date !== selectedDateStr)
             .slice(-4),
           previousInteractionId,
@@ -289,17 +376,14 @@ export default function App() {
         updateAgentState(data.interactionId, data.environmentId, data.steps);
       }
 
-      if (user.uid === 'guest_local') {
-        const updatedLogs = { ...logs, [selectedDateStr]: updatedLog };
-        setLogs(updatedLogs);
-        localStorage.setItem('cyclia_guest_logs', JSON.stringify(updatedLogs));
-      } else {
-        const logPath = `users/${user.uid}/logs/${selectedDateStr}`;
-        try {
-          await setDoc(doc(db, 'users', user.uid, 'logs', selectedDateStr), updatedLog);
-        } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, logPath);
-        }
+      if (typeof updatedLog.aiAnalysis !== 'string' || !updatedLog.aiAnalysis) {
+        throw new Error('La IA no devolvió un análisis.');
+      }
+      try {
+        await saveLogs(user.id, [updatedLog]);
+      } catch (error) {
+        console.error('No se pudo guardar el análisis:', error);
+        throw new Error('No se pudo guardar el análisis en Supabase.');
       }
     } catch (err: any) {
       setAnalysisError(err.message || "Error al conectar con la IA de Cyclia.");
@@ -308,50 +392,44 @@ export default function App() {
     }
   };
 
-  // Chat message callback
-  const handleAddMessage = (msg: ChatMessage) => {
+  const handleAddMessage = async (msg: ChatMessage) => {
     if (!user) return;
-    const updatedHistory = [...chatHistory, msg];
-    setChatHistory(updatedHistory);
-    localStorage.setItem(`cyclia_chat_${user.uid}`, JSON.stringify(updatedHistory));
-  };
-
-  // Clear Chat History
-  const handleClearHistory = () => {
-    if (!user) return;
-    if (confirm("¿Estás segura de que deseas limpiar la conversación actual con Cyclia?")) {
-      setChatHistory([]);
-      localStorage.removeItem(`cyclia_chat_${user.uid}`);
+    const stored: ChatMessage = { ...msg, createdAt: msg.createdAt ?? Date.now() };
+    setChatHistory((prev) => [...prev, stored]);
+    try {
+      await saveMessage(user.id, stored);
+    } catch (error) {
+      console.error('No se pudo guardar el mensaje:', error);
+      showNotice('No se pudo guardar el mensaje en Supabase.');
     }
   };
 
-  // Reset all app data (useful for testing)
+  const handleClearHistory = async () => {
+    if (!user) return;
+    if (!confirm("¿Estás segura de que deseas limpiar la conversación actual con Cyclia?")) return;
+    try {
+      await deleteMessages(user.id);
+      localStorage.removeItem(`cyclia_chat_${user.id}`);
+      setChatHistory([]);
+    } catch (error) {
+      console.error('No se pudo borrar el chat:', error);
+      showNotice('No se pudo borrar el chat en Supabase.');
+    }
+  };
+
   const handleResetAppData = async () => {
     if (!user) return;
-    if (confirm("⚠️ ¿Deseas eliminar todo tu perfil y registros históricos para empezar de nuevo?")) {
-      if (user.uid === 'guest_local') {
-        localStorage.removeItem('cyclia_guest_profile');
-        localStorage.removeItem('cyclia_guest_logs');
-        localStorage.removeItem('cyclia_chat_guest_local');
-      } else {
-        const profilePath = `users/${user.uid}`;
-        try {
-          await deleteDoc(doc(db, 'users', user.uid));
-          
-          const logsRef = collection(db, 'users', user.uid, 'logs');
-          const querySnapshot = await getDocs(logsRef);
-          for (const logDoc of querySnapshot.docs) {
-            await deleteDoc(doc(db, 'users', user.uid, 'logs', logDoc.id));
-          }
-        } catch (error) {
-          handleFirestoreError(error, OperationType.DELETE, profilePath);
-        }
-      }
-
+    if (!confirm("⚠️ ¿Deseas eliminar todo tu perfil y registros históricos para empezar de nuevo?")) return;
+    try {
+      await deleteAccountData(user.id);
+      localStorage.removeItem(`cyclia_chat_${user.id}`);
       setProfile(null);
       setLogs({});
       setChatHistory([]);
       setSelectedDateStr(formatDateStr(new Date()));
+    } catch (error) {
+      console.error('No se pudieron borrar los datos:', error);
+      showNotice('No se pudieron borrar los datos en Supabase.');
     }
   };
 
@@ -361,6 +439,7 @@ export default function App() {
     
     const today = new Date();
     const updatedLogs = { ...logs };
+    const demoLogs: DailyLog[] = [];
     
     // Generate logs for the last 15 days to make a gorgeous chart curve!
     for (let i = 15; i >= 1; i--) {
@@ -392,7 +471,7 @@ export default function App() {
         stress = 1; // Muy bajo
         mood = 1; // Muy feliz
         behavior = "Hice entrenamiento de fuerza pesada, comí alimentos ricos en hierro y fibra, y estuve muy enfocada en mis proyectos de trabajo.";
-      } else if (phase === 'Ovulatoria') {
+      } else if (phase === 'Ovulacion') {
         sleepQuality = 1; // Excelente
         fatigue = 1; // Ninguna
         pain = 1; // Ninguno
@@ -437,22 +516,18 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       };
 
       updatedLogs[dateStr] = logDoc;
+      demoLogs.push(logDoc);
+    }
 
-      if (user.uid !== 'guest_local') {
-        const logPath = `users/${user.uid}/logs/${dateStr}`;
-        try {
-          await setDoc(doc(db, 'users', user.uid, 'logs', dateStr), logDoc);
-        } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, logPath);
-        }
-      }
+    setLogs(updatedLogs);
+    try {
+      await saveLogs(user.id, demoLogs);
+    } catch (error) {
+      console.error('No se pudieron guardar los registros de demostración:', error);
+      showNotice('No se pudieron guardar los registros de demostración en Supabase.');
+      return;
     }
-    
-    if (user.uid === 'guest_local') {
-      setLogs(updatedLogs);
-      localStorage.setItem('cyclia_guest_logs', JSON.stringify(updatedLogs));
-    }
-    
+
     setNotificationMsg("¡Se han cargado 15 días de registros históricos de demostración!");
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 4000);
@@ -465,7 +540,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
   // Detect Alerts (Consecutive high ratings in stress/pain/fatigue/poor sleep)
   const checkAlerts = (): boolean => {
-    const logList = Object.values(logs).sort((a, b) => b.date.localeCompare(a.date));
+    const logList = listLogs(logs).sort((a, b) => b.date.localeCompare(a.date));
     if (logList.length < 3) return false;
 
     // Check last 3 logs
@@ -483,29 +558,25 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
     if (!profile || !user) return;
     if (confirm(`¿Confirmas que deseas registrar el primer día de tu ciclo menstrual en la fecha ${newDateStr}? Esto actualizará las fases y cálculos.`)) {
       const updatedProfile = { ...profile, lastPeriodDate: newDateStr };
-      await handleSaveProfile(updatedProfile);
+      const saved = await handleSaveProfile(updatedProfile);
+      if (!saved) return;
       
       // Clear old cached AI analyses of the logs to prevent stale advice
       const updatedLogs = { ...logs };
-      for (const key of Object.keys(updatedLogs)) {
-        const logWithClearedAnalysis = { ...updatedLogs[key] };
+      const clearedLogs = listLogs(updatedLogs).map((entry) => {
+        const logWithClearedAnalysis = { ...entry };
         delete logWithClearedAnalysis.aiAnalysis;
-        
-        updatedLogs[key] = logWithClearedAnalysis;
-        
-        if (user.uid !== 'guest_local') {
-          const logPath = `users/${user.uid}/logs/${key}`;
-          try {
-            await setDoc(doc(db, 'users', user.uid, 'logs', key), logWithClearedAnalysis);
-          } catch (error) {
-            handleFirestoreError(error, OperationType.WRITE, logPath);
-          }
-        }
-      }
+        updatedLogs[entry.date] = logWithClearedAnalysis;
+        return logWithClearedAnalysis;
+      });
+      setLogs(updatedLogs);
 
-      if (user.uid === 'guest_local') {
-        setLogs(updatedLogs);
-        localStorage.setItem('cyclia_guest_logs', JSON.stringify(updatedLogs));
+      try {
+        await saveLogs(user.id, clearedLogs);
+      } catch (error) {
+        console.error('No se pudieron limpiar los análisis:', error);
+        showNotice('El ciclo se actualizó, pero no se pudieron limpiar los análisis en Supabase.');
+        return;
       }
 
       setNotificationMsg("¡Ciclo recalculado con éxito!");
@@ -519,7 +590,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center animate-pulse">
         <span className="text-4xl">🌸</span>
         <h2 className="text-xl font-serif font-semibold text-[#5A5A40] mt-4">Iniciando Cyclia...</h2>
-        <p className="text-xs text-[#9A9A90] mt-1">Conectando de forma segura con Firebase</p>
+        <p className="text-xs text-[#9A9A90] mt-1">Conectando de forma segura con Supabase</p>
       </div>
     );
   }
@@ -531,23 +602,13 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       setIsAuthProcessing(true);
       try {
         if (isSignUpMode) {
-          await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+          await signUpWithEmail(loginEmail, loginPassword);
         } else {
-          await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+          await signInWithEmail(loginEmail, loginPassword);
         }
       } catch (err: any) {
         console.error("Error de autenticación:", err);
-        let friendlyMessage = "Ocurrió un error. Verifica tus credenciales.";
-        if (err?.code === 'auth/invalid-email') {
-          friendlyMessage = "El correo electrónico no es válido.";
-        } else if (err?.code === 'auth/user-not-found' || err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential') {
-          friendlyMessage = "Correo o contraseña incorrectos.";
-        } else if (err?.code === 'auth/email-already-in-use') {
-          friendlyMessage = "Este correo ya está registrado.";
-        } else if (err?.code === 'auth/weak-password') {
-          friendlyMessage = "La contraseña debe tener al menos 6 caracteres.";
-        }
-        setAuthPanelError(friendlyMessage);
+        setAuthPanelError(err?.message || "Ocurrió un error. Verifica tus credenciales.");
       } finally {
         setIsAuthProcessing(false);
       }
@@ -557,54 +618,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       setAuthPanelError('');
       setIsAuthProcessing(true);
       try {
-        localStorage.setItem('cyclia_session_type', 'guest');
-        const guestUser = { uid: 'guest_local', email: 'invitada@cyclia.local', displayName: 'Invitada' } as any as User;
-        setUser(guestUser);
-
-        const guestProfileStr = localStorage.getItem('cyclia_guest_profile');
-        if (guestProfileStr) {
-          setProfile(JSON.parse(guestProfileStr));
-        } else {
-          setProfile(null);
-        }
-
-        const guestLogsStr = localStorage.getItem('cyclia_guest_logs');
-        if (guestLogsStr) {
-          setLogs(JSON.parse(guestLogsStr));
-        } else {
-          setLogs({});
-        }
-
-        const storedChat = localStorage.getItem(`cyclia_chat_guest_local`);
-        if (storedChat) {
-          setChatHistory(JSON.parse(storedChat));
-        } else {
-          setChatHistory([]);
-        }
-      } catch (err) {
-        console.error("Error en acceso invitado:", err);
-        setAuthPanelError("No se pudo iniciar sesión como invitado.");
-      } finally {
-        setIsAuthProcessing(false);
-      }
-    };
-
-    const handleGoogleAuth = async () => {
-      setAuthPanelError('');
-      setIsAuthProcessing(true);
-      try {
-        await signInWithPopup(auth, googleProvider);
+        await signInAnonymously();
       } catch (err: any) {
-        console.error("Error con Google Auth:", err);
-        let msg = "No se pudo iniciar sesión con Google.";
-        if (err?.message?.includes('popup-blocked') || err?.code === 'auth/popup-blocked') {
-          msg = "Ventana emergente bloqueada por el navegador. Habilita las ventanas emergentes o usa Acceso de Invitado / Correo.";
-        } else if (err?.message?.includes('network-error')) {
-          msg = "Error de red al conectar con Google. Comprueba tu conexión.";
-        } else {
-          msg = "Error de conexión. Si usas un iframe, las cookies de terceros de Google Auth pueden estar bloqueadas por tu navegador. Prueba con 'Invitado' o 'Correo'.";
-        }
-        setAuthPanelError(msg);
+        console.error("Error en acceso anónimo:", err);
+        setAuthPanelError(err?.message || 'No se pudo iniciar la sesión anónima en Supabase.');
       } finally {
         setIsAuthProcessing(false);
       }
@@ -623,6 +640,11 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           <p className="text-xs text-[#7A7A70] leading-relaxed max-w-sm">
             Bienvenida a Cyclia. Elige un método para acceder a tu diario de bienestar, calendario y análisis personalizados en la nube.
           </p>
+          {!isSupabaseConfigured && (
+            <div className="w-full bg-amber-50 text-amber-800 p-3.5 rounded-2xl text-[11px] font-medium leading-relaxed border border-amber-100 text-left">
+              Faltan VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en el archivo .env. Sin esas claves Cyclia no puede entrar a Supabase.
+            </div>
+          )}
 
           {/* Tab Selection */}
           <div className="w-full flex bg-[#FAF8F5] rounded-full p-1 border border-[#F0EDE8]">
@@ -654,17 +676,17 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             {activeLoginTab === 'guest' && (
               <div className="flex flex-col gap-4 animate-fade-in">
                 <p className="text-xs text-[#7A7A70] leading-relaxed text-left">
-                  🚀 <strong>¿Quieres probar rápido?</strong> Accede al instante de forma totalmente anónima. Ideal para probar Cyclia y la Inteligencia Artificial dentro del navegador sin registrarte.
+                  Entras sin registrarte. Cyclia abre una sesión anónima y guarda tu perfil, registros y chat en Supabase.
                 </p>
                 <button
                   type="button"
-                  disabled={isAuthProcessing}
+                  disabled={isAuthProcessing || !isSupabaseConfigured}
                   onClick={handleGuestAuth}
                   className="w-full bg-[#5A5A40] hover:bg-[#484833] disabled:opacity-50 text-white font-semibold py-3.5 px-6 rounded-full text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-xs"
                 >
                   {isAuthProcessing ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : "Entrar como Invitado (Rápido)"}
+                  ) : "Entrar sin cuenta"}
                 </button>
               </div>
             )}
@@ -698,7 +720,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
                 <button
                   type="submit"
-                  disabled={isAuthProcessing}
+                  disabled={isAuthProcessing || !isSupabaseConfigured}
                   className="w-full mt-2 bg-[#5A5A40] hover:bg-[#484833] disabled:opacity-50 text-white font-semibold py-3.5 px-6 rounded-full text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-xs"
                 >
                   {isAuthProcessing ? (
@@ -720,7 +742,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           </div>
 
           <div className="text-[10px] text-[#9A9A90] font-medium leading-relaxed max-w-[280px]">
-            Conectado de manera segura con Firebase Authentication y Firestore Database
+            Conectado de manera segura con Supabase Authentication y Postgres
           </div>
         </div>
       </div>
@@ -792,15 +814,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <button 
                 onClick={async () => {
                   if (confirm("¿Estás segura de que deseas cerrar sesión?")) {
-                    if (user?.uid === 'guest_local') {
-                      localStorage.removeItem('cyclia_session_type');
-                      setUser(null);
-                      setProfile(null);
-                      setLogs({});
-                      setChatHistory([]);
-                    } else {
-                      await signOut(auth);
-                    }
+                    await signOut();
                   }
                 }} 
                 className="text-[9px] bg-red-50 text-red-600 hover:bg-red-100 font-bold px-2 py-0.5 rounded-full transition-colors cursor-pointer"
@@ -835,15 +849,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             <button
               onClick={async () => {
                 if (confirm("¿Estás segura de que deseas cerrar sesión?")) {
-                  if (user?.uid === 'guest_local') {
-                    localStorage.removeItem('cyclia_session_type');
-                    setUser(null);
-                    setProfile(null);
-                    setLogs({});
-                    setChatHistory([]);
-                  } else {
-                    await signOut(auth);
-                  }
+                  await signOut();
                 }
               }}
               className="w-9 h-9 rounded-full border border-red-200 hover:bg-red-50 text-red-500 flex items-center justify-center text-xs transition-colors cursor-pointer sm:hidden"

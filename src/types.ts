@@ -33,6 +33,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  createdAt?: number;
 }
 
 export type MenstrualPhase = 'Menstrual' | 'Folicular' | 'Ovulacion' | 'Lutea';
