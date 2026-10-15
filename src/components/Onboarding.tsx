@@ -3,9 +3,10 @@ import { UserProfile } from '../types';
 
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
+  accountEmail?: string;
 }
 
-export default function Onboarding({ onComplete }: OnboardingProps) {
+export default function Onboarding({ onComplete, accountEmail }: OnboardingProps) {
   // Load existing profile from localStorage to pre-populate if they are starting over
   const getStoredProfile = (): UserProfile | null => {
     try {
@@ -24,7 +25,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const [birthDate, setBirthDate] = useState(initialProfile?.birthDate || '');
   const [weight, setWeight] = useState<number | ''>(initialProfile?.weight || '');
   const [height, setHeight] = useState<number | ''>(initialProfile?.height || '');
-  const [email, setEmail] = useState(initialProfile?.email || '');
+  const [email, setEmail] = useState(initialProfile?.email || accountEmail || '');
   const [lastPeriodDate, setLastPeriodDate] = useState(initialProfile?.lastPeriodDate || '');
   const [periodLength, setPeriodLength] = useState<number | ''>(initialProfile?.periodLength || '');
   const [cycleLength, setCycleLength] = useState<number | ''>(initialProfile?.cycleLength || '');

@@ -20,6 +20,9 @@ import {
   saveProfile,
   signInAnonymously,
   signInWithEmail,
+  connectGoogle,
+  signInWithGoogle,
+  toSessionUser,
   signOut,
   signUpWithEmail,
   subscribeUserData,
@@ -105,7 +108,7 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
-  const [isSidebarChatOpen, setIsSidebarChatOpen] = useState(true);
+  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'perfil'>('inicio');
   const [isEditingHealth, setIsEditingHealth] = useState(false);
 
   // AntiGravity Agent states
@@ -130,6 +133,7 @@ export default function App() {
 
   // Authentication Panel States
   const [activeLoginTab, setActiveLoginTab] = useState<'guest' | 'email'>('guest');
+  const [gmailError, setGmailError] = useState('');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isSignUpMode, setIsSignUpMode] = useState(false);
@@ -138,6 +142,15 @@ export default function App() {
 
   const guestMigrationStarted = useRef(false);
   const chatMigrationStarted = useRef(false);
+
+  const handleConnectGoogle = async () => {
+    setGmailError('');
+    try {
+      await connectGoogle(Boolean(user?.isAnonymous));
+    } catch (err: any) {
+      setGmailError(err?.message || 'No se pudo abrir Gmail.');
+    }
+  };
 
   const showNotice = (message: string) => {
     setNotificationMsg(message);
@@ -154,13 +167,15 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       const sessionUser = data.session?.user;
-      setUser(sessionUser ? { id: sessionUser.id } : null);
+      setUser(sessionUser ? toSessionUser(sessionUser) : null);
       if (!sessionUser) setIsLoadingAuth(false);
+      const oauthError = new URLSearchParams(window.location.search).get('error_description');
+      if (oauthError) setAuthPanelError(oauthError.replace(/\+/g, ' '));
     });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       if (session?.user) {
-        setUser({ id: session.user.id });
+        setUser(toSessionUser(session.user));
         setIsLoadingAuth(true);
       } else {
         setUser(null);
@@ -614,6 +629,18 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       }
     };
 
+    const handleGoogleAuth = async () => {
+      setAuthPanelError('');
+      setIsAuthProcessing(true);
+      try {
+        await signInWithGoogle();
+      } catch (err: any) {
+        console.error('Error en acceso con Gmail:', err);
+        setAuthPanelError(err?.message || 'No se pudo iniciar sesión con Gmail.');
+        setIsAuthProcessing(false);
+      }
+    };
+
     const handleGuestAuth = async () => {
       setAuthPanelError('');
       setIsAuthProcessing(true);
@@ -628,8 +655,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
     };
 
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-white rounded-[32px] p-8 md:p-10 shadow-sm border border-[#F0EDE8] max-w-md w-full flex flex-col items-center gap-6 animate-fade-in">
+      <div className="min-h-screen bg-[#E7E2D8] flex justify-center">
+      <div className="w-full max-w-[430px] min-h-screen bg-[#FAF8F5] flex flex-col px-5 py-8 shadow-2xl">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-[#9A9A90] font-bold">Canal digital</p>
+        <div className="bg-white rounded-[32px] p-8 shadow-sm border border-[#F0EDE8] w-full flex flex-col items-center gap-6 animate-fade-in mt-6">
           <div className="w-16 h-16 bg-[#5A5A40] rounded-full flex items-center justify-center text-3xl shadow-xs">
             🌸
           </div>
@@ -645,6 +674,18 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               Faltan VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en el archivo .env. Sin esas claves Cyclia no puede entrar a Supabase.
             </div>
           )}
+
+          <button
+            type="button"
+            disabled={isAuthProcessing || !isSupabaseConfigured}
+            onClick={handleGoogleAuth}
+            className="w-full bg-white hover:bg-[#FAF8F5] disabled:opacity-50 text-[#3A3A35] font-semibold py-3.5 px-6 rounded-full text-xs border border-[#E4DFD6] transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-xs"
+          >
+            {isAuthProcessing ? (
+              <div className="w-4 h-4 border-2 border-[#5A5A40] border-t-transparent rounded-full animate-spin" />
+            ) : 'Entrar con Gmail'}
+          </button>
+          <p className="text-[10px] uppercase tracking-widest text-[#9A9A90] font-bold">o</p>
 
           {/* Tab Selection */}
           <div className="w-full flex bg-[#FAF8F5] rounded-full p-1 border border-[#F0EDE8]">
@@ -746,15 +787,22 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           </div>
         </div>
       </div>
+      </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-center px-4 py-12">
-        <div className="max-w-4xl mx-auto w-full">
-          {/* Main Onboarding Setup */}
-          <Onboarding onComplete={handleSaveProfile} />
+      <div className="min-h-screen bg-[#E7E2D8] flex justify-center">
+        <div className="w-full max-w-[430px] min-h-screen bg-[#FAF8F5] px-4 py-8 shadow-2xl flex flex-col gap-4">
+          {!user.hasGoogle && (
+            <div className="bg-white rounded-[24px] p-4 border border-[#E4DFD6] flex flex-col sm:flex-row sm:items-center gap-3">
+              <p className="text-xs text-[#5A5A40] text-left flex-1">Conecta Gmail para entrar con tu cuenta. Google te pedirá elegir el correo.</p>
+              <button type="button" onClick={handleConnectGoogle} className="bg-[#5A5A40] text-white text-xs font-semibold px-5 py-3 rounded-full cursor-pointer">Conectar Gmail</button>
+            </div>
+          )}
+          {gmailError && <p className="text-xs text-red-600 text-left">{gmailError}</p>}
+          <Onboarding onComplete={handleSaveProfile} accountEmail={user.email} />
         </div>
       </div>
     );
@@ -779,7 +827,8 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
   );
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-[#3A3A35] font-sans flex flex-col relative pb-12">
+    <div className="min-h-screen bg-[#E7E2D8] text-[#3A3A35] font-sans flex justify-center">
+    <div className="w-full max-w-[430px] min-h-screen bg-[#FAF8F5] relative flex flex-col shadow-2xl pb-24">
       
       {/* Toast Notification */}
       {showNotification && (
@@ -788,85 +837,31 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         </div>
       )}
 
-      {/* Header Navigation */}
-      <nav id="header-nav" className="flex justify-between items-center px-6 md:px-10 py-5 bg-white border-b border-[#EDE8E0] shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#5A5A40] rounded-full flex items-center justify-center text-xl shadow-xs">
-            🌸
-          </div>
+      <header id="header-nav" className="sticky top-0 z-30 bg-[#5A5A40] text-white px-5 pt-6 pb-5">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-white/70 font-bold">Canal digital</p>
+        <div className="mt-2 flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-serif font-semibold tracking-tight text-[#5A5A40]">Cyclia</h1>
-            <p className="text-[9px] uppercase tracking-widest text-[#9A9A90] font-bold">Bienestar Femenino</p>
+            <h1 className="font-serif text-[1.7rem] leading-none">Hola, {profile.name}</h1>
+            <p className="text-xs text-white/80 mt-1">{formatFriendlyDate(selectedDateStr)}</p>
           </div>
+          <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center text-2xl">🌸</div>
         </div>
-        
-        <div className="flex items-center gap-4 md:gap-8">
-          <div className="text-right hidden sm:block">
-            <div className="flex items-center justify-end gap-2 text-xs uppercase tracking-widest text-[#9A9A90] font-bold">
-              <span>Hola, {profile.name}</span>
-              <button 
-                onClick={() => setIsEditingHealth(true)} 
-                className="text-[9px] bg-[#5A5A40]/10 text-[#5A5A40] hover:bg-[#5A5A40]/25 font-bold px-2 py-0.5 rounded-full transition-colors cursor-pointer"
-                title="Editar perfil de salud"
-              >
-                ⚙️ Editar Salud
-              </button>
-              <button 
-                onClick={async () => {
-                  if (confirm("¿Estás segura de que deseas cerrar sesión?")) {
-                    await signOut();
-                  }
-                }} 
-                className="text-[9px] bg-red-50 text-red-600 hover:bg-red-100 font-bold px-2 py-0.5 rounded-full transition-colors cursor-pointer"
-                title="Cerrar sesión"
-              >
-                Cerrar Sesión
-              </button>
-            </div>
-            <p className="text-sm font-semibold text-[#5A5A40] mt-0.5">{formatFriendlyDate(selectedDateStr)}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleReRegister}
-              className="bg-white hover:bg-rose-50 border border-rose-200 text-xs font-bold py-2.5 px-4 rounded-full text-rose-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              title="Realizar nuevo análisis registrando tus datos de bienestar diarios"
-            >
-              🔄 Volver a Empezar (Check-In)
-            </button>
-            <button
-              onClick={() => setIsSidebarChatOpen(!isSidebarChatOpen)}
-              className="bg-[#FAF8F5] hover:bg-[#F2EFE9] border border-[#EDE8E0] text-xs font-bold py-2.5 px-4 rounded-full text-[#5A5A40] transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              💬 {isSidebarChatOpen ? 'Cerrar Asistente' : 'Hablar con Cyclia'}
-            </button>
-            <button
-              onClick={handleResetAppData}
-              className="w-9 h-9 rounded-full border border-red-200 hover:bg-red-50 text-red-500 flex items-center justify-center text-xs transition-colors cursor-pointer"
-              title="Restaurar valores de la App"
-            >
-              🔄
-            </button>
-            <button
-              onClick={async () => {
-                if (confirm("¿Estás segura de que deseas cerrar sesión?")) {
-                  await signOut();
-                }
-              }}
-              className="w-9 h-9 rounded-full border border-red-200 hover:bg-red-50 text-red-500 flex items-center justify-center text-xs transition-colors cursor-pointer sm:hidden"
-              title="Cerrar sesión"
-            >
-              🚪
-            </button>
-          </div>
+      </header>
+
+      {!user.hasGoogle && (
+        <div className="bg-white text-[#5A5A40] px-4 py-3 flex items-center gap-3 border-b border-[#EDE8E0]">
+          <p className="text-xs flex-1">Esta sesión no tiene Gmail. Conéctalo para que Google te pida tu cuenta.</p>
+          <button type="button" onClick={handleConnectGoogle} className="bg-white text-[#5A5A40] text-xs font-semibold px-4 py-2 rounded-full cursor-pointer">Conectar Gmail</button>
         </div>
-      </nav>
+      )}
+      {gmailError && <p className="bg-red-50 text-red-600 text-xs px-6 md:px-10 py-2">{gmailError}</p>}
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-[1280px] w-full mx-auto p-4 md:p-8 grid grid-cols-12 gap-6 items-start">
+      <main className="flex-1 w-full px-4 py-4 flex flex-col gap-4">
         
         {/* Active Health Profile Badges */}
         {(profile.isCeliac || profile.hasDiabetes || profile.hasObesity || profile.hasDepression) && (
-          <div className="col-span-12 bg-white rounded-[24px] p-4 border border-[#EDE8E0] flex flex-wrap items-center gap-2 text-xs shadow-2xs">
+          <div className={`${appTab === 'perfil' ? 'flex' : 'hidden'} bg-white rounded-[24px] p-4 border border-[#EDE8E0] flex-wrap items-center gap-2 text-xs shadow-2xs`}>
             <span className="font-bold text-[#7A7A70] uppercase tracking-wider text-[10px]">Perfil de Salud Activo:</span>
             {profile.isCeliac && (
               <span className="bg-rose-50 border border-rose-100 text-rose-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">🌾 Celíaca</span>
@@ -885,7 +880,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         
         {/* Alert Banner Detection */}
         {checkAlerts() && (
-          <div className="col-span-12 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-3 text-amber-900 text-sm leading-relaxed">
+          <div className={`${appTab === 'inicio' ? 'flex' : 'hidden'} bg-amber-50 border border-amber-200 p-4 rounded-2xl gap-3 text-amber-900 text-sm leading-relaxed`}>
             <span>💡</span>
             <div>
               <strong>Aviso de Bienestar:</strong> He observado que durante varios días consecutivos has registrado indicadores de bienestar elevados (fatiga, dolor, estrés o descanso pobre). Si estos síntomas persisten o afectan tu calidad de vida, considera consultar con un profesional de la salud.
@@ -894,7 +889,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         )}
 
         {/* Column 1: Current Phase Details */}
-        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6 h-full">
+        <div className={`${appTab === 'inicio' ? 'flex' : 'hidden'} flex-col gap-4`}>
           <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-[#F0EDE8] flex flex-col flex-1 min-h-[480px]">
             <div className={`inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-4 w-fit ${phaseDetails.colorClass}`}>
               {phaseDetails.badge}
@@ -989,10 +984,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         </div>
 
         {/* Column 2: Calendar & Main Dashboard Cards */}
-        <div className={`col-span-12 ${isSidebarChatOpen ? 'lg:col-span-5' : 'lg:col-span-8'} flex flex-col gap-6`}>
+        <div className="flex flex-col gap-4">
           
           {/* Interactive Calendar widget */}
-          <div className="h-fit">
+          <div className={appTab === 'calendario' ? 'h-fit' : 'hidden'}>
             <CalendarView
               profile={profile}
               selectedDateStr={selectedDateStr}
@@ -1001,7 +996,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           </div>
 
           {/* Detailed Recommended Activity for Selected Day */}
-          <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-[#F0EDE8] flex flex-col gap-4">
+          <div className={`${appTab === 'inicio' ? 'flex' : 'hidden'} bg-white rounded-[32px] p-6 shadow-sm border border-[#F0EDE8] flex-col gap-4`}>
             <div className="flex items-center justify-between pb-3 border-b border-[#F0EDE8]">
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🏃‍♀️</span>
@@ -1050,10 +1045,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           </div>
 
           {/* Footer Grid cards: Productivity Suggestions & Wellness Log Panel */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 h-auto">
+          <div className={`grid grid-cols-1 gap-4 ${appTab === 'inicio' || appTab === 'registro' ? '' : 'hidden'}`}>
             
             {/* Productivity Suggested */}
-            <div className="bg-[#5A5A40] rounded-[32px] p-6 text-white flex flex-col justify-between shadow-xs">
+            <div className={`${appTab === 'inicio' ? 'flex' : 'hidden'} bg-[#5A5A40] rounded-[32px] p-6 text-white flex-col justify-between shadow-xs`}>
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-widest opacity-80 mb-4 flex items-center gap-1.5">
                   💼 Productividad Sugerida
@@ -1075,7 +1070,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </div>
 
             {/* Wellness Checkin summary panel */}
-            <div className="bg-[#F2EFE9] rounded-[32px] p-6 flex flex-col justify-between shadow-xs border border-[#E1DCD4]">
+            <div className={`${appTab === 'registro' ? 'flex' : 'hidden'} bg-[#F2EFE9] rounded-[32px] p-6 flex-col justify-between shadow-xs border border-[#E1DCD4]`}>
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-widest text-[#9A9A90] mb-4 flex items-center gap-1.5">
                   ❤️ Registro de Bienestar
@@ -1155,8 +1150,8 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         </div>
 
         {/* Column 3: Collapsible Chat Panel Sidebar */}
-        {isSidebarChatOpen && (
-          <div className="col-span-12 lg:col-span-3 h-full">
+        {appTab === 'chat' && (
+          <div className="min-h-[70vh]">
             <ChatPanel
               profile={{
                 ...profile,
@@ -1175,7 +1170,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         )}
 
         {/* Full Width Symptom and Habit Evolution Graph */}
-        <div className="col-span-12 mt-4">
+        <div className={appTab === 'calendario' ? 'mt-1' : 'hidden'}>
           <SymptomChart
             logs={logs}
             profile={profile}
@@ -1183,7 +1178,46 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           />
         </div>
 
+        {appTab === 'perfil' && (
+          <div className="bg-white rounded-[28px] p-5 border border-[#F0EDE8] flex flex-col gap-3">
+            <h2 className="font-serif text-2xl text-[#5A5A40]">Tu perfil</h2>
+            <p className="text-xs text-[#7A7A70]">{profile.email || 'Sesión de Cyclia'}</p>
+            <button type="button" onClick={() => setIsEditingHealth(true)} className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl py-3 text-sm font-semibold text-[#5A5A40] cursor-pointer">Editar salud</button>
+            <button type="button" onClick={handleReRegister} className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl py-3 text-sm font-semibold text-[#5A5A40] cursor-pointer">Nuevo check-in</button>
+            <button type="button" onClick={handleResetAppData} className="w-full bg-white border border-red-200 rounded-2xl py-3 text-sm font-semibold text-red-600 cursor-pointer">Restaurar datos</button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (confirm('¿Estás segura de que deseas cerrar sesión?')) await signOut();
+              }}
+              className="w-full bg-[#5A5A40] text-white rounded-2xl py-3 text-sm font-semibold cursor-pointer"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        )}
+
       </main>
+
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-[#EDE8E0] grid grid-cols-5 z-40">
+        {([
+          ['inicio', 'Inicio', '⌂'],
+          ['calendario', 'Calendario', '▦'],
+          ['registro', 'Registro', '♥'],
+          ['chat', 'Chat', '💬'],
+          ['perfil', 'Perfil', '☺'],
+        ] as const).map(([id, label, icon]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setAppTab(id)}
+            className={`py-2.5 flex flex-col items-center gap-0.5 text-[10px] font-semibold cursor-pointer ${appTab === id ? 'text-[#5A5A40]' : 'text-[#9A9A90]'}`}
+          >
+            <span className="text-base leading-none">{icon}</span>
+            {label}
+          </button>
+        ))}
+      </nav>
 
       {/* Daily Check-in Modal */}
       {isCheckinOpen && (
@@ -1276,6 +1310,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         />
       )}
 
+    </div>
     </div>
   );
 }

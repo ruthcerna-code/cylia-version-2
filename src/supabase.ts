@@ -10,7 +10,25 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-export type SessionUser = { id: string };
+export type SessionUser = { id: string; email?: string; hasGoogle: boolean; isAnonymous: boolean };
+
+export function toSessionUser(user: {
+  id: string;
+  email?: string | null;
+  is_anonymous?: boolean;
+  identities?: { provider?: string }[] | null;
+  app_metadata?: { provider?: string; providers?: string[] };
+}): SessionUser {
+  const providers = user.app_metadata?.providers || [];
+  const hasGoogle = providers.includes('google')
+    || (user.identities || []).some((identity) => identity.provider === 'google');
+  return {
+    id: user.id,
+    email: user.email || undefined,
+    hasGoogle,
+    isAnonymous: Boolean(user.is_anonymous),
+  };
+}
 
 type ProfileRow = {
   id: string;
@@ -72,6 +90,9 @@ export function authErrorMessage(error: { message?: string; code?: string }): st
   if (code === 'anonymous_provider_disabled' || message.includes('anonymous')) {
     return 'El acceso anónimo no está habilitado en Supabase. Actívalo en Authentication → Providers.';
   }
+  if (message.includes('google') || message.includes('unsupported provider')) {
+    return 'El acceso con Gmail no está habilitado en Supabase. Actívalo en Authentication → Sign In / Providers → Google.';
+  }
   if (code === 'email_provider_disabled' || message.includes('email signups are disabled') || message.includes('provider is not enabled')) {
     return 'El acceso con correo no está habilitado en Supabase.';
   }
@@ -88,6 +109,24 @@ export function authErrorMessage(error: { message?: string; code?: string }): st
     return 'El correo electrónico no es válido.';
   }
   return 'No se pudo iniciar sesión en Supabase.';
+}
+
+export async function connectGoogle(linkExisting = false) {
+  const client = requireClient();
+  const options = {
+    redirectTo: window.location.origin,
+    queryParams: { prompt: 'select_account' },
+  };
+  if (linkExisting) {
+    const linked = await client.auth.linkIdentity({ provider: 'google', options });
+    if (!linked.error) return;
+  }
+  const { error } = await client.auth.signInWithOAuth({ provider: 'google', options });
+  if (error) throw new Error(error.message || 'No se pudo abrir Gmail.');
+}
+
+export async function signInWithGoogle() {
+  await connectGoogle(false);
 }
 
 export async function signInAnonymously() {
