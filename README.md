@@ -4,14 +4,31 @@ Cyclia es una aplicación de bienestar femenino que conecta el ciclo menstrual c
 
 > Cyclia es educativa y de bienestar: no diagnostica ni receta, y no reemplaza a un profesional de salud.
 
+## Tecnologías
+
+- **Interfaz:** React 19, Vite 6 y Tailwind 4.
+- **Servidor:** Node.js y Express (`server.ts`). En local escucha en `http://localhost:3001`.
+- **Datos y acceso:** Supabase. Se entra con Gmail, o con correo y contraseña si el correo no es de Gmail.
+- **Chat:** Gemini, llamado desde el servidor con `GEMINI_API_KEY`.
+
+## Dónde está ahora
+
+La aplicación corre en el computador de desarrollo (`npm run dev`). El código publicado está en GitHub, rama `main`: https://github.com/ruthcerna-code/cylia-version-2
+
+`bitacoradigitalruth.es` no aloja Cyclia. Hoy muestra un sitio del creador de páginas de Hostinger.
+
+Para publicarla hace falta un alojamiento que ejecute Node.js (`npm run build` y `npm start`) y estas variables: `GEMINI_API_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y `APP_URL`. Un plan que solo sirva páginas HTML no alcanza. En Supabase hay que permitir la URL pública en las redirecciones de acceso.
+
 ## Contenido del repositorio
 
 | Ruta | Qué contiene |
 |------|--------------|
 | `src/` | Aplicación web (React + Vite + Tailwind) |
-| `server.ts` | Servidor Express: sirve la app en `http://localhost:3001` y conecta con la API de Gemini |
-| `supabase/` | Configuración de la base de datos (Supabase) |
+| `server.ts` | Servidor Express y conexión con Gemini |
+| `public/` | Fondo floral de la app |
+| `supabase/` | Esquema de la base de datos (Supabase) |
 | `design/` | Diseño visual de la app: pantallas HTML navegables, mapa de navegación y fuentes del diseño |
+| `package.json` | Dependencias y scripts (`dev`, `build`, `start`) |
 
 ## Ejecutar la aplicación
 
