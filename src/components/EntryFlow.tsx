@@ -132,7 +132,7 @@ export function EntryFlow({
       <main className="flex-1 overflow-y-auto px-5 pt-6 pb-8">
       <h1 className="font-serif text-4xl" style={{ color: 'var(--emeraude)' }}>Entra a Cyclia</h1>
       <p className="text-sm mt-2 mb-6" style={{ color: 'var(--emeraude-deep)' }}>
-        El canal abre con tu cuenta de Google o en modo anónimo.
+        Entra con Gmail. Si tu correo no es de Gmail, la contraseña también es una cuenta válida.
       </p>
       {!configured && (
         <p className="text-xs rounded-2xl p-3 mb-4" style={{ background: 'var(--menthe)', color: 'var(--emeraude)' }}>

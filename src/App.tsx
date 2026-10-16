@@ -23,6 +23,7 @@ import {
   saveMessage,
   saveProfile,
   signInAnonymously,
+  canSeeRegisteredData,
   signInWithEmail,
   connectGoogle,
   signInWithGoogle,
@@ -187,8 +188,13 @@ export default function App() {
       const sessionUser = data.session?.user;
       setUser(sessionUser ? toSessionUser(sessionUser) : null);
       if (!sessionUser) setIsLoadingAuth(false);
-      const oauthError = new URLSearchParams(window.location.search).get('error_description');
-      if (oauthError) setAuthPanelError(oauthError.replace(/\+/g, ' '));
+      const oauthError = new URLSearchParams(window.location.search).get('error_description')
+        || new URLSearchParams(window.location.search).get('error');
+      if (oauthError) {
+        const text = decodeURIComponent(oauthError.replace(/\+/g, ' '));
+        setAuthPanelError(text);
+        setGmailError(text);
+      }
     });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
@@ -755,8 +761,8 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       {gmailError && <p className="bg-[#F49A9E] px-5 py-2 text-xs text-[#1B1F5E]">{gmailError}</p>}
 
       {/* Main Content Area */}
-      <main className={`flex-1 w-full flex flex-col gap-4 ${!user.hasGoogle || (appTab === 'inicio' && !homeSheet) ? '' : 'px-4 py-4'}`}>
-        {!user.hasGoogle ? (
+      <main className={`flex-1 w-full flex flex-col gap-4 ${!canSeeRegisteredData(user) || (appTab === 'inicio' && !homeSheet) ? '' : 'px-4 py-4'}`}>
+        {!canSeeRegisteredData(user) ? (
           <DataPrivacyGate onConnect={() => { void handleConnectGoogle(); }} />
         ) : (<>
         {appTab === 'inicio' && homeSheet === 'fase' && (

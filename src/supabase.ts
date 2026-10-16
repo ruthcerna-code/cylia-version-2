@@ -10,7 +10,22 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-export type SessionUser = { id: string; email?: string; hasGoogle: boolean; isAnonymous: boolean };
+export type SessionUser = {
+  id: string;
+  email?: string;
+  hasGoogle: boolean;
+  hasEmailAccount: boolean;
+  isAnonymous: boolean;
+};
+
+export function isGmailAddress(email?: string | null): boolean {
+  const host = (email || '').trim().toLowerCase().split('@')[1] || '';
+  return host === 'gmail.com' || host === 'googlemail.com';
+}
+
+export function canSeeRegisteredData(user: SessionUser): boolean {
+  return user.hasGoogle || user.hasEmailAccount;
+}
 
 export function toSessionUser(user: {
   id: string;
@@ -20,12 +35,16 @@ export function toSessionUser(user: {
   app_metadata?: { provider?: string; providers?: string[] };
 }): SessionUser {
   const providers = user.app_metadata?.providers || [];
+  const identities = user.identities || [];
   const hasGoogle = providers.includes('google')
-    || (user.identities || []).some((identity) => identity.provider === 'google');
+    || identities.some((identity) => identity.provider === 'google');
+  const hasEmailIdentity = providers.includes('email')
+    || identities.some((identity) => identity.provider === 'email');
   return {
     id: user.id,
     email: user.email || undefined,
     hasGoogle,
+    hasEmailAccount: !user.is_anonymous && hasEmailIdentity && !isGmailAddress(user.email),
     isAnonymous: Boolean(user.is_anonymous),
   };
 }
@@ -116,13 +135,22 @@ export async function connectGoogle(linkExisting = false) {
   const options = {
     redirectTo: window.location.origin,
     queryParams: { prompt: 'select_account' },
+    skipBrowserRedirect: true,
   };
   if (linkExisting) {
     const linked = await client.auth.linkIdentity({ provider: 'google', options });
-    if (!linked.error) return;
+    if (!linked.error && linked.data?.url) {
+      window.location.assign(linked.data.url);
+      return;
+    }
+    await client.auth.signOut();
   }
-  const { error } = await client.auth.signInWithOAuth({ provider: 'google', options });
+  const { data, error } = await client.auth.signInWithOAuth({ provider: 'google', options });
   if (error) throw new Error(authErrorMessage(error));
+  if (!data?.url) {
+    throw new Error('No se pudo abrir Gmail. Revisa que Google esté activo en Supabase.');
+  }
+  window.location.assign(data.url);
 }
 
 export async function signInWithGoogle() {
@@ -135,13 +163,26 @@ export async function signInAnonymously() {
   if (error) throw new Error(authErrorMessage(error));
 }
 
+function assertPasswordAccount(email: string) {
+  if (isGmailAddress(email)) {
+    throw new Error('Este correo es una cuenta de Gmail. Entra con el botón de Gmail.');
+  }
+}
+
 export async function signInWithEmail(email: string, password: string) {
+  assertPasswordAccount(email);
   const client = requireClient();
-  const { error } = await client.auth.signInWithPassword({ email, password });
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw new Error(authErrorMessage(error));
+  const sessionUser = data.user ? toSessionUser(data.user) : null;
+  if (sessionUser?.hasGoogle && !sessionUser.hasEmailAccount) {
+    await client.auth.signOut();
+    throw new Error('Esta cuenta se creó con Gmail. Entra con el botón de Gmail.');
+  }
 }
 
 export async function signUpWithEmail(email: string, password: string) {
+  assertPasswordAccount(email);
   const client = requireClient();
   const { data, error } = await client.auth.signUp({ email, password });
   if (error) throw new Error(authErrorMessage(error));
