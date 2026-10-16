@@ -7,6 +7,7 @@ interface ChatPanelProps {
   chatHistory: ChatMessage[];
   onAddMessage: (msg: ChatMessage) => void;
   onClearHistory: () => void;
+  onOpenHistory?: () => void;
   previousInteractionId: string | null;
   environmentId: string | null;
   onUpdateAgentState: (interId?: string, envId?: string, steps?: any[]) => void;
@@ -52,7 +53,7 @@ function AgentTrace({ steps }: { steps: any[] }) {
           }
 
           return (
-            <div key={index} className="flex gap-2 items-start bg-white/80 p-2 rounded-xl border border-[#EDE8E0] shadow-2xs">
+            <div key={index} className="flex gap-2 items-start bg-white/80 p-2 rounded-xl border border-[#d7e6d4] shadow-2xs">
               <span>{icon}</span>
               <span className="font-medium">{label}</span>
             </div>
@@ -75,7 +76,7 @@ export default function ChatPanel({
   logs,
   chatHistory,
   onAddMessage,
-  onClearHistory,
+  onOpenHistory,
   previousInteractionId,
   environmentId,
   onUpdateAgentState,
@@ -244,8 +245,8 @@ export default function ChatPanel({
           }
 
           // Decide block card styles based on type
-          let cardBg = 'bg-[#FAF8F5] border-[#EDE8E0]';
-          let titleColor = 'text-[#5A5A40]';
+          let cardBg = 'bg-[#F5F6F8] border-[#d7e6d4]';
+          let titleColor = 'text-[#1E5631]';
           if (block.type === 'resumen') {
             cardBg = 'bg-rose-50/50 border-rose-100';
             titleColor = 'text-rose-700';
@@ -280,33 +281,28 @@ export default function ChatPanel({
   };
 
   return (
-    <div className="bg-white rounded-[32px] p-6 shadow-sm border border-[#F0EDE8] flex flex-col h-full min-h-[500px]">
-      
-      {/* Panel Header */}
-      <div className="flex justify-between items-center pb-4 border-b border-[#F0EDE8] mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#5A5A40] rounded-full flex items-center justify-center text-sm text-white shadow-xs">
-            🌸
-          </div>
-          <div>
-            <h4 className="font-serif font-semibold text-base text-[#5A5A40]">Conversación con Cyclia</h4>
-            <p className="text-[10px] uppercase tracking-widest text-[#9A9A90] font-bold">Asistente Inteligente</p>
-          </div>
+    <div className="-mx-4 -mt-4 flex min-h-[560px] flex-col">
+      <div className="flex items-center gap-3 bg-[#3A44C4] px-4 pb-4 pt-8 text-white">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F9C4C6] font-serif text-[22px] text-[#3A44C4]">C</div>
+        <div className="flex-1">
+          <h4 className="text-[19px] font-extrabold">Cyclia IA</h4>
+          <p className="text-[13px] text-[#DCE5FA]">Tu asistente de ciclo y bienestar</p>
         </div>
         
-        {chatHistory.length > 0 && (
+        {onOpenHistory && (
           <button
-            onClick={onClearHistory}
-            className="text-[10px] uppercase tracking-widest text-[#9A9A90] hover:text-red-600 font-bold cursor-pointer transition-colors"
-            title="Limpiar conversación"
+            type="button"
+            onClick={onOpenHistory}
+            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-lg font-extrabold text-[#1B1F5E]"
+            title="Historial de conversaciones"
           >
-            Limpiar Chat
+            ◷
           </button>
         )}
       </div>
 
       {/* Message History */}
-      <div className="flex-1 overflow-y-auto pr-1 space-y-4 mb-4 min-h-[260px] max-h-[460px]">
+      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4 min-h-[260px] max-h-[460px]">
         {chatHistory.length === 0 ? (
           <div className="text-center py-8 px-4 space-y-4">
             <p className="text-[#7A7A70] text-sm max-w-xs mx-auto leading-relaxed">
@@ -320,10 +316,9 @@ export default function ChatPanel({
                 <button
                   key={index}
                   onClick={() => handleSend(prompt.text)}
-                  className="bg-[#FAF8F5] hover:bg-[#F2EFE9] border border-[#EDE8E0] text-xs font-medium py-3 px-4 rounded-xl text-[#5A5A40] transition-colors text-left cursor-pointer flex justify-between items-center"
+                  className="min-h-10 cursor-pointer rounded-full bg-[#F6E27F] px-4 py-2 text-left text-[13px] font-bold text-[#1B1F5E]"
                 >
                   <span>{prompt.label}</span>
-                  <span className="opacity-40">→</span>
                 </button>
               ))}
             </div>
@@ -339,8 +334,8 @@ export default function ChatPanel({
                 <div
                   className={`max-w-[85%] rounded-[24px] p-4 text-sm shadow-2xs ${
                     isUser
-                      ? 'bg-[#5A5A40] text-white rounded-br-none'
-                      : 'bg-[#FAF8F5] border border-[#EDE8E0] text-[#3A3A35] rounded-bl-none'
+                      ? 'bg-[#3A44C4] text-white rounded-br-md'
+                      : 'bg-white text-[#1B1F5E] rounded-bl-md'
                   }`}
                 >
                   {isUser ? (
@@ -360,11 +355,11 @@ export default function ChatPanel({
         {/* Typing loading state */}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-[#FAF8F5] border border-[#EDE8E0] rounded-[24px] rounded-bl-none p-4 text-xs text-[#7A7A70] flex items-center gap-2">
+            <div className="bg-[#F5F6F8] border border-[#d7e6d4] rounded-[24px] rounded-bl-none p-4 text-xs text-[#7A7A70] flex items-center gap-2">
               <span className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-[#5A5A40] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                <span className="w-1.5 h-1.5 bg-[#5A5A40] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                <span className="w-1.5 h-1.5 bg-[#5A5A40] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                <span className="w-1.5 h-1.5 bg-[#1E5631] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                <span className="w-1.5 h-1.5 bg-[#1E5631] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                <span className="w-1.5 h-1.5 bg-[#1E5631] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
               </span>
               <span>Cyclia está pensando...</span>
             </div>
@@ -381,23 +376,24 @@ export default function ChatPanel({
       )}
 
       {/* Input box */}
-      <div className="mt-auto border-t border-[#F0EDE8] pt-4">
-        <div className="flex gap-2">
+      <div className="mt-auto px-4 pb-3 pt-2">
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend(input)}
-            placeholder="Pregúntale a Cyclia..."
+            placeholder="Pregúntale a Cyclia…"
             disabled={isLoading}
-            className="flex-1 bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#5A5A40] text-sm text-[#3A3A35]"
+            className="h-12 flex-1 rounded-full border-[1.5px] border-[#C9D3EF] bg-white px-4 text-[15px] text-[#1B1F5E] outline-none"
           />
           <button
             onClick={() => handleSend(input)}
             disabled={isLoading || !input.trim()}
-            className="bg-[#5A5A40] hover:bg-[#484833] disabled:opacity-50 text-white font-bold px-5 rounded-2xl text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center"
+            aria-label="Enviar"
+            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-lg font-extrabold text-[#1B1F5E] disabled:opacity-50"
           >
-            Enviar
+            →
           </button>
         </div>
       </div>

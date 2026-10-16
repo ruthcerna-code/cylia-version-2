@@ -64,8 +64,8 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
     labels: string[],
     colorScheme: 'sage' | 'amber' | 'coral'
   ) => {
-    let activeBorderColor = 'border-[#5A5A40] bg-[#FAF8F5] text-[#5A5A40]';
-    let hoverColor = 'hover:bg-[#FAF8F5]';
+    let activeBorderColor = 'border-[#F49A9E] bg-[#FFF6CF] text-[#1B1F5E]';
+    let hoverColor = 'hover:bg-[#F5F6F8]';
     
     if (colorScheme === 'amber') {
       activeBorderColor = 'border-[#D97706] bg-[#FFFBEB] text-[#D97706]';
@@ -84,7 +84,7 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
               key={optionVal}
               onClick={() => setVal(optionVal)}
               className={`py-4 px-5 rounded-2xl border text-sm font-semibold transition-all text-left cursor-pointer flex justify-between items-center ${
-                isActive ? activeBorderColor : `border-[#EDE8E0] bg-white text-[#3A3A35] ${hoverColor}`
+                isActive ? activeBorderColor : `border-[#d7e6d4] bg-white text-[#3A3A35] ${hoverColor}`
               }`}
             >
               <span>{label}</span>
@@ -110,103 +110,53 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
     }
   };
 
+  const fieldClass = 'w-full h-44 rounded-2xl border-2 border-[#C9D3EF] bg-[#F8F9FE] px-5 py-5 text-lg font-medium leading-relaxed text-[#1B1F5E] outline-none focus:ring-4 focus:ring-[#3A44C4]/15';
+
   return (
-    <div className="fixed inset-0 bg-[#3A3A35]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[32px] border border-[#EDE8E0] shadow-xl w-full max-w-lg p-6 md:p-8 flex flex-col max-h-[90vh]">
-        
-        {/* Modal Header */}
-        <div className="flex justify-between items-center pb-4 border-b border-[#EDE8E0] mb-6">
-          <div>
-            <h3 className="font-serif font-semibold text-lg text-[#5A5A40]">Registro Diario</h3>
-            <p className="text-xs text-[#9A9A90] font-medium">{formatFriendlyDate(dateStr)}</p>
+    <div className="fixed inset-0 z-50 flex justify-center bg-[#F5F6F8]">
+      <div className="channel-frame !min-h-0 flex h-dvh flex-col">
+        <header className="shrink-0 bg-[#F5F6F8]">
+          <div className="h-1.5 w-full bg-[#EFEFEF]">
+            <div className="h-full bg-[#F49A9E] transition-all duration-300" style={{ width: `${(step / 8) * 100}%` }} />
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full border border-[#EDE8E0] text-[#9A9A90] hover:text-[#5A5A40] flex items-center justify-center transition-colors cursor-pointer text-sm"
-          >
-            ✕
-          </button>
-        </div>
+          <div className="flex h-14 items-center justify-between px-5">
+            <button
+              type="button"
+              onClick={step === 1 ? onClose : handlePrev}
+              className="cursor-pointer text-sm font-semibold text-[#3A44C4]"
+            >
+              ← Atrás
+            </button>
+            <span className="text-xs font-semibold text-[#1B4D3E]">Paso {step} de 8 · {formatFriendlyDate(dateStr)}</span>
+          </div>
+        </header>
 
-        {/* Step Indicators */}
-        <div className="flex gap-1.5 mb-6">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-            <div
-              key={num}
-              className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                num <= step ? 'bg-[#5A5A40]' : 'bg-[#F0EDE8]'
-              }`}
-            ></div>
-          ))}
-        </div>
-
-        {/* Question Title */}
-        <h4 className="text-xl font-serif font-medium text-[#5A5A40] mb-6">
-          {getStepHeader()}
-        </h4>
-
-        {/* Question Input Areas */}
-        <div className="flex-1 overflow-y-auto pr-1 mb-8 min-h-[220px]">
+        <main className="flex-1 overflow-y-auto px-5 pb-4 pt-6">
+          <h2 className="mb-8 font-serif text-3xl leading-tight text-[#1B1F5E]">{getStepHeader()}</h2>
           {step === 1 && renderScaleButtons(sleepQuality, setSleepQuality, SCALE_LABELS.sleep, 'sage')}
           {step === 2 && renderScaleButtons(fatigue, setFatigue, SCALE_LABELS.fatigue, 'amber')}
           {step === 3 && renderScaleButtons(pain, setPain, SCALE_LABELS.pain, 'coral')}
           {step === 4 && renderScaleButtons(stress, setStress, SCALE_LABELS.stress, 'amber')}
           {step === 5 && renderScaleButtons(mood, setMood, SCALE_LABELS.mood, 'sage')}
-          
           {step === 6 && (
-            <textarea
-              autoFocus
-              value={sleepDetails}
-              onChange={(e) => setSleepDetails(e.target.value)}
-              placeholder="Ej. Me costó conciliar el sueño pero luego dormí profundo. Me siento renovada."
-              className="w-full h-40 bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl p-4 focus:outline-none focus:ring-2 focus:ring-[#5A5A40] text-sm font-medium leading-relaxed"
-            />
+            <textarea autoFocus value={sleepDetails} onChange={(e) => setSleepDetails(e.target.value)} placeholder="Ej. Me costó conciliar el sueño pero luego dormí profundo." className={fieldClass} />
           )}
-
           {step === 7 && (
-            <textarea
-              autoFocus
-              value={additionalNotes}
-              onChange={(e) => setAdditionalNotes(e.target.value)}
-              placeholder="Ej. Siento un poco de dolor lumbar pero mi energía mental está muy bien hoy. Lista para planificar la semana."
-              className="w-full h-40 bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl p-4 focus:outline-none focus:ring-2 focus:ring-[#5A5A40] text-sm font-medium leading-relaxed"
-            />
+            <textarea autoFocus value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} placeholder="Ej. Siento un poco de dolor lumbar, pero mi energía mental está bien." className={fieldClass} />
           )}
-
           {step === 8 && (
             <div className="space-y-4">
-              <p className="text-xs text-[#7A7A70]">Registra tus comportamientos y hábitos del día de hoy. Por ejemplo: si realizaste actividad física (caminata, yoga, HIIT), tus elecciones de alimentación, tiempo al aire libre, meditación, hidratación o si lograste seguir las recomendaciones de bienestar de Cyclia.</p>
-              <textarea
-                autoFocus
-                value={behavior}
-                onChange={(e) => setBehavior(e.target.value)}
-                placeholder="Ej. Seguí la recomendación de caminar 20 minutos por la tarde, me hidraté muy bien con 2 litros de agua, comí saludable y sin gluten, y evité pantallas antes de dormir."
-                className="w-full h-32 bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl p-4 focus:outline-none focus:ring-2 focus:ring-[#5A5A40] text-sm font-medium leading-relaxed"
-              />
+              <p className="text-sm text-[#1B4D3E]">Cuenta hábitos de hoy: movimiento, alimentación, agua o descanso.</p>
+              <textarea autoFocus value={behavior} onChange={(e) => setBehavior(e.target.value)} placeholder="Ej. Caminé 20 minutos y me hidraté bien." className={fieldClass} />
             </div>
           )}
-        </div>
+        </main>
 
-        {/* Action Buttons */}
-        <div className="flex justify-between gap-4 border-t border-[#EDE8E0] pt-4">
-          <button
-            onClick={handlePrev}
-            disabled={step === 1}
-            className={`px-6 py-3.5 rounded-full border border-[#EDE8E0] text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-              step === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[#FAF8F5] text-[#7A7A70]'
-            }`}
-          >
-            Atrás
-          </button>
-          
-          <button
-            onClick={handleNext}
-            className="flex-1 bg-[#5A5A40] hover:bg-[#484833] text-white font-semibold py-3.5 rounded-full shadow-sm transition-all text-sm tracking-wide cursor-pointer text-center"
-          >
+        <div className="shrink-0 bg-[#F5F6F8] px-5 pb-6 pt-3">
+          <button type="button" onClick={handleNext} className="btn-fucsia w-full cursor-pointer rounded-full py-4 text-base font-semibold">
             {step === 8 ? 'Guardar Registro' : 'Siguiente'}
           </button>
         </div>
-
       </div>
     </div>
   );

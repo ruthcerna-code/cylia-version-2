@@ -77,31 +77,31 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
 
   return (
     <div className="fixed inset-0 bg-[#3A3A35]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[32px] border border-[#EDE8E0] shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-[32px] border border-[#d7e6d4] shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}
-        <div className="flex justify-between items-center p-6 md:p-8 pb-4 border-b border-[#EDE8E0]">
+        <div className="flex justify-between items-center p-6 md:p-8 pb-4 border-b border-[#d7e6d4]">
           <div>
-            <h3 className="font-serif font-semibold text-xl text-[#5A5A40]">Ficha de Salud y Perfil</h3>
+            <h3 className="font-serif font-semibold text-xl text-[#1E5631]">Ficha de Salud y Perfil</h3>
             <p className="text-xs text-[#9A9A90] font-medium">Modifica los datos iniciales y tu estado de salud</p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full border border-[#EDE8E0] text-[#9A9A90] hover:text-[#5A5A40] flex items-center justify-center transition-colors cursor-pointer text-sm"
+            className="w-8 h-8 rounded-full border border-[#d7e6d4] text-[#9A9A90] hover:text-[#1E5631] flex items-center justify-center transition-colors cursor-pointer text-sm"
           >
             ✕
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-[#EDE8E0] px-4 md:px-8 bg-[#FAF8F5]">
+        <div className="flex border-b border-[#d7e6d4] px-4 md:px-8 bg-[#F5F6F8]">
           <button
             type="button"
             onClick={() => setActiveTab('personal')}
             className={`py-3 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
               activeTab === 'personal'
-                ? 'border-[#5A5A40] text-[#5A5A40]'
-                : 'border-transparent text-[#9A9A90] hover:text-[#5A5A40]'
+                ? 'border-[#1E5631] text-[#1E5631]'
+                : 'border-transparent text-[#9A9A90] hover:text-[#1E5631]'
             }`}
           >
             👤 Datos Personales
@@ -111,8 +111,8 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             onClick={() => setActiveTab('cycle')}
             className={`py-3 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
               activeTab === 'cycle'
-                ? 'border-[#5A5A40] text-[#5A5A40]'
-                : 'border-transparent text-[#9A9A90] hover:text-[#5A5A40]'
+                ? 'border-[#1E5631] text-[#1E5631]'
+                : 'border-transparent text-[#9A9A90] hover:text-[#1E5631]'
             }`}
           >
             🌸 Salud Femenina
@@ -122,8 +122,8 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             onClick={() => setActiveTab('conditions')}
             className={`py-3 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
               activeTab === 'conditions'
-                ? 'border-[#5A5A40] text-[#5A5A40]'
-                : 'border-transparent text-[#9A9A90] hover:text-[#5A5A40]'
+                ? 'border-[#1E5631] text-[#1E5631]'
+                : 'border-transparent text-[#9A9A90] hover:text-[#1E5631]'
             }`}
           >
             ⚠️ Salud General
@@ -144,12 +144,12 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             {activeTab === 'personal' && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Nombre Completo</label>
+                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Nombre Completo</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                    className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                     placeholder="Tu nombre"
                     required
                   />
@@ -157,24 +157,24 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Edad (años)</label>
+                    <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Edad (años)</label>
                     <input
                       type="number"
                       value={age}
                       onChange={(e) => setAge(Number(e.target.value))}
-                      className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                      className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                       min="10"
                       max="100"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Fecha de Nacimiento</label>
+                    <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Fecha de Nacimiento</label>
                     <input
                       type="date"
                       value={birthDate}
                       onChange={(e) => setBirthDate(e.target.value)}
-                      className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                      className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                       required
                     />
                   </div>
@@ -182,24 +182,24 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Peso (kg)</label>
+                    <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Peso (kg)</label>
                     <input
                       type="number"
                       value={weight}
                       onChange={(e) => setWeight(Number(e.target.value))}
-                      className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                      className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                       min="30"
                       max="200"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Estatura (cm)</label>
+                    <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Estatura (cm)</label>
                     <input
                       type="number"
                       value={height}
                       onChange={(e) => setHeight(Number(e.target.value))}
-                      className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                      className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                       min="100"
                       max="250"
                       required
@@ -208,12 +208,12 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Correo Electrónico</label>
+                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Correo Electrónico</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                    className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                     placeholder="ejemplo@correo.com"
                   />
                 </div>
@@ -224,37 +224,37 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             {activeTab === 'cycle' && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Última Fecha de Menstruación</label>
+                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Última Fecha de Menstruación</label>
                   <p className="text-[10px] text-[#9A9A90] mb-1">Indica el primer día de tu último período para recalcular tus fases.</p>
                   <input
                     type="date"
                     value={lastPeriodDate}
                     onChange={(e) => setLastPeriodDate(e.target.value)}
-                    className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                    className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                     required
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Duración Período (días)</label>
+                    <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Duración Período (días)</label>
                     <input
                       type="number"
                       value={periodLength}
                       onChange={(e) => setPeriodLength(Number(e.target.value))}
-                      className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                      className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                       min="2"
                       max="15"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Duración Ciclo (días)</label>
+                    <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Duración Ciclo (días)</label>
                     <input
                       type="number"
                       value={cycleLength}
                       onChange={(e) => setCycleLength(Number(e.target.value))}
-                      className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                      className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                       min="15"
                       max="45"
                       required
@@ -263,12 +263,12 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">Método Anticonceptivo</label>
+                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Método Anticonceptivo</label>
                   <input
                     type="text"
                     value={contraceptive}
                     onChange={(e) => setContraceptive(e.target.value)}
-                    className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                    className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
                     placeholder="Ej. Ninguno, Píldora oral, DIU, etc."
                     required
                   />
@@ -287,8 +287,8 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     onClick={() => setIsCeliac(!isCeliac)}
                     className={`py-3.5 px-5 rounded-2xl border text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                       isCeliac
-                        ? 'border-[#5A5A40] bg-[#FAF8F5] text-[#5A5A40] font-bold ring-2 ring-[#5A5A40]'
-                        : 'border-[#EDE8E0] bg-white text-[#3A3A35] hover:bg-[#FAF8F5]'
+                        ? 'border-[#1E5631] bg-[#F5F6F8] text-[#1E5631] font-bold ring-2 ring-[#1E5631]'
+                        : 'border-[#d7e6d4] bg-white text-[#3A3A35] hover:bg-[#F5F6F8]'
                     }`}
                   >
                     <span>🌾 Celiaquía / Sensibilidad al gluten</span>
@@ -300,8 +300,8 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     onClick={() => setHasDiabetes(!hasDiabetes)}
                     className={`py-3.5 px-5 rounded-2xl border text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                       hasDiabetes
-                        ? 'border-[#5A5A40] bg-[#FAF8F5] text-[#5A5A40] font-bold ring-2 ring-[#5A5A40]'
-                        : 'border-[#EDE8E0] bg-white text-[#3A3A35] hover:bg-[#FAF8F5]'
+                        ? 'border-[#1E5631] bg-[#F5F6F8] text-[#1E5631] font-bold ring-2 ring-[#1E5631]'
+                        : 'border-[#d7e6d4] bg-white text-[#3A3A35] hover:bg-[#F5F6F8]'
                     }`}
                   >
                     <span>🩸 Diabetes / Resistencia a la insulina</span>
@@ -313,8 +313,8 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     onClick={() => setHasObesity(!hasObesity)}
                     className={`py-3.5 px-5 rounded-2xl border text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                       hasObesity
-                        ? 'border-[#5A5A40] bg-[#FAF8F5] text-[#5A5A40] font-bold ring-2 ring-[#5A5A40]'
-                        : 'border-[#EDE8E0] bg-white text-[#3A3A35] hover:bg-[#FAF8F5]'
+                        ? 'border-[#1E5631] bg-[#F5F6F8] text-[#1E5631] font-bold ring-2 ring-[#1E5631]'
+                        : 'border-[#d7e6d4] bg-white text-[#3A3A35] hover:bg-[#F5F6F8]'
                     }`}
                   >
                     <span>⚖️ Obesidad</span>
@@ -326,8 +326,8 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     onClick={() => setHasDepression(!hasDepression)}
                     className={`py-3.5 px-5 rounded-2xl border text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                       hasDepression
-                        ? 'border-[#5A5A40] bg-[#FAF8F5] text-[#5A5A40] font-bold ring-2 ring-[#5A5A40]'
-                        : 'border-[#EDE8E0] bg-white text-[#3A3A35] hover:bg-[#FAF8F5]'
+                        ? 'border-[#1E5631] bg-[#F5F6F8] text-[#1E5631] font-bold ring-2 ring-[#1E5631]'
+                        : 'border-[#d7e6d4] bg-white text-[#3A3A35] hover:bg-[#F5F6F8]'
                     }`}
                   >
                     <span>🧠 Depresión / Ansiedad persistente</span>
@@ -340,17 +340,17 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
           </div>
 
           {/* Form Footer */}
-          <div className="p-6 md:p-8 border-t border-[#EDE8E0] flex justify-between gap-4 bg-[#FAF8F5]">
+          <div className="p-6 md:p-8 border-t border-[#d7e6d4] flex justify-between gap-4 bg-[#F5F6F8]">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 rounded-full border border-[#EDE8E0] text-xs font-bold uppercase tracking-wider text-[#7A7A70] hover:bg-white transition-all cursor-pointer"
+              className="px-6 py-3 rounded-full border border-[#d7e6d4] text-xs font-bold uppercase tracking-wider text-[#7A7A70] hover:bg-white transition-all cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 bg-[#5A5A40] hover:bg-[#484833] text-white font-semibold py-3 rounded-full shadow-sm transition-all text-xs uppercase tracking-wide cursor-pointer text-center"
+              className="flex-1 bg-[#1E5631] hover:bg-[#1B4D3E] text-white font-semibold py-3 rounded-full shadow-sm transition-all text-xs uppercase tracking-wide cursor-pointer text-center"
             >
               Guardar Cambios
             </button>

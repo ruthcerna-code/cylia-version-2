@@ -80,13 +80,13 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate }:
     // Decide phase-based color classes matching the "Natural Tones" layout specification
     let bgClass = "bg-gray-100 text-gray-500";
     if (phase === 'Menstrual') {
-      bgClass = "bg-[#FCA5A5] text-white hover:bg-[#f88f8f]";
+      bgClass = "bg-[#F49A9E] text-[#1B1F5E] hover:bg-[#E57F86]";
     } else if (phase === 'Folicular') {
-      bgClass = "bg-[#86EFAC] text-[#1e3a1e] hover:bg-[#72e59a]";
+      bgClass = "bg-[#A9C4F0] text-[#1B1F5E] hover:bg-[#96b4ea]";
     } else if (phase === 'Ovulacion') {
-      bgClass = "bg-[#93C5FD] text-[#1e293b] hover:bg-[#7ebdff]";
+      bgClass = "bg-[#F6E27F] text-[#1B1F5E] hover:bg-[#E8D46A]";
     } else if (phase === 'Lutea') {
-      bgClass = "bg-[#FDE047] text-[#451a03] hover:bg-[#fbda1c]";
+      bgClass = "bg-[#3A44C4] text-white hover:bg-[#2E37B0]";
     }
 
     gridCells.push(
@@ -95,49 +95,47 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate }:
         id={`calendar-day-${d}`}
         onClick={() => onSelectDate(dateStr)}
         className={`aspect-square flex flex-col items-center justify-center rounded-2xl font-semibold text-sm transition-all relative cursor-pointer ${bgClass} ${
-          isSelected ? 'ring-4 ring-[#5A5A40] scale-105 z-10 font-bold shadow-md' : ''
+          isSelected ? 'ring-4 ring-[#1B1F5E] scale-105 z-10 font-bold shadow-md' : ''
         } ${
-          isToday ? 'border-2 border-dashed border-[#5A5A40]' : ''
+          isToday ? 'border-2 border-dashed border-[#1B1F5E]' : ''
         }`}
         title={`Día ${d}: Día ${cycleDay} del ciclo (${phase})`}
       >
         <span>{d}</span>
         {isToday && (
-          <span className="absolute bottom-1 w-1.5 h-1.5 bg-[#5A5A40] rounded-full"></span>
+          <span className="absolute bottom-1 w-1.5 h-1.5 bg-[#1B1F5E] rounded-full"></span>
         )}
       </button>
     );
   }
 
   return (
-    <div className="bg-white rounded-[32px] p-6 shadow-sm border border-[#F0EDE8] flex flex-col h-full">
+    <div className="flex h-full flex-col rounded-3xl bg-white px-3 py-4">
       {/* Month Selector & Navigation */}
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-serif font-medium text-[#5A5A40]">
+      <div className="mb-4 flex items-center justify-between">
+        <button
+          onClick={prevMonth}
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-lg font-extrabold text-[#1B1F5E]"
+          title="Mes Anterior"
+        >
+          ‹
+        </button>
+        <h3 className="text-lg font-extrabold text-[#1B1F5E]">
           {MONTH_NAMES[currentMonth]} {currentYear}
         </h3>
-        <div className="flex gap-2">
-          <button
-            onClick={prevMonth}
-            className="w-8 h-8 rounded-full border border-[#EDE8E0] hover:bg-[#FAF8F5] flex items-center justify-center text-[#5A5A40] transition-colors cursor-pointer"
-            title="Mes Anterior"
-          >
-            ‹
-          </button>
-          <button
-            onClick={nextMonth}
-            className="w-8 h-8 rounded-full border border-[#EDE8E0] hover:bg-[#FAF8F5] flex items-center justify-center text-[#5A5A40] transition-colors cursor-pointer"
-            title="Mes Siguiente"
-          >
-            ›
-          </button>
-        </div>
+        <button
+          onClick={nextMonth}
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-lg font-extrabold text-[#1B1F5E]"
+          title="Mes Siguiente"
+        >
+          ›
+        </button>
       </div>
 
       {/* Weekday Labels */}
       <div className="grid grid-cols-7 gap-2 text-center mb-3">
-        {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((dayLabel, idx) => (
-          <div key={idx} className="text-[#9A9A90] text-[11px] font-bold uppercase tracking-wider py-1">
+        {["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"].map((dayLabel, idx) => (
+          <div key={idx} className="py-1 text-xs font-extrabold text-[#4A4F7A]">
             {dayLabel}
           </div>
         ))}
@@ -149,21 +147,21 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate }:
       </div>
 
       {/* Color Legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-[#F0EDE8] justify-center sm:justify-start">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-[#EFEFEF] justify-center sm:justify-start">
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#FCA5A5] inline-block shadow-sm"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#F49A9E] inline-block shadow-sm"></span>
           <span>Menstrual</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#86EFAC] inline-block shadow-sm"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#A9C4F0] inline-block shadow-sm"></span>
           <span>Folicular</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#93C5FD] inline-block shadow-sm"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#F6E27F] inline-block shadow-sm"></span>
           <span>Ovulación</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#FDE047] inline-block shadow-sm"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#3A44C4] inline-block shadow-sm"></span>
           <span>Lútea</span>
         </div>
       </div>

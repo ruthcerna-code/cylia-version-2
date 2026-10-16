@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, DailyLog, ChatMessage, MenstrualPhase } from './types';
 import Onboarding from './components/Onboarding';
+import { EntryFlow, MoodGrid, ObjectivesScreen, RegionScreen } from './components/EntryFlow';
+import DesignHome from './components/DesignHome';
+import DesignRegister from './components/DesignRegister';
+import { ActivityScreen, CycleDataScreen, DataPrivacyGate, GoalsScreen, PhaseScreen, PrivacyScreen } from './components/DesignScreens';
 import CalendarView from './components/CalendarView';
 import DailyCheckin from './components/DailyCheckin';
 import ChatPanel from './components/ChatPanel';
@@ -108,7 +112,17 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
-  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'perfil'>('inicio');
+  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil'>('inicio');
+  const [homeSheet, setHomeSheet] = useState<null | 'fase' | 'actividad'>(null);
+  const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion'>(null);
+  const [profileSheet, setProfileSheet] = useState<null | 'ciclo' | 'objetivos' | 'privacidad'>(null);
+  const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
+  const [region, setRegion] = useState<string | null>(() => localStorage.getItem('cyclia_region'));
+  const [objectivesDone, setObjectivesDone] = useState(() => localStorage.getItem('cyclia_objectives_done') === '1');
+  const [savedGoals, setSavedGoals] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('cyclia_objectives') || '[]'); } catch { return []; }
+  });
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('cyclia_theme') === 'dark');
   const [isEditingHealth, setIsEditingHealth] = useState(false);
 
   // AntiGravity Agent states
@@ -132,7 +146,6 @@ export default function App() {
   };
 
   // Authentication Panel States
-  const [activeLoginTab, setActiveLoginTab] = useState<'guest' | 'email'>('guest');
   const [gmailError, setGmailError] = useState('');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -142,6 +155,11 @@ export default function App() {
 
   const guestMigrationStarted = useRef(false);
   const chatMigrationStarted = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+    localStorage.setItem('cyclia_theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   const handleConnectGoogle = async () => {
     setGmailError('');
@@ -285,7 +303,7 @@ export default function App() {
   };
 
   // Sync logs to Supabase
-  const handleSaveLog = async (log: DailyLog) => {
+  const handleSaveLog = async (log: DailyLog, options?: { analyze?: boolean }) => {
     if (!user) return;
 
     const logWithClearedAnalysis = withoutAnalysis(log);
@@ -308,10 +326,12 @@ export default function App() {
       return;
     }
     
-    // Show a quick toast notification
-    setNotificationMsg("¡Registro guardado! Generando nuevo análisis...");
+    const analyze = options?.analyze !== false;
+    setNotificationMsg(analyze ? "¡Registro guardado! Generando nuevo análisis..." : "Registro guardado.");
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 4000);
+
+    if (!analyze) return;
 
     // Trigger AI analysis with the cleared log
     triggerAiAnalysis(logWithClearedAnalysis, updatedLogs);
@@ -600,12 +620,11 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
     }
   };
 
-  if (isLoadingAuth) {
+  if (isLoadingAuth && !user) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center animate-pulse">
-        <span className="text-4xl">🌸</span>
-        <h2 className="text-xl font-serif font-semibold text-[#5A5A40] mt-4">Iniciando Cyclia...</h2>
-        <p className="text-xs text-[#9A9A90] mt-1">Conectando de forma segura con Supabase</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#2E37B0] p-6 text-center text-white">
+        <h2 className="font-serif text-4xl font-light tracking-[0.16em] text-[#F9C4C6]">CYCLIA</h2>
+        <p className="mt-3 text-sm text-[#D2DDF8]">Preparando tu espacio</p>
       </div>
     );
   }
@@ -655,156 +674,52 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
     };
 
     return (
-      <div className="min-h-screen bg-[#E7E2D8] flex justify-center">
-      <div className="w-full max-w-[430px] min-h-screen bg-[#FAF8F5] flex flex-col px-5 py-8 shadow-2xl">
-        <p className="text-[10px] uppercase tracking-[0.22em] text-[#9A9A90] font-bold">Canal digital</p>
-        <div className="bg-white rounded-[32px] p-8 shadow-sm border border-[#F0EDE8] w-full flex flex-col items-center gap-6 animate-fade-in mt-6">
-          <div className="w-16 h-16 bg-[#5A5A40] rounded-full flex items-center justify-center text-3xl shadow-xs">
-            🌸
-          </div>
-          <div>
-            <h1 className="text-3xl font-serif font-semibold tracking-tight text-[#5A5A40]">Cyclia</h1>
-            <p className="text-xs uppercase tracking-widest text-[#9A9A90] font-bold mt-1">Bienestar Femenino Inteligente</p>
-          </div>
-          <p className="text-xs text-[#7A7A70] leading-relaxed max-w-sm">
-            Bienvenida a Cyclia. Elige un método para acceder a tu diario de bienestar, calendario y análisis personalizados en la nube.
-          </p>
-          {!isSupabaseConfigured && (
-            <div className="w-full bg-amber-50 text-amber-800 p-3.5 rounded-2xl text-[11px] font-medium leading-relaxed border border-amber-100 text-left">
-              Faltan VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en el archivo .env. Sin esas claves Cyclia no puede entrar a Supabase.
-            </div>
-          )}
+      <EntryFlow
+        configured={isSupabaseConfigured}
+        processing={isAuthProcessing}
+        error={authPanelError}
+        email={loginEmail}
+        password={loginPassword}
+        signUp={isSignUpMode}
+        onEmailChange={setLoginEmail}
+        onPasswordChange={setLoginPassword}
+        onToggleSignUp={() => { setIsSignUpMode(!isSignUpMode); setAuthPanelError(''); }}
+        onGoogle={handleGoogleAuth}
+        onAnonymous={handleGuestAuth}
+        onEmailSubmit={handleEmailAuth}
+      />
+    );
+  }
 
-          <button
-            type="button"
-            disabled={isAuthProcessing || !isSupabaseConfigured}
-            onClick={handleGoogleAuth}
-            className="w-full bg-white hover:bg-[#FAF8F5] disabled:opacity-50 text-[#3A3A35] font-semibold py-3.5 px-6 rounded-full text-xs border border-[#E4DFD6] transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-xs"
-          >
-            {isAuthProcessing ? (
-              <div className="w-4 h-4 border-2 border-[#5A5A40] border-t-transparent rounded-full animate-spin" />
-            ) : 'Entrar con Gmail'}
-          </button>
-          <p className="text-[10px] uppercase tracking-widest text-[#9A9A90] font-bold">o</p>
+  if (!region) {
+    return (
+      <RegionScreen onSelect={(nextRegion) => {
+        localStorage.setItem('cyclia_region', nextRegion);
+        setRegion(nextRegion);
+      }} />
+    );
+  }
 
-          {/* Tab Selection */}
-          <div className="w-full flex bg-[#FAF8F5] rounded-full p-1 border border-[#F0EDE8]">
-            <button
-              type="button"
-              onClick={() => { setActiveLoginTab('guest'); setAuthPanelError(''); }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all cursor-pointer ${activeLoginTab === 'guest' ? 'bg-[#5A5A40] text-white shadow-xs' : 'text-[#7A7A70] hover:text-[#5A5A40]'}`}
-            >
-              Invitado / Demo
-            </button>
-            <button
-              type="button"
-              onClick={() => { setActiveLoginTab('email'); setAuthPanelError(''); }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all cursor-pointer ${activeLoginTab === 'email' ? 'bg-[#5A5A40] text-white shadow-xs' : 'text-[#7A7A70] hover:text-[#5A5A40]'}`}
-            >
-              Correo
-            </button>
-          </div>
-
-          {/* Error Message */}
-          {authPanelError && (
-            <div className="w-full bg-red-50 text-red-600 p-3.5 rounded-2xl text-[11px] font-medium leading-relaxed border border-red-100 text-left">
-              ⚠️ {authPanelError}
-            </div>
-          )}
-
-          {/* Active Tab View */}
-          <div className="w-full">
-            {activeLoginTab === 'guest' && (
-              <div className="flex flex-col gap-4 animate-fade-in">
-                <p className="text-xs text-[#7A7A70] leading-relaxed text-left">
-                  Entras sin registrarte. Cyclia abre una sesión anónima y guarda tu perfil, registros y chat en Supabase.
-                </p>
-                <button
-                  type="button"
-                  disabled={isAuthProcessing || !isSupabaseConfigured}
-                  onClick={handleGuestAuth}
-                  className="w-full bg-[#5A5A40] hover:bg-[#484833] disabled:opacity-50 text-white font-semibold py-3.5 px-6 rounded-full text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-xs"
-                >
-                  {isAuthProcessing ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : "Entrar sin cuenta"}
-                </button>
-              </div>
-            )}
-
-            {activeLoginTab === 'email' && (
-              <form onSubmit={handleEmailAuth} className="flex flex-col gap-3 text-left animate-fade-in">
-                <div>
-                  <label className="block text-[10px] font-semibold text-[#7A7A70] uppercase tracking-wider mb-1">Correo Electrónico</label>
-                  <input
-                    type="email"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="ejemplo@correo.com"
-                    className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-xl px-4 py-2.5 text-xs text-[#3A3A35] focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-semibold text-[#7A7A70] uppercase tracking-wider mb-1">Contraseña</label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••"
-                    className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-xl px-4 py-2.5 text-xs text-[#3A3A35] focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40]"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isAuthProcessing || !isSupabaseConfigured}
-                  className="w-full mt-2 bg-[#5A5A40] hover:bg-[#484833] disabled:opacity-50 text-white font-semibold py-3.5 px-6 rounded-full text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-xs"
-                >
-                  {isAuthProcessing ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : isSignUpMode ? "Crear Cuenta" : "Iniciar Sesión"}
-                </button>
-
-                <div className="text-center mt-2">
-                  <button
-                    type="button"
-                    onClick={() => { setIsSignUpMode(!isSignUpMode); setAuthPanelError(''); }}
-                    className="text-xs text-[#5A5A40] hover:underline font-semibold cursor-pointer"
-                  >
-                    {isSignUpMode ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Regístrate aquí"}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-
-          <div className="text-[10px] text-[#9A9A90] font-medium leading-relaxed max-w-[280px]">
-            Conectado de manera segura con Supabase Authentication y Postgres
-          </div>
-        </div>
-      </div>
-      </div>
+  if (!objectivesDone) {
+    return (
+      <ObjectivesScreen onSave={(goals) => {
+        localStorage.setItem('cyclia_objectives', JSON.stringify(goals));
+        localStorage.setItem('cyclia_objectives_done', '1');
+        setSavedGoals(goals);
+        setObjectivesDone(true);
+      }} />
     );
   }
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-[#E7E2D8] flex justify-center">
-        <div className="w-full max-w-[430px] min-h-screen bg-[#FAF8F5] px-4 py-8 shadow-2xl flex flex-col gap-4">
-          {!user.hasGoogle && (
-            <div className="bg-white rounded-[24px] p-4 border border-[#E4DFD6] flex flex-col sm:flex-row sm:items-center gap-3">
-              <p className="text-xs text-[#5A5A40] text-left flex-1">Conecta Gmail para entrar con tu cuenta. Google te pedirá elegir el correo.</p>
-              <button type="button" onClick={handleConnectGoogle} className="bg-[#5A5A40] text-white text-xs font-semibold px-5 py-3 rounded-full cursor-pointer">Conectar Gmail</button>
-            </div>
-          )}
-          {gmailError && <p className="text-xs text-red-600 text-left">{gmailError}</p>}
-          <Onboarding onComplete={handleSaveProfile} accountEmail={user.email} />
-        </div>
-      </div>
+      <Onboarding
+        onComplete={handleSaveProfile}
+        accountEmail={user.email}
+        gmailConnected={user.hasGoogle}
+        gmailError={gmailError}
+        onConnectGoogle={handleConnectGoogle}
+      />
     );
   }
 
@@ -827,41 +742,136 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
   );
 
   return (
-    <div className="min-h-screen bg-[#E7E2D8] text-[#3A3A35] font-sans flex justify-center">
-    <div className="w-full max-w-[430px] min-h-screen bg-[#FAF8F5] relative flex flex-col shadow-2xl pb-24">
+    <div className="min-h-dvh text-[#1B1F5E] font-sans flex justify-center bg-transparent">
+    <div className="w-full max-w-[480px] min-h-dvh relative flex flex-col pb-24 bg-transparent">
       
       {/* Toast Notification */}
       {showNotification && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-[#5A5A40] text-white py-3 px-6 rounded-full shadow-lg border border-white/15 text-xs font-semibold tracking-wider uppercase z-50 flex items-center gap-2 animate-fade-in">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-[#1E5631] text-white py-3 px-6 rounded-full shadow-lg border border-white/15 text-xs font-semibold tracking-wider uppercase z-50 flex items-center gap-2 animate-fade-in">
           🌸 {notificationMsg}
         </div>
       )}
 
-      <header id="header-nav" className="sticky top-0 z-30 bg-[#5A5A40] text-white px-5 pt-6 pb-5">
-        <p className="text-[10px] uppercase tracking-[0.22em] text-white/70 font-bold">Canal digital</p>
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <div>
-            <h1 className="font-serif text-[1.7rem] leading-none">Hola, {profile.name}</h1>
-            <p className="text-xs text-white/80 mt-1">{formatFriendlyDate(selectedDateStr)}</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center text-2xl">🌸</div>
-        </div>
-      </header>
-
-      {!user.hasGoogle && (
-        <div className="bg-white text-[#5A5A40] px-4 py-3 flex items-center gap-3 border-b border-[#EDE8E0]">
-          <p className="text-xs flex-1">Esta sesión no tiene Gmail. Conéctalo para que Google te pida tu cuenta.</p>
-          <button type="button" onClick={handleConnectGoogle} className="bg-white text-[#5A5A40] text-xs font-semibold px-4 py-2 rounded-full cursor-pointer">Conectar Gmail</button>
-        </div>
-      )}
-      {gmailError && <p className="bg-red-50 text-red-600 text-xs px-6 md:px-10 py-2">{gmailError}</p>}
+      {gmailError && <p className="bg-[#F49A9E] px-5 py-2 text-xs text-[#1B1F5E]">{gmailError}</p>}
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full px-4 py-4 flex flex-col gap-4">
+      <main className={`flex-1 w-full flex flex-col gap-4 ${!user.hasGoogle || (appTab === 'inicio' && !homeSheet) ? '' : 'px-4 py-4'}`}>
+        {!user.hasGoogle ? (
+          <DataPrivacyGate onConnect={() => { void handleConnectGoogle(); }} />
+        ) : (<>
+        {appTab === 'inicio' && homeSheet === 'fase' && (
+          <PhaseScreen current={selectedPhase} onBack={() => setHomeSheet(null)} />
+        )}
+        {appTab === 'inicio' && homeSheet === 'actividad' && (
+          <ActivityScreen
+            phaseName={selectedActivity.phaseName}
+            title={selectedActivity.title}
+            why={selectedActivity.why}
+            steps={phaseDetails.tips}
+            notes={selectedActivity.illnessNotes}
+            onBack={() => setHomeSheet(null)}
+            onAsk={() => { setHomeSheet(null); setAppTab('chat'); }}
+          />
+        )}
+        {appTab === 'inicio' && !homeSheet && (
+          <DesignHome
+            name={profile.name}
+            dateLabel={formatFriendlyDate(selectedDateStr)}
+            todayStr={selectedDateStr}
+            cycleDay={selectedCycleDay}
+            cycleLength={profile.cycleLength}
+            periodLength={profile.periodLength}
+            lastPeriodDate={profile.lastPeriodDate}
+            phase={selectedPhase}
+            activityTitle={selectedActivity.title}
+            onOpenPhase={() => setHomeSheet('fase')}
+            onRegister={() => setAppTab('registro')}
+            onChat={() => { setHomeSheet(null); setAppTab('chat'); }}
+            onMood={() => { setHomeSheet(null); setAppTab('humor'); }}
+            onActivity={() => setHomeSheet('actividad')}
+            onCalendar={() => { setHomeSheet(null); setAppTab('calendario'); }}
+          />
+        )}
+        {false && appTab === 'inicio' && (
+          <article className="rounded-[32px] border border-[#d7e6d4] bg-white px-7 py-10 text-center shadow-[0_12px_40px_rgba(30,86,49,0.08)]">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full text-4xl" style={{ background: 'var(--menthe)' }}>🌸</div>
+            <h2 className="font-serif text-4xl leading-tight text-[#1E5631]">Bienvenida a Cyclia</h2>
+            <p className="mt-4 text-[15px] leading-relaxed text-[#1B4D3E]">
+              Hola, {profile.name}. Tu canal de bienestar está listo para el registro de hoy.
+            </p>
+            <div className="mt-6 rounded-2xl px-4 py-4 text-left text-sm leading-relaxed text-[#1E5631]" style={{ background: 'var(--menthe)' }}>
+              <strong>Privacidad absoluta.</strong> Tus datos se almacenan de forma privada y solo se usan para personalizar tu bienestar.
+            </div>
+            <button type="button" onClick={() => setIsCheckinOpen(true)} className="btn-emeraude mt-8 w-full cursor-pointer rounded-full py-4 text-base font-semibold">
+              Comenzar registro
+            </button>
+          </article>
+        )}
+        {false && (
+          <div className="rounded-[28px] p-5 text-white" style={{ background: 'var(--emeraude)' }}>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-white/70">Progreso diario</p>
+            <div className="mt-2 flex items-end justify-between">
+              <h2 className="font-serif text-4xl">🔥 {Object.keys(logs).length}</h2>
+              <p className="text-xs text-white/80 text-right">registros<br />en tu historial</p>
+            </div>
+            <p className="text-sm mt-3 text-white/90">Hoy tu foco es {savedGoals.length ? savedGoals.join(', ') : 'bienestar'}.</p>
+          </div>
+        )}
+        {false && (
+          <div className="rounded-[28px] p-5" style={{ background: 'var(--menthe)' }}>
+            <h3 className="font-semibold" style={{ color: 'var(--emeraude)' }}>Hábitos de hoy</h3>
+            <ul className="mt-3 space-y-2">
+              {phaseDetails.tips.slice(0, 3).map((tip) => (
+                <li key={tip} className="flex items-start gap-2 text-sm" style={{ color: 'var(--emeraude-deep)' }}>
+                  <span>{activeLog ? '✓' : '○'}</span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setAppTab('registro')} className="btn-fucsia mt-4 w-full rounded-full py-3 text-sm font-semibold cursor-pointer">
+              {activeLog ? 'Ver registro' : 'Registrar hoy'}
+            </button>
+          </div>
+        )}
+        {appTab === 'registro' && (
+          <DesignRegister
+            dateStr={selectedDateStr}
+            dateLabel={formatFriendlyDate(selectedDateStr)}
+            phaseLabel={phaseDetails.name}
+            cycleDay={selectedCycleDay}
+            existing={activeLog}
+            onSave={(log) => { void handleSaveLog(log, { analyze: false }); }}
+            onSaveAndAnalyze={(log) => { void handleSaveLog(log); }}
+          />
+        )}
+        {appTab === 'humor' && (
+          <MoodGrid
+            current={activeLog?.mood}
+            onBack={() => setAppTab('inicio')}
+            onFull={() => setAppTab('registro')}
+            onSave={(mood, tags) => {
+              const previous = (activeLog?.additionalNotes || '').replace(/\n?Influye:.*$/s, '').trim();
+              const tagLine = tags.length ? `Influye: ${tags.join(', ')}` : '';
+              handleSaveLog({
+                date: selectedDateStr,
+                sleepQuality: activeLog?.sleepQuality || 3,
+                fatigue: activeLog?.fatigue || 3,
+                pain: activeLog?.pain || 1,
+                stress: activeLog?.stress || 3,
+                mood,
+                sleepDetails: activeLog?.sleepDetails || '',
+                additionalNotes: [previous, tagLine].filter(Boolean).join('\n'),
+                behavior: activeLog?.behavior || '',
+                aiAnalysis: activeLog?.aiAnalysis,
+              }, { analyze: false });
+              setAppTab('inicio');
+            }}
+          />
+        )}
         
         {/* Active Health Profile Badges */}
         {(profile.isCeliac || profile.hasDiabetes || profile.hasObesity || profile.hasDepression) && (
-          <div className={`${appTab === 'perfil' ? 'flex' : 'hidden'} bg-white rounded-[24px] p-4 border border-[#EDE8E0] flex-wrap items-center gap-2 text-xs shadow-2xs`}>
+          <div className={`${appTab === 'perfil' ? 'flex' : 'hidden'} bg-white rounded-[24px] p-4 border border-[#d7e6d4] flex-wrap items-center gap-2 text-xs shadow-2xs`}>
             <span className="font-bold text-[#7A7A70] uppercase tracking-wider text-[10px]">Perfil de Salud Activo:</span>
             {profile.isCeliac && (
               <span className="bg-rose-50 border border-rose-100 text-rose-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">🌾 Celíaca</span>
@@ -880,7 +890,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         
         {/* Alert Banner Detection */}
         {checkAlerts() && (
-          <div className={`${appTab === 'inicio' ? 'flex' : 'hidden'} bg-amber-50 border border-amber-200 p-4 rounded-2xl gap-3 text-amber-900 text-sm leading-relaxed`}>
+          <div className="hidden bg-amber-50 border border-amber-200 p-4 rounded-2xl gap-3 text-amber-900 text-sm leading-relaxed">
             <span>💡</span>
             <div>
               <strong>Aviso de Bienestar:</strong> He observado que durante varios días consecutivos has registrado indicadores de bienestar elevados (fatiga, dolor, estrés o descanso pobre). Si estos síntomas persisten o afectan tu calidad de vida, considera consultar con un profesional de la salud.
@@ -889,8 +899,8 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         )}
 
         {/* Column 1: Current Phase Details */}
-        <div className={`${appTab === 'inicio' ? 'flex' : 'hidden'} flex-col gap-4`}>
-          <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-[#F0EDE8] flex flex-col flex-1 min-h-[480px]">
+        <div className="hidden flex-col gap-4">
+          <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-[#EFEFEF] flex flex-col flex-1 min-h-[480px]">
             <div className={`inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-4 w-fit ${phaseDetails.colorClass}`}>
               {phaseDetails.badge}
             </div>
@@ -903,9 +913,9 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </p>
 
             {/* Microhormonal details */}
-            <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-[#EDE8E0] mb-6">
+            <div className="bg-[#F5F6F8] p-4 rounded-2xl border border-[#d7e6d4] mb-6">
               <p className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest mb-1">Estado Hormonal</p>
-              <p className="text-xs font-medium text-[#5A5A40]">{phaseDetails.hormones}</p>
+              <p className="text-xs font-medium text-[#1E5631]">{phaseDetails.hormones}</p>
             </div>
 
             {/* Cognitive & Physical Stats Progress Bars */}
@@ -914,11 +924,11 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <div>
                 <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-[#9A9A90] mb-1.5">
                   <span>Concentración</span>
-                  <span className="text-[#5A5A40]">{phaseDetails.stats.concentration}%</span>
+                  <span className="text-[#1E5631]">{phaseDetails.stats.concentration}%</span>
                 </div>
-                <div className="h-1.5 w-full bg-[#F0EDE8] rounded-full overflow-hidden">
+                <div className="h-1.5 w-full bg-[#EFEFEF] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#5A5A40] rounded-full transition-all duration-500"
+                    className="h-full bg-[#1E5631] rounded-full transition-all duration-500"
                     style={{ width: `${phaseDetails.stats.concentration}%` }}
                   ></div>
                 </div>
@@ -927,11 +937,11 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <div>
                 <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-[#9A9A90] mb-1.5">
                   <span>Creatividad</span>
-                  <span className="text-[#5A5A40]">{phaseDetails.stats.creativity}%</span>
+                  <span className="text-[#1E5631]">{phaseDetails.stats.creativity}%</span>
                 </div>
-                <div className="h-1.5 w-full bg-[#F0EDE8] rounded-full overflow-hidden">
+                <div className="h-1.5 w-full bg-[#EFEFEF] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#5A5A40] rounded-full transition-all duration-500"
+                    className="h-full bg-[#1E5631] rounded-full transition-all duration-500"
                     style={{ width: `${phaseDetails.stats.creativity}%` }}
                   ></div>
                 </div>
@@ -940,11 +950,11 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <div>
                 <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-[#9A9A90] mb-1.5">
                   <span>Energía Física</span>
-                  <span className="text-[#5A5A40]">{phaseDetails.stats.physicalEnergy}%</span>
+                  <span className="text-[#1E5631]">{phaseDetails.stats.physicalEnergy}%</span>
                 </div>
-                <div className="h-1.5 w-full bg-[#F0EDE8] rounded-full overflow-hidden">
+                <div className="h-1.5 w-full bg-[#EFEFEF] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#5A5A40] rounded-full transition-all duration-500"
+                    className="h-full bg-[#1E5631] rounded-full transition-all duration-500"
                     style={{ width: `${phaseDetails.stats.physicalEnergy}%` }}
                   ></div>
                 </div>
@@ -952,11 +962,11 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </div>
 
             {/* Autocuidado Tips */}
-            <div className="mt-8 pt-6 border-t border-[#F0EDE8] space-y-3">
+            <div className="mt-8 pt-6 border-t border-[#EFEFEF] space-y-3">
               <h5 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest">Consejos de autocuidado</h5>
               <ul className="space-y-1.5">
                 {phaseDetails.tips.slice(0, 2).map((tip, idx) => (
-                  <li key={idx} className="text-xs text-[#5A5A40] flex items-start gap-1.5">
+                  <li key={idx} className="text-xs text-[#1E5631] flex items-start gap-1.5">
                     <span className="text-rose-400">✨</span>
                     <span>{tip}</span>
                   </li>
@@ -968,7 +978,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             <div className="mt-auto pt-6 flex flex-col gap-2.5">
               <button
                 onClick={() => handleUpdatePeriodStart(selectedDateStr)}
-                className="w-full bg-[#FAF8F5] hover:bg-[#F2EFE9] border border-[#EDE8E0] text-[11px] font-bold uppercase tracking-wider py-3 rounded-full text-rose-500 hover:text-rose-600 transition-all cursor-pointer text-center"
+                className="w-full bg-[#F5F6F8] hover:bg-[#EFEFEF] border border-[#d7e6d4] text-[11px] font-bold uppercase tracking-wider py-3 rounded-full text-rose-500 hover:text-rose-600 transition-all cursor-pointer text-center"
               >
                 🔴 Registrar Inicio de Periodo Hoy
               </button>
@@ -987,21 +997,88 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         <div className="flex flex-col gap-4">
           
           {/* Interactive Calendar widget */}
-          <div className={appTab === 'calendario' ? 'h-fit' : 'hidden'}>
+          <div className={appTab === 'calendario' && !cycleSheet ? 'flex flex-col gap-3' : 'hidden'}>
+            <header className="px-1 pt-6">
+              <span className="font-serif text-[15px] tracking-[0.18em] text-[#3A44C4]">CYCLIA</span>
+              <h1 className="m-0 text-[28px] font-extrabold">Tu ciclo</h1>
+            </header>
             <CalendarView
               profile={profile}
               selectedDateStr={selectedDateStr}
               onSelectDate={setSelectedDateStr}
             />
+            <section className="flex flex-col gap-1.5 rounded-[20px] bg-white p-4">
+              <span className="text-xs font-extrabold tracking-wide text-[#4A4F7A]">DÍA SELECCIONADO</span>
+              <h2 className="m-0 text-[17px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h2>
+              <p className="m-0 text-sm text-[#3B4070]">Día {selectedCycleDay} del ciclo · {phaseDetails.name} · {activeLog ? 'Con registro' : 'Sin registro'}</p>
+              <button type="button" onClick={() => setCycleSheet('dia')} className="w-fit cursor-pointer py-2 text-[15px] font-extrabold text-[#3A44C4]">Ver detalle del día</button>
+              <div className="my-1 h-px bg-[#E1E5F5]" />
+              <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {formatFriendlyDate(formatDateStr(new Date(new Date().setHours(12, 0, 0, 0) + (profile.cycleLength - getCycleDay(formatDateStr(new Date()), profile.lastPeriodDate, profile.cycleLength) + 1) * 86400000)))}</p>
+            </section>
+            <button type="button" onClick={() => setCycleSheet('evolucion')} className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">↗</span>
+              <span><strong className="block text-base">Evolución de bienestar</strong><span className="text-[13px] text-[#3B4070]">Ánimo, estrés, dolor, sueño y cansancio</span></span>
+            </button>
+            <button type="button" onClick={() => handleUpdatePeriodStart(formatDateStr(new Date()))} className="h-[50px] cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Registrar inicio de periodo hoy</button>
           </div>
+          {appTab === 'calendario' && cycleSheet === 'dia' && (
+            <section className="flex flex-col gap-3 pt-4">
+              <button type="button" onClick={() => setCycleSheet(null)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Calendario</button>
+              <h1 className="m-0 text-[26px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h1>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-2xl px-3 py-1 text-[13px] font-extrabold text-[#1B1F5E]" style={{ background: phaseDetails.bgHex, color: phaseDetails.textHex }}>{phaseDetails.name}</span>
+                <span className="rounded-2xl border border-[#C9D3EF] bg-white px-3 py-1 text-[13px] font-bold">Día {selectedCycleDay} del ciclo</span>
+              </div>
+              {activeLog ? (
+                <>
+                  <section className="rounded-[20px] bg-white p-4">
+                    <h2 className="m-0 text-base font-extrabold">Cómo te sentiste</h2>
+                    <div className="mt-3 grid grid-cols-2 gap-2.5">
+                      {[
+                        ['Cansancio', activeLog.fatigue],
+                        ['Ánimo', activeLog.mood],
+                        ['Estrés', activeLog.stress],
+                        ['Sueño', activeLog.sleepQuality],
+                        ['Dolor', activeLog.pain],
+                      ].map(([label, value]) => (
+                        <div key={String(label)} className="flex flex-col gap-1.5 rounded-[14px] bg-[#F3F5FC] p-3">
+                          <span className="text-[13px] font-bold text-[#4A4F7A]">{label}</span>
+                          <span className="text-xl font-extrabold">{value} / 5</span>
+                          <div className="h-1.5 rounded-full bg-[#E1E5F5]"><div className="h-1.5 rounded-full bg-[#3A44C4]" style={{ width: `${Number(value) * 20}%` }} /></div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                  <section className="rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#3B4070]">
+                    <h2 className="m-0 mb-2 text-base font-extrabold text-[#1B1F5E]">Sueño y hábitos</h2>
+                    <p className="m-0"><strong className="text-[#1B1F5E]">Sueño:</strong> {activeLog.sleepDetails || 'Sin detalle'}</p>
+                    <p className="m-0 mt-2"><strong className="text-[#1B1F5E]">Hábitos:</strong> {activeLog.behavior || 'Sin detalle'}</p>
+                    <p className="m-0 mt-2"><strong className="text-[#1B1F5E]">Notas:</strong> {activeLog.additionalNotes || 'Sin notas'}</p>
+                  </section>
+                </>
+              ) : (
+                <p className="rounded-[20px] bg-white p-4 text-sm">Este día todavía no tiene registro.</p>
+              )}
+              <div className="flex gap-2.5">
+                <button type="button" onClick={() => activeLog ? setIsAnalysisOpen(true) : setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Ver análisis</button>
+                <button type="button" onClick={() => setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#F6E27F] text-[15px] font-extrabold text-[#1B1F5E]">Editar registro</button>
+              </div>
+            </section>
+          )}
+          {appTab === 'calendario' && cycleSheet === 'evolucion' && (
+            <div className="flex flex-col gap-3 pt-4">
+              <button type="button" onClick={() => setCycleSheet(null)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Calendario</button>
+              <h1 className="m-0 text-[26px] font-extrabold">Evolución de bienestar</h1>
+            </div>
+          )}
 
           {/* Detailed Recommended Activity for Selected Day */}
-          <div className={`${appTab === 'inicio' ? 'flex' : 'hidden'} bg-white rounded-[32px] p-6 shadow-sm border border-[#F0EDE8] flex-col gap-4`}>
-            <div className="flex items-center justify-between pb-3 border-b border-[#F0EDE8]">
+          <div className="hidden bg-white rounded-[32px] p-6 shadow-sm border border-[#EFEFEF] flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EFEFEF]">
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🏃‍♀️</span>
                 <div>
-                  <h3 className="font-serif font-semibold text-lg text-[#5A5A40]">Actividad Recomendada</h3>
+                  <h3 className="font-serif font-semibold text-lg text-[#1E5631]">Actividad Recomendada</h3>
                   <p className="text-[10px] uppercase tracking-widest text-[#9A9A90] font-bold">Personalizado para ti</p>
                 </div>
               </div>
@@ -1014,16 +1091,16 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <h4 className="text-base font-serif font-bold text-[#3A3A35] mb-2 leading-tight">
                 {selectedActivity.title}
               </h4>
-              <p className="text-sm text-[#5A5A40] leading-relaxed mb-4">
+              <p className="text-sm text-[#1E5631] leading-relaxed mb-4">
                 {selectedActivity.description}
               </p>
             </div>
 
-            <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-[#EDE8E0]">
+            <div className="bg-[#F5F6F8] p-4 rounded-2xl border border-[#d7e6d4]">
               <h5 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest mb-1.5 flex items-center gap-1">
                 <span>💡</span> ¿Por qué es adecuada para ti?
               </h5>
-              <p className="text-xs text-[#5A5A40] leading-relaxed">
+              <p className="text-xs text-[#1E5631] leading-relaxed">
                 {selectedActivity.why}
               </p>
             </div>
@@ -1045,10 +1122,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           </div>
 
           {/* Footer Grid cards: Productivity Suggestions & Wellness Log Panel */}
-          <div className={`grid grid-cols-1 gap-4 ${appTab === 'inicio' || appTab === 'registro' ? '' : 'hidden'}`}>
+          <div className={`grid grid-cols-1 gap-4 ${appTab === 'registro' ? '' : 'hidden'}`}>
             
             {/* Productivity Suggested */}
-            <div className={`${appTab === 'inicio' ? 'flex' : 'hidden'} bg-[#5A5A40] rounded-[32px] p-6 text-white flex-col justify-between shadow-xs`}>
+            <div className="hidden bg-[#1E5631] rounded-[32px] p-6 text-white flex-col justify-between shadow-xs">
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-widest opacity-80 mb-4 flex items-center gap-1.5">
                   💼 Productividad Sugerida
@@ -1070,7 +1147,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </div>
 
             {/* Wellness Checkin summary panel */}
-            <div className={`${appTab === 'registro' ? 'flex' : 'hidden'} bg-[#F2EFE9] rounded-[32px] p-6 flex-col justify-between shadow-xs border border-[#E1DCD4]`}>
+            <div className="hidden bg-[#EFEFEF] rounded-[32px] p-6 flex-col justify-between shadow-xs border border-[#d7e6d4]">
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-widest text-[#9A9A90] mb-4 flex items-center gap-1.5">
                   ❤️ Registro de Bienestar
@@ -1079,35 +1156,35 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                 {activeLog ? (
                   <div className="space-y-3.5">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-[#5A5A40]">Sueño:</span>
-                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#DED9D0]">
+                      <span className="text-xs font-semibold text-[#1E5631]">Sueño:</span>
+                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#d7e6d4]">
                         {SCALE_LABELS.sleep[activeLog.sleepQuality - 1]}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-[#5A5A40]">Estrés:</span>
-                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#DED9D0]">
+                      <span className="text-xs font-semibold text-[#1E5631]">Estrés:</span>
+                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#d7e6d4]">
                         {SCALE_LABELS.stress[activeLog.stress - 1]}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-[#5A5A40]">Energía:</span>
-                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#DED9D0]">
+                      <span className="text-xs font-semibold text-[#1E5631]">Energía:</span>
+                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#d7e6d4]">
                         {SCALE_LABELS.fatigue === undefined ? 'N/A' : (SCALE_LABELS.fatigue[activeLog.fatigue - 1] === 'Ninguna' ? 'Alta' : 'Moderada')}
                       </span>
                     </div>
 
                     {/* Text logs details including the new behavior log */}
                     {(activeLog.sleepDetails || activeLog.additionalNotes || activeLog.behavior) && (
-                      <div className="mt-4 pt-3 border-t border-[#DED9D0]/60 space-y-2">
+                      <div className="mt-4 pt-3 border-t border-[#d7e6d4]/60 space-y-2">
                         {activeLog.sleepDetails && (
-                          <div className="text-xs bg-white/50 p-2.5 rounded-xl border border-[#EDE8E0] leading-relaxed">
-                            <span className="font-bold text-[#5A5A40]">🌙 Noche:</span> <span className="text-[#3A3A35]">{activeLog.sleepDetails}</span>
+                          <div className="text-xs bg-white/50 p-2.5 rounded-xl border border-[#d7e6d4] leading-relaxed">
+                            <span className="font-bold text-[#1E5631]">🌙 Noche:</span> <span className="text-[#3A3A35]">{activeLog.sleepDetails}</span>
                           </div>
                         )}
                         {activeLog.additionalNotes && (
-                          <div className="text-xs bg-white/50 p-2.5 rounded-xl border border-[#EDE8E0] leading-relaxed">
-                            <span className="font-bold text-[#5A5A40]">📝 Notas:</span> <span className="text-[#3A3A35]">{activeLog.additionalNotes}</span>
+                          <div className="text-xs bg-white/50 p-2.5 rounded-xl border border-[#d7e6d4] leading-relaxed">
+                            <span className="font-bold text-[#1E5631]">📝 Notas:</span> <span className="text-[#3A3A35]">{activeLog.additionalNotes}</span>
                           </div>
                         )}
                         {activeLog.behavior && (
@@ -1121,7 +1198,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                 ) : (
                   <div className="text-center py-6">
                     <p className="text-xs text-[#9A9A90] font-medium leading-relaxed mb-1">No has completado tu registro diario hoy.</p>
-                    <p className="text-[10px] text-[#5A5A40] italic">Tu asistente espera tus datos para dar consejos inteligentes.</p>
+                    <p className="text-[10px] text-[#1E5631] italic">Tu asistente espera tus datos para dar consejos inteligentes.</p>
                   </div>
                 )}
               </div>
@@ -1129,7 +1206,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <div className="mt-6 space-y-2">
                 <button
                   onClick={() => setIsCheckinOpen(true)}
-                  className="w-full bg-white hover:bg-white/80 text-[#5A5A40] text-xs font-bold py-3 rounded-full border border-[#DED9D0] shadow-2xs transition-colors cursor-pointer text-center"
+                  className="w-full bg-white hover:bg-white/80 text-[#1E5631] text-xs font-bold py-3 rounded-full border border-[#d7e6d4] shadow-2xs transition-colors cursor-pointer text-center"
                 >
                   {activeLog ? '📝 Editar Registro Diario' : '➕ Registrar Bienestar Hoy'}
                 </button>
@@ -1138,7 +1215,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                   <button
                     onClick={handleRequestAnalysisManually}
                     disabled={isAnalyzing}
-                    className="w-full bg-[#5A5A40] hover:bg-[#484833] text-white text-xs font-bold py-3 rounded-full shadow-2xs transition-all cursor-pointer text-center"
+                    className="w-full bg-[#1E5631] hover:bg-[#1B4D3E] text-white text-xs font-bold py-3 rounded-full shadow-2xs transition-all cursor-pointer text-center"
                   >
                     {isAnalyzing ? '✨ Generando análisis...' : '🔍 Ver Análisis Inteligente'}
                   </button>
@@ -1150,7 +1227,24 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         </div>
 
         {/* Column 3: Collapsible Chat Panel Sidebar */}
-        {appTab === 'chat' && (
+        {appTab === 'chat' && chatHistoryOpen && (
+          <div className="flex flex-col gap-3 pt-2">
+            <button type="button" onClick={() => setChatHistoryOpen(false)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Cyclia IA</button>
+            <h1 className="m-0 text-[26px] font-extrabold">Tus conversaciones</h1>
+            <button type="button" onClick={() => setChatHistoryOpen(false)} className="flex h-[50px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Nueva conversación</button>
+            {chatHistory.length === 0 && <p className="rounded-[18px] bg-white p-4 text-sm">Todavía no hay conversaciones.</p>}
+            {chatHistory.filter((message) => message.role === 'user').map((message) => (
+              <button key={message.id} type="button" onClick={() => setChatHistoryOpen(false)} className="flex flex-col gap-1 rounded-[18px] bg-white p-4 text-left">
+                <strong className="text-[15px]">{message.content.slice(0, 48)}</strong>
+                <span className="text-[13px] text-[#3B4070]">{message.timestamp}</span>
+              </button>
+            ))}
+            {chatHistory.length > 0 && (
+              <button type="button" onClick={handleClearHistory} className="mx-auto mt-1 h-11 cursor-pointer rounded-full bg-[#F6E27F] px-5 text-sm font-extrabold text-[#1B1F5E]">Borrar historial</button>
+            )}
+          </div>
+        )}
+        {appTab === 'chat' && !chatHistoryOpen && (
           <div className="min-h-[70vh]">
             <ChatPanel
               profile={{
@@ -1162,6 +1256,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               chatHistory={chatHistory}
               onAddMessage={handleAddMessage}
               onClearHistory={handleClearHistory}
+              onOpenHistory={() => setChatHistoryOpen(true)}
               previousInteractionId={previousInteractionId}
               environmentId={environmentId}
               onUpdateAgentState={updateAgentState}
@@ -1170,7 +1265,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         )}
 
         {/* Full Width Symptom and Habit Evolution Graph */}
-        <div className={appTab === 'calendario' ? 'mt-1' : 'hidden'}>
+        <div className={appTab === 'calendario' && cycleSheet === 'evolucion' ? 'mt-1' : 'hidden'}>
           <SymptomChart
             logs={logs}
             profile={profile}
@@ -1178,42 +1273,99 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           />
         </div>
 
-        {appTab === 'perfil' && (
-          <div className="bg-white rounded-[28px] p-5 border border-[#F0EDE8] flex flex-col gap-3">
-            <h2 className="font-serif text-2xl text-[#5A5A40]">Tu perfil</h2>
-            <p className="text-xs text-[#7A7A70]">{profile.email || 'Sesión de Cyclia'}</p>
-            <button type="button" onClick={() => setIsEditingHealth(true)} className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl py-3 text-sm font-semibold text-[#5A5A40] cursor-pointer">Editar salud</button>
-            <button type="button" onClick={handleReRegister} className="w-full bg-[#FAF8F5] border border-[#EDE8E0] rounded-2xl py-3 text-sm font-semibold text-[#5A5A40] cursor-pointer">Nuevo check-in</button>
-            <button type="button" onClick={handleResetAppData} className="w-full bg-white border border-red-200 rounded-2xl py-3 text-sm font-semibold text-red-600 cursor-pointer">Restaurar datos</button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (confirm('¿Estás segura de que deseas cerrar sesión?')) await signOut();
-              }}
-              className="w-full bg-[#5A5A40] text-white rounded-2xl py-3 text-sm font-semibold cursor-pointer"
-            >
-              Cerrar sesión
-            </button>
+        {appTab === 'perfil' && profileSheet === 'ciclo' && (
+          <CycleDataScreen
+            profile={profile}
+            goals={savedGoals}
+            onBack={() => setProfileSheet(null)}
+            onGoals={() => setProfileSheet('objetivos')}
+            onSave={(next) => { void handleSaveProfile(next); setProfileSheet(null); }}
+          />
+        )}
+        {appTab === 'perfil' && profileSheet === 'objetivos' && (
+          <GoalsScreen
+            saved={savedGoals}
+            onBack={() => setProfileSheet(null)}
+            onSave={(ids) => {
+              localStorage.setItem('cyclia_objectives', JSON.stringify(ids));
+              localStorage.setItem('cyclia_objectives_done', '1');
+              setSavedGoals(ids);
+              setObjectivesDone(true);
+              setProfileSheet(null);
+            }}
+          />
+        )}
+        {appTab === 'perfil' && profileSheet === 'privacidad' && (
+          <PrivacyScreen
+            darkMode={darkMode}
+            onBack={() => setProfileSheet(null)}
+            onToggleDark={() => setDarkMode((value) => !value)}
+            onExport={() => {
+              const blob = new Blob([JSON.stringify({ profile, logs }, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'cyclia-datos.json';
+              link.click();
+              URL.revokeObjectURL(url);
+            }}
+            onDelete={() => { if (confirm('¿Eliminar los datos de esta cuenta en este dispositivo?')) handleResetAppData(); }}
+          />
+        )}
+        {appTab === 'perfil' && !profileSheet && (
+          <div className="flex flex-col">
+            <header className="-mx-4 flex flex-col items-center gap-2 bg-[#3A44C4] px-5 pb-7 pt-12 text-center text-white">
+              <span className="flex h-[84px] w-[84px] items-center justify-center rounded-full border-[3px] border-white bg-[#F9C4C6] font-serif text-4xl text-[#3A44C4]">{profile.name.slice(0, 1).toUpperCase()}</span>
+              <h1 className="m-0 text-2xl font-extrabold">{profile.name}</h1>
+              <span className="text-sm text-[#DCE5FA]">Ciclo de {profile.cycleLength} días · Periodo de {profile.periodLength} días</span>
+            </header>
+            <nav className="flex flex-col gap-2.5 py-4">
+              {[
+                ['Datos del ciclo y salud', 'Fechas, duración, condiciones', () => setProfileSheet('ciclo')],
+                ['Privacidad y notificaciones', darkMode ? 'Modo oscuro activo' : 'Recordatorios, tus datos', () => setProfileSheet('privacidad')],
+                ['Objetivos', 'Elige tu foco', () => setProfileSheet('objetivos')],
+                ['Ayuda y soporte', 'Preguntas frecuentes, contacto', () => setAppTab('chat')],
+              ].map(([title, subtitle, action]) => (
+                <button key={String(title)} type="button" onClick={action as () => void} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-left">
+                  <span className="flex-1">
+                    <strong className="block text-[15px]">{title}</strong>
+                    <span className="text-[13px] text-[#4A4F7A]">{subtitle}</span>
+                  </span>
+                  <span className="text-[#3A44C4]">›</span>
+                </button>
+              ))}
+              <button type="button" onClick={handleResetAppData} className="cursor-pointer rounded-[18px] bg-white px-4 py-3.5 text-left text-sm font-extrabold text-[#3A44C4]">Restaurar datos de esta cuenta</button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm('¿Estás segura de que deseas cerrar sesión?')) await signOut();
+                }}
+                className="mx-auto mt-2 flex h-12 cursor-pointer items-center rounded-full bg-[#F49A9E] px-7 text-[15px] font-extrabold text-[#1B1F5E]"
+              >
+                Cerrar sesión
+              </button>
+            </nav>
           </div>
         )}
+        </>)}
 
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-[#EDE8E0] grid grid-cols-5 z-40">
+      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[82px] w-full max-w-[480px] -translate-x-1/2 grid-cols-5 border-t border-[#E7ECFB] bg-white">
         {([
           ['inicio', 'Inicio', '⌂'],
-          ['calendario', 'Calendario', '▦'],
-          ['registro', 'Registro', '♥'],
-          ['chat', 'Chat', '💬'],
-          ['perfil', 'Perfil', '☺'],
+          ['calendario', 'Ciclo', '▦'],
+          ['registro', 'Registro', '+'],
+          ['chat', 'Cyclia IA', '✦'],
+          ['perfil', 'Perfil', '•'],
         ] as const).map(([id, label, icon]) => (
           <button
             key={id}
             type="button"
-            onClick={() => setAppTab(id)}
-            className={`py-2.5 flex flex-col items-center gap-0.5 text-[10px] font-semibold cursor-pointer ${appTab === id ? 'text-[#5A5A40]' : 'text-[#9A9A90]'}`}
+            onClick={() => { setHomeSheet(null); setCycleSheet(null); setProfileSheet(null); setChatHistoryOpen(false); setAppTab(id); }}
+            className={`flex cursor-pointer flex-col items-center justify-center gap-1 text-[11px] font-extrabold ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
           >
-            <span className="text-base leading-none">{icon}</span>
+            <span className="text-lg leading-none">{icon}</span>
             {label}
           </button>
         ))}
@@ -1231,26 +1383,21 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
       {/* AI Analysis View Modal */}
       {isAnalysisOpen && (
-        <div className="fixed inset-0 bg-[#3A3A35]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[32px] border border-[#EDE8E0] shadow-xl w-full max-w-xl p-6 md:p-8 flex flex-col max-h-[85vh]">
-            <div className="flex justify-between items-center pb-4 border-b border-[#EDE8E0] mb-6">
+        <div className="fixed inset-0 z-50 flex justify-center bg-[#E3F1FB]">
+          <div className="flex w-full max-w-[390px] flex-col max-h-[100dvh] overflow-y-auto bg-[#E3F1FB] pb-8">
+            <div className="bg-[#3A44C4] px-5 pb-6 pt-10 text-white">
               <div>
-                <h3 className="font-serif font-semibold text-lg text-[#5A5A40]">Análisis Inteligente de Cyclia</h3>
-                <p className="text-xs text-[#9A9A90] font-medium">{formatFriendlyDate(selectedDateStr)}</p>
+                <button type="button" onClick={() => setIsAnalysisOpen(false)} className="cursor-pointer text-[15px] font-extrabold">← Registro</button>
+                <p className="mt-2 text-xs font-extrabold tracking-widest text-[#F9C4C6]">ANÁLISIS DE CYCLIA</p>
+                <h3 className="m-0 text-[26px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h3>
               </div>
-              <button
-                onClick={() => setIsAnalysisOpen(false)}
-                className="w-8 h-8 rounded-full border border-[#EDE8E0] text-[#9A9A90] hover:text-[#5A5A40] flex items-center justify-center transition-colors cursor-pointer text-sm"
-              >
-                ✕
-              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-1 mb-6">
               {isAnalyzing ? (
                 <div className="text-center py-12 space-y-4">
-                  <div className="w-10 h-10 border-4 border-t-[#5A5A40] border-[#EDE8E0] rounded-full animate-spin mx-auto"></div>
-                  <p className="text-sm font-semibold text-[#5A5A40] animate-pulse">Cyclia está analizando tu registro hormonal e historial diario...</p>
+                  <div className="w-10 h-10 border-4 border-t-[#1E5631] border-[#d7e6d4] rounded-full animate-spin mx-auto"></div>
+                  <p className="text-sm font-semibold text-[#1E5631] animate-pulse">Cyclia está analizando tu registro hormonal e historial diario...</p>
                 </div>
               ) : analysisError ? (
                 <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -1272,7 +1419,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                   </div>
                   
                   {/* Parsing sections from response */}
-                  <div className="whitespace-pre-wrap leading-relaxed bg-[#FAF8F5] p-5 rounded-2xl border border-[#EDE8E0] max-h-[400px] overflow-y-auto">
+                  <div className="whitespace-pre-wrap leading-relaxed bg-[#F5F6F8] p-5 rounded-2xl border border-[#d7e6d4] max-h-[400px] overflow-y-auto">
                     {activeLog.aiAnalysis}
                   </div>
                 </div>
@@ -1281,7 +1428,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                   <p className="text-sm text-[#7A7A70]">No hay análisis disponible aún. Haz clic en el botón de abajo para generarlo por IA.</p>
                   <button
                     onClick={handleRequestAnalysisManually}
-                    className="mt-4 bg-[#5A5A40] hover:bg-[#484833] text-white font-semibold py-2.5 px-6 rounded-full text-xs uppercase tracking-wide cursor-pointer"
+                    className="mt-4 bg-[#1E5631] hover:bg-[#1B4D3E] text-white font-semibold py-2.5 px-6 rounded-full text-xs uppercase tracking-wide cursor-pointer"
                   >
                     Generar Análisis por IA
                   </button>
@@ -1289,10 +1436,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               )}
             </div>
 
-            <div className="border-t border-[#EDE8E0] pt-4 flex justify-end">
+            <div className="border-t border-[#d7e6d4] pt-4 flex justify-end">
               <button
                 onClick={() => setIsAnalysisOpen(false)}
-                className="bg-[#5A5A40] hover:bg-[#484833] text-white font-semibold py-2.5 px-6 rounded-full text-xs uppercase tracking-wide cursor-pointer"
+                className="bg-[#1E5631] hover:bg-[#1B4D3E] text-white font-semibold py-2.5 px-6 rounded-full text-xs uppercase tracking-wide cursor-pointer"
               >
                 Cerrar
               </button>

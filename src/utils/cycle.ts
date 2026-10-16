@@ -3,10 +3,10 @@ import { MenstrualPhase, PhaseInfo } from "../types";
 export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   Menstrual: {
     name: "Menstruación",
-    badge: "🟥 Menstrual",
-    colorClass: "bg-[#FCA5A5] text-white",
-    bgHex: "#FCA5A5",
-    textHex: "#ffffff",
+    badge: "Menstrual",
+    colorClass: "bg-[#F49A9E] text-[#1B1F5E]",
+    bgHex: "#F49A9E",
+    textHex: "#1B1F5E",
     description: "Tu ciclo comienza hoy. El estrógeno y la progesterona están en sus niveles más bajos, invitándote al descanso y a la renovación física y mental.",
     hormones: "Estrógeno y progesterona en niveles mínimos.",
     stats: {
@@ -29,10 +29,10 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   },
   Folicular: {
     name: "Fase Folicular",
-    badge: "🟩 Folicular",
-    colorClass: "bg-[#86EFAC] text-[#1e3a1e]",
-    bgHex: "#86EFAC",
-    textHex: "#1e3a1e",
+    badge: "Folicular",
+    colorClass: "bg-[#A9C4F0] text-[#1B1F5E]",
+    bgHex: "#A9C4F0",
+    textHex: "#1B1F5E",
     description: "La hormona FSH estimula tus ovarios. Tus niveles de estrógeno comienzan a subir, aumentando tu energía, optimismo, claridad mental y apertura social.",
     hormones: "Incremento progresivo de estrógeno.",
     stats: {
@@ -55,10 +55,10 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   },
   Ovulacion: {
     name: "Ovulación",
-    badge: "🟦 Ovulación",
-    colorClass: "bg-[#93C5FD] text-[#1e293b]",
-    bgHex: "#93C5FD",
-    textHex: "#1e293b",
+    badge: "Ovulación",
+    colorClass: "bg-[#F6E27F] text-[#1B1F5E]",
+    bgHex: "#F6E27F",
+    textHex: "#1B1F5E",
     description: "El pico de LH provoca la liberación del óvulo. Tu estrógeno y testosterona están al máximo. Te sientes sumamente magnética, comunicativa, con gran poder de convicción y vitalidad.",
     hormones: "Pico de estrógeno y hormona luteinizante (LH).",
     stats: {
@@ -81,10 +81,10 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   },
   Lutea: {
     name: "Fase Lútea",
-    badge: "🟨 Fase Lútea",
-    colorClass: "bg-[#FDE047] text-[#451a03]",
-    bgHex: "#FDE047",
-    textHex: "#451a03",
+    badge: "Fase Lútea",
+    colorClass: "bg-[#3A44C4] text-white",
+    bgHex: "#3A44C4",
+    textHex: "#ffffff",
     description: "El folículo se convierte en cuerpo lúteo y produce progesterona. Esta hormona te invita a replegarte, enfocarte en detalles técnicos, organizar tu espacio, documentar y cerrar pendientes.",
     hormones: "Progesterona en su nivel máximo.",
     stats: {

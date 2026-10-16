@@ -122,7 +122,7 @@ export async function connectGoogle(linkExisting = false) {
     if (!linked.error) return;
   }
   const { error } = await client.auth.signInWithOAuth({ provider: 'google', options });
-  if (error) throw new Error(error.message || 'No se pudo abrir Gmail.');
+  if (error) throw new Error(authErrorMessage(error));
 }
 
 export async function signInWithGoogle() {

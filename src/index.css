@@ -1,6 +1,97 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Josefin Sans", Georgia, sans-serif;
+  --color-menthe: #F6E27F;
+  --color-perle: #E3F1FB;
+  --color-emeraude: #3A44C4;
+  --color-emeraude-deep: #1B1F5E;
+  --color-fucsia: #F49A9E;
 }
+
+:root {
+  --menthe: #F6E27F;
+  --perle: #E3F1FB;
+  --perle-soft: #E7ECFB;
+  --emeraude: #3A44C4;
+  --emeraude-deep: #1B1F5E;
+  --fucsia: #F49A9E;
+  --ink: #1B1F5E;
+  --card: #ffffff;
+  --line: #C9D3EF;
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  --perle: #12163a;
+  --perle-soft: #1c2354;
+  --menthe: #3A44C4;
+  --emeraude: #A9C4F0;
+  --emeraude-deep: #E3F1FB;
+  --fucsia: #F49A9E;
+  --ink: #E3F1FB;
+  --card: #1B1F5E;
+  --line: #3A44C4;
+  color-scheme: dark;
+}
+
+html, body, #root {
+  min-height: 100%;
+  min-height: 100dvh;
+  background-color: transparent;
+  color: #1B1F5E;
+  font-family: "Nunito Sans", sans-serif;
+}
+
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.app-bg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+img, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.channel-frame {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: transparent;
+  color: var(--ink);
+}
+
+.btn-fucsia {
+  background: #F49A9E;
+  color: #1B1F5E;
+}
+.btn-fucsia:hover { background: #E57F86; }
+.btn-fucsia:active { background: #d96d76; }
+.btn-fucsia:disabled { opacity: 0.5; }
+
+.btn-emeraude {
+  background: #F6E27F;
+  color: #1B1F5E;
+}
+.btn-emeraude:hover { background: #E8D46A; }
+.btn-emeraude:active { background: #dcc85a; }
