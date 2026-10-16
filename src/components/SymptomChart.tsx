@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { DailyLog, UserProfile } from '../types';
-import { getCycleDay, getPhaseForDay, PHASE_DETAILS } from '../utils/cycle';
+import { formatDateStr } from '../utils/cycle';
 
 interface SymptomChartProps {
   logs: Record<string, DailyLog>;
@@ -8,485 +8,177 @@ interface SymptomChartProps {
   onLoadDemoData: () => void;
 }
 
-type MetricKey = 'mood' | 'stress' | 'pain' | 'sleepQuality' | 'fatigue';
+type MetricKey = 'behavior' | 'mood' | 'stress' | 'pain' | 'sleepQuality' | 'fatigue';
 
-interface MetricConfig {
-  key: MetricKey;
-  label: string;
-  color: string;
-  gradientStart: string;
-  gradientEnd: string;
-  invert: boolean; // if true, 1 is shown at the top (better) and 5 at the bottom
-  getLabel: (val: number) => string;
-}
-
-const METRICS: MetricConfig[] = [
-  {
-    key: 'mood',
-    label: 'Estado de Ánimo',
-    color: '#3A44C4',
-    gradientStart: 'rgba(13, 148, 136, 0.2)',
-    gradientEnd: 'rgba(13, 148, 136, 0.0)',
-    invert: true, // 1 is Muy Feliz (top), 5 is Muy Triste (bottom)
-    getLabel: (val) => {
-      const labels = ["Muy feliz", "Feliz", "Neutral", "Triste", "Muy triste"];
-      return labels[val - 1] || `Nivel ${val}`;
-    }
-  },
-  {
-    key: 'stress',
-    label: 'Estrés',
-    color: '#E11D48', // Rose
-    gradientStart: 'rgba(225, 29, 72, 0.2)',
-    gradientEnd: 'rgba(225, 29, 72, 0.0)',
-    invert: false, // 1 is Muy Bajo (bottom), 5 is Muy Alto (top)
-    getLabel: (val) => {
-      const labels = ["Muy bajo", "Bajo", "Moderado", "Alto", "Muy alto"];
-      return labels[val - 1] || `Nivel ${val}`;
-    }
-  },
-  {
-    key: 'pain',
-    label: 'Dolor / Cólicos',
-    color: '#D97706', // Amber
-    gradientStart: 'rgba(217, 119, 6, 0.2)',
-    gradientEnd: 'rgba(217, 119, 6, 0.0)',
-    invert: false, // 1 is Ninguno (bottom), 5 is Muy Alto (top)
-    getLabel: (val) => {
-      const labels = ["Ninguno", "Leve", "Moderado", "Alto", "Muy alto"];
-      return labels[val - 1] || `Nivel ${val}`;
-    }
-  },
-  {
-    key: 'sleepQuality',
-    label: 'Calidad de Sueño',
-    color: '#4F46E5', // Indigo
-    gradientStart: 'rgba(79, 70, 229, 0.2)',
-    gradientEnd: 'rgba(79, 70, 229, 0.0)',
-    invert: true, // 1 is Excelente (top), 5 is Muy Mala (bottom)
-    getLabel: (val) => {
-      const labels = ["Excelente", "Buena", "Regular", "Mala", "Muy mala"];
-      return labels[val - 1] || `Nivel ${val}`;
-    }
-  },
-  {
-    key: 'fatigue',
-    label: 'Cansancio / Fatiga',
-    color: '#6B7280', // Gray
-    gradientStart: 'rgba(107, 114, 128, 0.2)',
-    gradientEnd: 'rgba(107, 114, 128, 0.0)',
-    invert: false, // 1 is Ninguna (bottom), 5 is Extrema (top)
-    getLabel: (val) => {
-      const labels = ["Ninguno", "Leve", "Moderado", "Fuerte", "Extremo"];
-      return labels[val - 1] || `Nivel ${val}`;
-    }
-  }
+const METRICS: { key: MetricKey; label: string }[] = [
+  { key: 'behavior', label: 'Comportamiento' },
+  { key: 'mood', label: 'Ánimo' },
+  { key: 'stress', label: 'Estrés' },
+  { key: 'pain', label: 'Dolor' },
+  { key: 'sleepQuality', label: 'Sueño' },
+  { key: 'fatigue', label: 'Cansancio' },
 ];
 
-export default function SymptomChart({ logs, profile, onLoadDemoData }: SymptomChartProps) {
-  const [selectedMetric, setSelectedMetric] = useState<MetricKey>('mood');
-  const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
+export function behaviorValue(log: DailyLog): number {
+  return (log.mood + log.stress + log.pain + log.sleepQuality + log.fatigue) / 5;
+}
 
-  // Parse and sort logs chronologically
-  const chartData = useMemo(() => {
-    const sorted = Object.values(logs)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    return sorted.map((log) => {
-      const cycleDay = getCycleDay(log.date, profile.lastPeriodDate, profile.cycleLength);
-      const phase = getPhaseForDay(cycleDay, profile.periodLength, profile.cycleLength);
-      
-      // Format friendly date: "12 Jul"
-      const dateObj = new Date(log.date + 'T00:00:00');
-      const formattedDate = dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+export function metricValue(log: DailyLog, key: MetricKey): number {
+  return key === 'behavior' ? behaviorValue(log) : log[key];
+}
 
-      return {
-        ...log,
-        cycleDay,
-        phase,
-        formattedDate,
-        phaseDetails: PHASE_DETAILS[phase] || { name: phase, colorClass: 'bg-gray-100 text-gray-700' }
-      };
-    });
-  }, [logs, profile]);
+export function lastWeekDates(today = new Date()): string[] {
+  const end = new Date(today);
+  end.setHours(12, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(end);
+    date.setDate(end.getDate() - (6 - index));
+    return formatDateStr(date);
+  });
+}
 
-  const activeMetric = METRICS.find(m => m.key === selectedMetric) || METRICS[0];
+function formatAverage(value: number): string {
+  return value.toFixed(1).replace('.', ',');
+}
 
-  // SVG parameters
-  const width = 600;
-  const height = 240;
-  const paddingLeft = 40;
-  const paddingRight = 20;
-  const paddingTop = 30;
-  const paddingBottom = 40;
+function behaviorSentence(average: number): string {
+  if (average <= 2) return 'La semana se ve estable: tus registros están cerca de sentirte mejor.';
+  if (average <= 3.2) return 'La semana está en un punto medio. Conviene cuidar sueño y ritmo.';
+  return 'La semana marca más cansancio, estrés o malestar. Prioriza descanso.';
+}
 
-  const graphWidth = width - paddingLeft - paddingRight;
-  const graphHeight = height - paddingTop - paddingBottom;
+export default function SymptomChart({ logs, onLoadDemoData }: SymptomChartProps) {
+  const [selected, setSelected] = useState<MetricKey>('behavior');
+  const week = useMemo(() => lastWeekDates().map((dateStr) => {
+    const date = new Date(`${dateStr}T12:00:00`);
+    const label = date.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '');
+    return { dateStr, label, day: date.getDate(), log: logs[dateStr] };
+  }), [logs]);
 
-  // Calculate coordinates
-  const points = useMemo(() => {
-    if (chartData.length === 0) return [];
+  const logged = week.filter((day) => day.log);
+  const values = logged.map((day) => metricValue(day.log as DailyLog, selected));
+  const average = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  const best = logged.reduce<{ label: string; value: number } | null>((winner, day) => {
+    const value = metricValue(day.log as DailyLog, selected);
+    if (!winner || value < winner.value) return { label: `${day.label} ${day.day}`, value };
+    return winner;
+  }, null);
 
-    return chartData.map((d, index) => {
-      // X coordinate
-      const x = paddingLeft + (index / (chartData.length - 1 || 1)) * graphWidth;
+  const width = 330;
+  const height = 168;
+  const left = 28;
+  const right = 8;
+  const top = 12;
+  const bottom = 28;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const points = week.map((day, index) => {
+    if (!day.log) return null;
+    const value = metricValue(day.log, selected);
+    const x = left + (index / 6) * plotWidth;
+    const y = top + ((value - 1) / 4) * plotHeight;
+    return { x, y, value };
+  });
+  const line = points.filter((point): point is { x: number; y: number; value: number } => point !== null)
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+    .join(' ');
 
-      // Y coordinate based on value (1-5 scale)
-      const val = d[selectedMetric] || 3;
-      let percent = 0;
-      if (activeMetric.invert) {
-        // 1 is at top (100%), 5 is at bottom (0%)
-        percent = (5 - val) / 4;
-      } else {
-        // 5 is at top (100%), 1 is at bottom (0%)
-        percent = (val - 1) / 4;
-      }
-
-      const y = paddingTop + (1 - percent) * graphHeight;
-
-      return { x, y, val, data: d, index };
-    });
-  }, [chartData, selectedMetric, activeMetric, graphWidth, graphHeight]);
-
-  // Construct SVG Path
-  const linePath = useMemo(() => {
-    if (points.length < 2) return '';
-    return points.reduce((path, p, i) => {
-      return i === 0 ? `M ${p.x} ${p.y}` : `${path} L ${p.x} ${p.y}`;
-    }, '');
-  }, [points]);
-
-  // Construct Area Path for gradient fill
-  const areaPath = useMemo(() => {
-    if (points.length < 2) return '';
-    const first = points[0];
-    const last = points[points.length - 1];
-    const baseLineY = paddingTop + graphHeight;
-    return `${linePath} L ${last.x} ${baseLineY} L ${first.x} ${baseLineY} Z`;
-  }, [points, linePath, graphHeight]);
-
-  // Insights based on data
-  const insights = useMemo(() => {
-    if (chartData.length === 0) return null;
-    
-    const count = chartData.length;
-    const values = chartData.map(d => d[selectedMetric] || 3);
-    const sum = values.reduce((a, b) => a + b, 0);
-    const avg = sum / count;
-
-    // For behaviors linked to best status
-    let behaviorInsight = '';
-    const goodDays = chartData.filter(d => {
-      const val = d[selectedMetric] || 3;
-      return activeMetric.invert ? val <= 2 : val >= 4; // Good mood is 1-2, high stress/pain is 4-5
-    });
-
-    const behaviorsWithGoodStatus = goodDays
-      .map(d => d.behavior)
-      .filter((b): b is string => !!b && b.trim().length > 0);
-
-    if (behaviorsWithGoodStatus.length > 0) {
-      behaviorInsight = `En tus días con mejores registros de "${activeMetric.label}", solías reportar hábitos como: "${behaviorsWithGoodStatus[0].slice(0, 100)}..."`;
-    } else {
-      behaviorInsight = "Registra tus hábitos diarios de comportamiento para que Cyclia pueda correlacionar tus rutinas con tu bienestar.";
-    }
-
-    return {
-      avg: avg.toFixed(1),
-      count,
-      behaviorInsight
-    };
-  }, [chartData, selectedMetric, activeMetric]);
+  const metricAverages = METRICS.filter((metric) => metric.key !== 'behavior').map((metric) => {
+    const series = logged.map((day) => metricValue(day.log as DailyLog, metric.key));
+    const avg = series.reduce((sum, value) => sum + value, 0) / (series.length || 1);
+    return { ...metric, avg: series.length ? avg : null };
+  });
 
   return (
-    <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-[#EFEFEF] flex flex-col gap-6">
-      
-      {/* Header and Selectors */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-[#EFEFEF]">
-        <div>
-          <h3 className="font-serif font-semibold text-xl text-[#3A44C4] flex items-center gap-2">
-            <span>📊</span> Evolución de Bienestar y Hábitos
-          </h3>
-          <p className="text-xs text-[#9A9A90] font-medium mt-0.5">
-            Descubre cómo influyen tus hábitos en tu salud a lo largo de tu ciclo menstrual
-          </p>
-        </div>
-
-        {/* Metric Selector Tabs */}
-        <div className="flex flex-wrap gap-1 bg-[#F5F6F8] p-1 rounded-full border border-[#d7e6d4] text-xs">
-          {METRICS.map(m => (
+    <div className="flex flex-col gap-3">
+      <p className="m-0 text-sm text-[#4A4F7A]">Promedio de tus registros de los últimos 7 días. 1 es mejor y 5 es más difícil.</p>
+      <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Indicador">
+        {METRICS.map((metric) => {
+          const on = metric.key === selected;
+          return (
             <button
-              key={m.key}
-              onClick={() => {
-                setSelectedMetric(m.key);
-                setHoveredPoint(null);
-              }}
-              className={`px-3 py-1.5 rounded-full font-semibold transition-all cursor-pointer ${
-                selectedMetric === m.key
-                  ? 'bg-[#1E5631] text-white shadow-xs'
-                  : 'text-[#7A7A70] hover:text-[#1E5631]'
-              }`}
+              key={metric.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setSelected(metric.key)}
+              className="min-h-10 shrink-0 cursor-pointer rounded-full px-3.5 text-[13px] font-extrabold text-[#1B1F5E]"
+              style={{ background: on ? '#F49A9E' : '#FFF6CF', border: `1.5px solid ${on ? '#E57F86' : '#F6E27F'}` }}
             >
-              {m.label}
+              {metric.label}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {chartData.length === 0 ? (
-        /* Empty State / Demo Data Trigger */
-        <div className="py-12 px-6 bg-[#F5F6F8] rounded-2xl border border-[#d7e6d4] text-center flex flex-col items-center gap-4">
-          <span className="text-4xl">🌸</span>
-          <div className="max-w-md">
-            <h4 className="font-serif font-semibold text-[#1E5631] text-base mb-1.5">Aún no hay suficientes registros diarios</h4>
-            <p className="text-xs text-[#7A7A70] leading-relaxed mb-4">
-              Realiza tus registros diarios con el botón de <strong>Check-In Diario</strong> para empezar a ver la gráfica de tu evolución.
-            </p>
-            <button
-              type="button"
-              onClick={onLoadDemoData}
-              className="bg-[#1E5631] hover:bg-[#1B4D3E] text-white font-semibold py-2.5 px-6 rounded-full text-xs uppercase tracking-wider transition-all cursor-pointer inline-flex items-center gap-2 shadow-xs"
-            >
-              <span>✨</span> Cargar 7 días de datos demostrativos
-            </button>
-          </div>
-        </div>
+      {logged.length === 0 ? (
+        <section className="rounded-[20px] bg-white p-5 text-center">
+          <h2 className="m-0 text-base font-extrabold">Esta semana todavía no tiene registros</h2>
+          <p className="mb-4 mt-2 text-sm leading-relaxed text-[#4A4F7A]">La gráfica usa solo los últimos 7 días. Guarda un registro para ver el promedio de tu comportamiento.</p>
+          <button type="button" onClick={onLoadDemoData} className="h-11 cursor-pointer rounded-full bg-[#F6E27F] px-5 text-sm font-extrabold text-[#1B1F5E]">Cargar una semana de ejemplo</button>
+        </section>
       ) : (
-        /* Chart Visualization */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-          
-          {/* Column 1: SVG Graph */}
-          <div className="lg:col-span-8 flex flex-col gap-3">
-            
-            {/* Top scale guide */}
-            <div className="flex justify-between text-[10px] uppercase tracking-wider text-[#9A9A90] font-bold px-1">
-              <span>{activeMetric.invert ? '🔺 Mejor (1)' : '🔺 Mayor nivel (5)'}</span>
-              <span>{activeMetric.invert ? '🔻 Peor (5)' : '🔻 Menor nivel (1)'}</span>
+        <>
+          <section className="rounded-[20px] bg-white p-3.5">
+            <div className="mb-1 flex justify-between text-xs font-bold text-[#4A4F7A]">
+              <span>Arriba: mejor (1)</span>
+              <span>Abajo: peor (5)</span>
             </div>
+            <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label={`Comportamiento de la última semana, promedio ${average === null ? 'sin datos' : formatAverage(average)} de 5`}>
+              {[0, 1, 2, 3, 4].map((step) => {
+                const y = top + (step / 4) * plotHeight;
+                return <line key={step} x1={left} y1={y} x2={width - right} y2={y} stroke="#D5DCF2" strokeWidth="1" />;
+              })}
+              {[1, 3, 5].map((mark) => (
+                <text key={mark} x={left - 6} y={top + ((mark - 1) / 4) * plotHeight + 3} textAnchor="end" fill="#4A4F7A" fontSize="10" fontWeight="700">{mark}</text>
+              ))}
+              {line && <path d={line} fill="none" stroke="#3A44C4" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
+              {points.map((point, index) => point && (
+                <circle key={week[index].dateStr} cx={point.x} cy={point.y} r="4.5" fill="#3A44C4" stroke="#FFFFFF" strokeWidth="2" />
+              ))}
+              {week.map((day, index) => (
+                <text key={day.dateStr} x={left + (index / 6) * plotWidth} y={height - 6} textAnchor="middle" fill="#4A4F7A" fontSize="10" fontWeight="700">{day.day}</text>
+              ))}
+            </svg>
+          </section>
 
-            {/* Responsive SVG Container */}
-            <div className="relative bg-[#F5F6F8] p-2 rounded-2xl border border-[#d7e6d4] overflow-hidden">
-              <svg 
-                viewBox={`0 0 ${width} ${height}`} 
-                className="w-full h-auto max-h-[260px] overflow-visible"
-              >
-                <defs>
-                  {/* Gradient for Line Fill */}
-                  <linearGradient id={`grad-${selectedMetric}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={activeMetric.color} stopOpacity="0.2" />
-                    <stop offset="100%" stopColor={activeMetric.color} stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Grid Lines */}
-                {[0, 1, 2, 3, 4].map((gridIndex) => {
-                  const y = paddingTop + (gridIndex / 4) * graphHeight;
-                  return (
-                    <line
-                      key={gridIndex}
-                      x1={paddingLeft}
-                      y1={y}
-                      x2={width - paddingRight}
-                      y2={y}
-                      stroke="#d7e6d4"
-                      strokeWidth="1"
-                      strokeDasharray="4 4"
-                    />
-                  );
-                })}
-
-                {/* Area Gradient Fill */}
-                {points.length >= 2 && (
-                  <path
-                    d={areaPath}
-                    fill={`url(#grad-${selectedMetric})`}
-                  />
-                )}
-
-                {/* Line Path */}
-                {points.length >= 2 && (
-                  <path
-                    d={linePath}
-                    fill="none"
-                    stroke={activeMetric.color}
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                )}
-
-                {/* Data Points */}
-                {points.map((p) => {
-                  const isHovered = hoveredPoint === p.index;
-                  return (
-                    <g key={p.index} className="cursor-pointer">
-                      {/* Interactive Trigger area */}
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={isHovered ? 12 : 6}
-                        fill={activeMetric.color}
-                        fillOpacity={isHovered ? 0.2 : 0.0}
-                        onMouseEnter={() => setHoveredPoint(p.index)}
-                        onMouseLeave={() => setHoveredPoint(null)}
-                      />
-                      {/* Actual visual point */}
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={isHovered ? 6 : 4}
-                        fill={isHovered ? '#FFFFFF' : activeMetric.color}
-                        stroke={activeMetric.color}
-                        strokeWidth={isHovered ? 3 : 1}
-                        onMouseEnter={() => setHoveredPoint(p.index)}
-                        onMouseLeave={() => setHoveredPoint(null)}
-                      />
-                    </g>
-                  );
-                })}
-
-                {/* X-Axis Labels (Dates & Cycle Days) */}
-                {points.map((p, i) => {
-                  // Only show label for every point if size <= 7, else skip some for clean display
-                  const shouldShow = points.length <= 7 || i % Math.ceil(points.length / 6) === 0 || i === points.length - 1;
-                  if (!shouldShow) return null;
-
-                  return (
-                    <g key={p.index}>
-                      <text
-                        x={p.x}
-                        y={height - paddingBottom + 18}
-                        textAnchor="middle"
-                        fill="#1E5631"
-                        fontSize="9"
-                        fontWeight="bold"
-                        className="font-mono"
-                      >
-                        {p.data.formattedDate}
-                      </text>
-                      <text
-                        x={p.x}
-                        y={height - paddingBottom + 30}
-                        textAnchor="middle"
-                        fill="#9A9A90"
-                        fontSize="8"
-                        fontWeight="bold"
-                        className="font-mono"
-                      >
-                        D{p.data.cycleDay}
-                      </text>
-                    </g>
-                  );
-                })}
-
-                {/* Y-Axis scale label markers */}
-                <text x={paddingLeft - 8} y={paddingTop + 4} textAnchor="end" fill="#9A9A90" fontSize="8" fontWeight="bold">
-                  {activeMetric.invert ? '1' : '5'}
-                </text>
-                <text x={paddingLeft - 8} y={paddingTop + graphHeight / 2 + 3} textAnchor="end" fill="#9A9A90" fontSize="8" fontWeight="bold">
-                  3
-                </text>
-                <text x={paddingLeft - 8} y={paddingTop + graphHeight + 2} textAnchor="end" fill="#9A9A90" fontSize="8" fontWeight="bold">
-                  {activeMetric.invert ? '5' : '1'}
-                </text>
-              </svg>
+          <section className="grid grid-cols-3 gap-2">
+            <div className="rounded-2xl bg-white p-3">
+              <span className="block text-xs font-bold text-[#4A4F7A]">Días</span>
+              <span className="text-[22px] font-extrabold">{logged.length}</span>
             </div>
+            <div className="rounded-2xl bg-white p-3">
+              <span className="block text-xs font-bold text-[#4A4F7A]">Promedio</span>
+              <span className="text-[22px] font-extrabold">{average === null ? '—' : formatAverage(average)}</span>
+            </div>
+            <div className="rounded-2xl bg-white p-3">
+              <span className="block text-xs font-bold text-[#4A4F7A]">Mejor día</span>
+              <span className="text-base font-extrabold capitalize">{best?.label ?? '—'}</span>
+            </div>
+          </section>
 
-            <p className="text-[10px] text-[#9A9A90] font-bold text-center flex items-center justify-center gap-1.5 mt-1">
-              <span>💡</span> Haz clic o sitúa el cursor sobre los círculos de la gráfica para ver el detalle y tus hábitos de ese día.
+          <section className="rounded-[18px] bg-white p-4">
+            <h2 className="m-0 text-[15px] font-extrabold">Promedio de la semana</h2>
+            <ul className="mb-0 mt-2 flex flex-col gap-1.5 text-sm">
+              {metricAverages.map((metric) => (
+                <li key={metric.key} className="flex items-center justify-between gap-3">
+                  <span>{metric.label}</span>
+                  <strong>{metric.avg === null ? '—' : formatAverage(metric.avg)}</strong>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="rounded-[18px] bg-[#F6E27F] p-4">
+            <h2 className="m-0 text-[15px] font-extrabold">Comportamiento</h2>
+            <p className="mb-0 mt-1.5 text-sm leading-relaxed">
+              {average === null
+                ? 'Registra al menos un día de esta semana para calcular tu promedio.'
+                : `Tu ${METRICS.find((metric) => metric.key === selected)?.label.toLowerCase()} de la última semana promedia ${formatAverage(average)} de 5. ${selected === 'behavior' ? behaviorSentence(average) : 'El cálculo usa solo los días que registraste en estos 7 días.'}`}
             </p>
-          </div>
-
-          {/* Column 2: Selected Point Detail / Interactive Tooltip & Insights */}
-          <div className="lg:col-span-4 flex flex-col gap-4">
-            
-            {/* Interactive Detail Panel */}
-            {hoveredPoint !== null && points[hoveredPoint] ? (
-              <div className="bg-[#F5F6F8] border border-[#1E5631] rounded-2xl p-4 flex flex-col gap-3 shadow-xs h-full justify-between transition-all">
-                <div>
-                  <div className="flex justify-between items-start pb-2 border-b border-[#d7e6d4]">
-                    <div>
-                      <p className="text-xs font-bold text-[#1E5631] font-mono">{points[hoveredPoint].data.formattedDate}</p>
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider mt-1 ${points[hoveredPoint].data.phaseDetails.colorClass}`}>
-                        Fase {points[hoveredPoint].data.phase} (Día {points[hoveredPoint].data.cycleDay})
-                      </span>
-                    </div>
-                    <span className="text-2xl">{points[hoveredPoint].data.phase === 'Menstrual' ? '🩸' : points[hoveredPoint].data.phase === 'Folicular' ? '🌱' : points[hoveredPoint].data.phase === 'Ovulatoria' ? '✨' : '🌸'}</span>
-                  </div>
-
-                  <div className="mt-3 space-y-1.5 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-[#7A7A70]">{activeMetric.label}:</span>
-                      <span className="font-bold text-[#3A3A35]">{activeMetric.getLabel(points[hoveredPoint].val)}</span>
-                    </div>
-                    <div className="flex justify-between border-t border-dashed border-[#d7e6d4] pt-1">
-                      <span className="text-[#7A7A70]">Sueño:</span>
-                      <span className="font-semibold text-[#1E5631]">{METRICS[3].getLabel(points[hoveredPoint].data.sleepQuality)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#7A7A70]">Estrés:</span>
-                      <span className="font-semibold text-[#1E5631]">{METRICS[1].getLabel(points[hoveredPoint].data.stress)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#7A7A70]">Dolor:</span>
-                      <span className="font-semibold text-[#1E5631]">{METRICS[2].getLabel(points[hoveredPoint].data.pain)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Behaviors logs for that day */}
-                <div className="mt-2 bg-white/70 p-3 rounded-xl border border-[#d7e6d4] text-xs">
-                  <span className="block font-bold text-emerald-800 text-[10px] uppercase tracking-wider mb-1">🏃‍♀️ Comportamiento del día:</span>
-                  <p className="text-[#1E5631] leading-relaxed italic text-[11px]">
-                    {points[hoveredPoint].data.behavior 
-                      ? `"${points[hoveredPoint].data.behavior}"` 
-                      : "No se registraron hábitos ni detalles de comportamiento este día."}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              /* Overall metric summary & Correlative Insight */
-              <div className="bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl p-4 md:p-5 flex flex-col gap-4 h-full justify-between">
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-[#9A9A90] mb-3">Análisis de Tendencias</h4>
-                  
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-white p-3 rounded-xl border border-[#d7e6d4] text-center">
-                      <span className="block text-[10px] uppercase tracking-wider text-[#9A9A90] font-bold">Total Días</span>
-                      <span className="text-xl font-serif font-bold text-[#1E5631]">{insights?.count}</span>
-                    </div>
-                    <div className="bg-white p-3 rounded-xl border border-[#d7e6d4] text-center">
-                      <span className="block text-[10px] uppercase tracking-wider text-[#9A9A90] font-bold">Promedio</span>
-                      <span className="text-xl font-serif font-bold text-[#1E5631]">{insights?.avg} / 5</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3.5">
-                    <span className="block font-bold text-emerald-800 text-[10px] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <span>🌿</span> Correlación de Hábitos
-                    </span>
-                    <p className="text-xs text-[#1E5631] leading-relaxed">
-                      {insights?.behaviorInsight}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Button to reload demo data to extend points */}
-                <button
-                  type="button"
-                  onClick={onLoadDemoData}
-                  className="w-full text-center py-2 bg-white hover:bg-[#F5F6F8] border border-[#d7e6d4] rounded-xl text-[10px] font-bold uppercase tracking-wider text-[#7A7A70] hover:text-[#1E5631] transition-colors cursor-pointer"
-                >
-                  🔄 Recargar / Actualizar Datos de Demostración
-                </button>
-              </div>
-            )}
-
-          </div>
-
-        </div>
+          </section>
+        </>
       )}
-
     </div>
   );
 }
