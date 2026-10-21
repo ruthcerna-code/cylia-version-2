@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, DailyLog, ChatMessage, MenstrualPhase } from './types';
+import { UserProfile, DailyLog, ChatMessage, MenstrualPhase, ScheduledActivity } from './types';
+import AgendaScreen, { type AgendaSeed } from './components/AgendaScreen';
 import Onboarding from './components/Onboarding';
 import { EntryFlow, MoodGrid, ObjectivesScreen, RegionScreen } from './components/EntryFlow';
 import DesignHome from './components/DesignHome';
@@ -11,10 +12,14 @@ import ChatPanel from './components/ChatPanel';
 import HealthProfileModal from './components/HealthProfileModal';
 import SymptomChart from './components/SymptomChart';
 import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
+import { compareActivities, explainActivityError, formatActivityWhen, LOCAL_ACTIVITY_STORE_NOTE, suggestActivity } from './utils/activities';
 import { generateActivityForDay } from './utils/activity';
 import {
   deleteAccountData,
   deleteMessages,
+  activitiesStoredOnThisDevice,
+  deleteScheduledActivity,
+  fetchActivities,
   fetchLogs,
   fetchMessages,
   fetchProfile,
@@ -22,6 +27,7 @@ import {
   saveLogs,
   saveMessage,
   saveProfile,
+  saveScheduledActivity,
   signInAnonymously,
   canSeeRegisteredData,
   signInWithEmail,
@@ -113,7 +119,11 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
-  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil'>('inicio');
+  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'agenda' | 'chat' | 'humor' | 'perfil'>('inicio');
+  const [activities, setActivities] = useState<ScheduledActivity[]>([]);
+  const [activitiesError, setActivitiesError] = useState('');
+  const [activityStorageNote, setActivityStorageNote] = useState('');
+  const [agendaSeed, setAgendaSeed] = useState<AgendaSeed | null>(null);
   const [homeSheet, setHomeSheet] = useState<null | 'fase' | 'actividad'>(null);
   const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion'>(null);
   const [profileSheet, setProfileSheet] = useState<null | 'ciclo' | 'objetivos' | 'privacidad'>(null);
@@ -276,6 +286,65 @@ export default function App() {
       unsubscribe();
     };
   }, [user]);
+
+  const refreshActivities = async () => {
+    if (!user || !canSeeRegisteredData(user)) {
+      setActivities([]);
+      setActivitiesError('');
+      setActivityStorageNote('');
+      return;
+    }
+    try {
+      setActivities(await fetchActivities(user.id));
+      setActivitiesError('');
+      setActivityStorageNote(activitiesStoredOnThisDevice() ? LOCAL_ACTIVITY_STORE_NOTE : '');
+    } catch (error) {
+      setActivitiesError(explainActivityError(error));
+    }
+  };
+
+  useEffect(() => {
+    void refreshActivities();
+  }, [user]);
+
+  const calendarReturnHandled = useRef(false);
+  useEffect(() => {
+    if (!user || calendarReturnHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const calendar = params.get('calendar');
+    if (!calendar) return;
+    calendarReturnHandled.current = true;
+    window.history.replaceState({}, '', window.location.pathname);
+    setAppTab('agenda');
+    showNotice(calendar === 'connected'
+      ? 'Google Calendar conectado. Elige el calendario y sincroniza cuando quieras.'
+      : (params.get('reason') || 'No se pudo conectar Google Calendar.'));
+  }, [user]);
+
+  const handleSaveActivity = async (draft: Parameters<typeof saveScheduledActivity>[1]) => {
+    if (!user) return;
+    try {
+      const saved = await saveScheduledActivity(user.id, draft);
+      setActivities((current) => [...current.filter((item) => item.id !== saved.id), saved].sort(compareActivities));
+      setActivitiesError('');
+      setActivityStorageNote(activitiesStoredOnThisDevice() ? LOCAL_ACTIVITY_STORE_NOTE : '');
+    } catch (error) {
+      throw new Error(explainActivityError(error));
+    }
+  };
+
+  const handleDeleteActivity = async (activity: ScheduledActivity) => {
+    if (!user) return;
+    try {
+      const updated = await deleteScheduledActivity(user.id, activity);
+      setActivities((current) => updated
+        ? current.map((item) => item.id === activity.id ? updated : item)
+        : current.filter((item) => item.id !== activity.id));
+      setActivityStorageNote(activitiesStoredOnThisDevice() ? LOCAL_ACTIVITY_STORE_NOTE : '');
+    } catch (error) {
+      throw new Error(explainActivityError(error));
+    }
+  };
 
   const handleSaveProfile = async (newProfile: UserProfile) => {
     if (!user) return false;
@@ -734,6 +803,17 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
   const selectedPhase = getPhaseForDay(selectedCycleDay, profile.periodLength, profile.cycleLength);
   const phaseDetails = PHASE_DETAILS[selectedPhase];
   const activeLog = logs[selectedDateStr];
+  const dayActivities = activities.filter((item) => item.date === selectedDateStr && item.syncStatus !== 'delete_pending');
+  const activitySuggestion = activeLog ? suggestActivity(selectedPhase, activeLog) : null;
+  const activityDates = activities.filter((item) => item.syncStatus !== 'delete_pending').map((item) => item.date);
+  const openAgenda = (title: string, date: string) => {
+    setAgendaSeed({ token: Date.now(), title, date });
+    setHomeSheet(null);
+    setCycleSheet(null);
+    setProfileSheet(null);
+    setChatHistoryOpen(false);
+    setAppTab('agenda');
+  };
 
   const selectedActivity = generateActivityForDay(
     profile.name,
@@ -749,7 +829,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
   return (
     <div className="min-h-dvh text-[#1B1F5E] font-sans flex justify-center bg-transparent">
-    <div className="w-full max-w-[480px] min-h-dvh relative flex flex-col pb-24 bg-transparent">
+    <div className="w-full max-w-[480px] min-h-dvh relative flex flex-col pb-28 bg-transparent">
       
       {/* Toast Notification */}
       {showNotification && (
@@ -839,6 +919,18 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </button>
           </div>
         )}
+        {appTab === 'agenda' && (
+          <AgendaScreen
+            activities={activities}
+            loadError={activitiesError}
+            storageNote={activityStorageNote}
+            seed={agendaSeed}
+            onSeedApplied={() => setAgendaSeed(null)}
+            onSave={handleSaveActivity}
+            onDelete={handleDeleteActivity}
+            onRefresh={refreshActivities}
+          />
+        )}
         {appTab === 'registro' && (
           <DesignRegister
             dateStr={selectedDateStr}
@@ -846,6 +938,8 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             phaseLabel={phaseDetails.name}
             cycleDay={selectedCycleDay}
             existing={activeLog}
+            suggestion={activitySuggestion}
+            onSchedule={(title) => openAgenda(title, selectedDateStr)}
             onSave={(log) => { void handleSaveLog(log, { analyze: false }); }}
             onSaveAndAnalyze={(log) => { void handleSaveLog(log); }}
           />
@@ -1012,12 +1106,26 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               profile={profile}
               selectedDateStr={selectedDateStr}
               onSelectDate={setSelectedDateStr}
+              activityDates={activityDates}
             />
             <section className="flex flex-col gap-1.5 rounded-[20px] bg-white p-4">
               <span className="text-xs font-extrabold tracking-wide text-[#4A4F7A]">DÍA SELECCIONADO</span>
               <h2 className="m-0 text-[17px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h2>
               <p className="m-0 text-sm text-[#3B4070]">Día {selectedCycleDay} del ciclo · {phaseDetails.name} · {activeLog ? 'Con registro' : 'Sin registro'}</p>
               <button type="button" onClick={() => setCycleSheet('dia')} className="w-fit cursor-pointer py-2 text-[15px] font-extrabold text-[#3A44C4]">Ver detalle del día</button>
+              {dayActivities.length > 0 && (
+                <ul className="m-0 list-none p-0 text-sm text-[#3B4070]">
+                  {dayActivities.map((activity) => (
+                    <li key={activity.id}><strong className="text-[#1B1F5E]">{activity.title}</strong> · {activity.startTime}–{activity.endTime}</li>
+                  ))}
+                </ul>
+              )}
+              {activitySuggestion && (
+                <>
+                  <p className="m-0 text-sm text-[#3B4070]">Sugerencia opcional: <strong className="text-[#1B1F5E]">{activitySuggestion.title}</strong>. {activitySuggestion.note}</p>
+                  <button type="button" onClick={() => openAgenda(activitySuggestion.title, selectedDateStr)} className="mt-1 h-11 cursor-pointer rounded-full bg-[#F49A9E] px-4 text-sm font-extrabold text-[#1B1F5E]">Agendar una actividad para mí</button>
+                </>
+              )}
               <div className="my-1 h-px bg-[#E1E5F5]" />
               <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {formatFriendlyDate(formatDateStr(new Date(new Date().setHours(12, 0, 0, 0) + (profile.cycleLength - getCycleDay(formatDateStr(new Date()), profile.lastPeriodDate, profile.cycleLength) + 1) * 86400000)))}</p>
             </section>
@@ -1064,6 +1172,23 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                 </>
               ) : (
                 <p className="rounded-[20px] bg-white p-4 text-sm">Este día todavía no tiene registro.</p>
+              )}
+              {dayActivities.length > 0 && (
+                <section className="rounded-[20px] bg-white p-4">
+                  <h2 className="m-0 text-base font-extrabold">Actividades de este día</h2>
+                  <ul className="m-0 mt-2 list-none p-0 text-sm text-[#3B4070]">
+                    {dayActivities.map((activity) => (
+                      <li key={activity.id} className="mt-1"><strong className="text-[#1B1F5E]">{activity.title}</strong> · {formatActivityWhen(activity)}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {activitySuggestion && (
+                <section className="rounded-[20px] bg-white p-4">
+                  <h2 className="m-0 text-base font-extrabold">Agendar una actividad para mí</h2>
+                  <p className="m-0 mt-2 text-sm text-[#3B4070]">Sugerencia opcional: <strong className="text-[#1B1F5E]">{activitySuggestion.title}</strong>. {activitySuggestion.note}</p>
+                  <button type="button" onClick={() => openAgenda(activitySuggestion.title, selectedDateStr)} className="mt-3 h-11 cursor-pointer rounded-full bg-[#A9C4F0] px-4 text-[15px] font-extrabold text-[#1B1F5E]">Agendar una actividad para mí</button>
+                </section>
               )}
               <div className="flex gap-2.5">
                 <button type="button" onClick={() => activeLog ? setIsAnalysisOpen(true) : setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Ver análisis</button>
@@ -1357,11 +1482,12 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[82px] w-full max-w-[480px] -translate-x-1/2 grid-cols-5 border-t border-[#E7ECFB] bg-white">
+      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-6 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
         {([
           ['inicio', 'Inicio', '⌂'],
           ['calendario', 'Ciclo', '▦'],
           ['registro', 'Registro', '+'],
+          ['agenda', 'Agendar actividades', '◷'],
           ['chat', 'Cyclia IA', '✦'],
           ['perfil', 'Perfil', '•'],
         ] as const).map(([id, label, icon]) => (
@@ -1369,10 +1495,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             key={id}
             type="button"
             onClick={() => { setHomeSheet(null); setCycleSheet(null); setProfileSheet(null); setChatHistoryOpen(false); setAppTab(id); }}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-1 text-[11px] font-extrabold ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
+            className={`flex cursor-pointer flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-extrabold leading-tight ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
           >
             <span className="text-lg leading-none">{icon}</span>
-            {label}
+            {id === 'agenda' ? <span className="text-center">Agendar<br />actividades</span> : label}
           </button>
         ))}
       </nav>

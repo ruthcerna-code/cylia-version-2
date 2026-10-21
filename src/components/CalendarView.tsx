@@ -6,6 +6,7 @@ interface CalendarViewProps {
   profile: UserProfile;
   selectedDateStr: string;
   onSelectDate: (dateStr: string) => void;
+  activityDates?: string[];
 }
 
 const MONTH_NAMES = [
@@ -13,7 +14,7 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
 
-export default function CalendarView({ profile, selectedDateStr, onSelectDate }: CalendarViewProps) {
+export default function CalendarView({ profile, selectedDateStr, onSelectDate, activityDates = [] }: CalendarViewProps) {
   const today = new Date();
   const todayStr = formatDateStr(today);
 
@@ -76,6 +77,7 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate }:
     const { dateStr, cycleDay, phase } = getDayDetails(d);
     const isSelected = selectedDateStr === dateStr;
     const isToday = todayStr === dateStr;
+    const hasActivity = activityDates.includes(dateStr);
 
     // Decide phase-based color classes matching the "Natural Tones" layout specification
     let bgClass = "bg-gray-100 text-gray-500";
@@ -104,6 +106,9 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate }:
         <span>{d}</span>
         {isToday && (
           <span className="absolute bottom-1 w-1.5 h-1.5 bg-[#1B1F5E] rounded-full"></span>
+        )}
+        {hasActivity && (
+          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-white ring-2 ring-[#1B1F5E]" title="Actividad agendada"></span>
         )}
       </button>
     );

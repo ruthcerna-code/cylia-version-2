@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import { registerCalendarRoutes } from "./calendarRoutes";
 
 dotenv.config();
 
@@ -333,6 +334,8 @@ Responde a la usuaria de forma natural y cercana, respetando el tono de Cyclia. 
     res.status(500).json({ error: error.message || "Error al procesar el chat con la IA" });
   }
 });
+
+registerCalendarRoutes(app);
 
 // Setup Vite Dev Server / Static Files Serving
 async function startServer() {

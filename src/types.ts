@@ -38,6 +38,24 @@ export interface ChatMessage {
 
 export type MenstrualPhase = 'Menstrual' | 'Folicular' | 'Ovulacion' | 'Lutea';
 
+export type ActivitySyncStatus = 'pending' | 'synced' | 'changed' | 'error' | 'delete_pending';
+
+export interface ScheduledActivity {
+  id: string;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  reminderMinutes: number | null;
+  notes: string;
+  timeZone: string;
+  syncStatus: ActivitySyncStatus;
+  googleEventId: string | null;
+  googleCalendarId: string | null;
+  syncError: string | null;
+  updatedAt: string;
+}
+
 export interface PhaseInfo {
   name: string;
   badge: string;

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { ChatMessage, DailyLog, UserProfile } from './types';
+import type { ChatMessage, DailyLog, ScheduledActivity, UserProfile } from './types';
+import { compareActivities } from './utils/activities';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -346,14 +347,245 @@ export async function deleteMessages(userId: string) {
   throwIfError(error, 'deleteMessages');
 }
 
+function isMissingTable(error: { message: string } | null): boolean {
+  if (!error) return false;
+  return /schema cache|does not exist|could not find the table/i.test(error.message);
+}
+
 export async function deleteAccountData(userId: string) {
   const client = requireClient();
+  const activities = await client.from('scheduled_activities').delete().eq('user_id', userId);
+  if (!isMissingTable(activities.error)) throwIfError(activities.error, 'deleteActivities');
+  const connection = await client.from('calendar_connections').delete().eq('user_id', userId);
+  if (!isMissingTable(connection.error)) throwIfError(connection.error, 'deleteCalendarConnection');
   const messages = await client.from('messages').delete().eq('user_id', userId);
   throwIfError(messages.error, 'deleteMessages');
   const logs = await client.from('daily_logs').delete().eq('user_id', userId);
   throwIfError(logs.error, 'deleteLogs');
   const profile = await client.from('profiles').delete().eq('id', userId);
   throwIfError(profile.error, 'deleteProfile');
+}
+
+type ActivityRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  activity_date: string;
+  start_time: string;
+  end_time: string;
+  reminder_minutes: number | null;
+  notes: string;
+  time_zone: string;
+  sync_status: ScheduledActivity['syncStatus'];
+  google_event_id: string | null;
+  google_calendar_id: string | null;
+  sync_error: string | null;
+  updated_at: string;
+};
+
+function rowToActivity(row: ActivityRow): ScheduledActivity {
+  return {
+    id: row.id,
+    title: row.title,
+    date: row.activity_date,
+    startTime: row.start_time.slice(0, 5),
+    endTime: row.end_time.slice(0, 5),
+    reminderMinutes: row.reminder_minutes,
+    notes: row.notes || '',
+    timeZone: row.time_zone,
+    syncStatus: row.sync_status,
+    googleEventId: row.google_event_id,
+    googleCalendarId: row.google_calendar_id,
+    syncError: row.sync_error,
+    updatedAt: row.updated_at,
+  };
+}
+
+export type ActivityDraft = {
+  id?: string;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  reminderMinutes: number | null;
+  notes: string;
+  timeZone: string;
+};
+
+const localActivityKey = (userId: string) => `cyclia_activities_${userId}`;
+let activityStoreIsLocal = false;
+
+export function activitiesStoredOnThisDevice(): boolean {
+  return activityStoreIsLocal;
+}
+
+function readLocalActivities(userId: string): ScheduledActivity[] {
+  try {
+    const raw = localStorage.getItem(localActivityKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ScheduledActivity[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalActivities(userId: string, items: ScheduledActivity[]) {
+  localStorage.setItem(localActivityKey(userId), JSON.stringify(items));
+  activityStoreIsLocal = true;
+}
+
+function activityToRow(userId: string, activity: ScheduledActivity) {
+  return {
+    id: activity.id,
+    user_id: userId,
+    title: activity.title,
+    activity_date: activity.date,
+    start_time: activity.startTime,
+    end_time: activity.endTime,
+    reminder_minutes: activity.reminderMinutes,
+    notes: activity.notes,
+    time_zone: activity.timeZone,
+    sync_status: activity.syncStatus,
+    google_event_id: activity.googleEventId,
+    google_calendar_id: activity.googleCalendarId,
+    sync_error: activity.syncError,
+    updated_at: activity.updatedAt,
+  };
+}
+
+function saveLocalActivity(userId: string, draft: ActivityDraft): ScheduledActivity {
+  const items = readLocalActivities(userId);
+  const existing = draft.id ? items.find((item) => item.id === draft.id) || null : null;
+  const saved: ScheduledActivity = {
+    id: existing?.id || draft.id || crypto.randomUUID(),
+    title: draft.title.trim(),
+    date: draft.date,
+    startTime: draft.startTime,
+    endTime: draft.endTime,
+    reminderMinutes: draft.reminderMinutes,
+    notes: draft.notes.trim(),
+    timeZone: draft.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    syncStatus: existing?.googleEventId ? 'changed' : 'pending',
+    googleEventId: existing?.googleEventId ?? null,
+    googleCalendarId: existing?.googleCalendarId ?? null,
+    syncError: null,
+    updatedAt: new Date().toISOString(),
+  };
+  writeLocalActivities(userId, [...items.filter((item) => item.id !== saved.id), saved].sort(compareActivities));
+  return saved;
+}
+
+export async function fetchActivities(userId: string): Promise<ScheduledActivity[]> {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('scheduled_activities')
+    .select('*')
+    .eq('user_id', userId);
+  if (error && isMissingTable(error)) {
+    activityStoreIsLocal = true;
+    return readLocalActivities(userId).sort(compareActivities);
+  }
+  throwIfError(error, 'fetchActivities');
+  activityStoreIsLocal = false;
+  const remote = ((data || []) as ActivityRow[]).map(rowToActivity);
+  const local = readLocalActivities(userId).filter((item) => !remote.some((row) => row.id === item.id));
+  if (local.length) {
+    const uploaded: ScheduledActivity[] = [];
+    for (const item of local) {
+      const insert = await client.from('scheduled_activities').upsert(activityToRow(userId, item));
+      if (insert.error) return [...remote, ...local].sort(compareActivities);
+      uploaded.push(item);
+    }
+    localStorage.removeItem(localActivityKey(userId));
+    return [...remote, ...uploaded].sort(compareActivities);
+  }
+  localStorage.removeItem(localActivityKey(userId));
+  return remote.sort(compareActivities);
+}
+
+export async function saveScheduledActivity(userId: string, draft: ActivityDraft): Promise<ScheduledActivity> {
+  const client = requireClient();
+  const now = new Date().toISOString();
+  let existing: ActivityRow | null = null;
+  if (draft.id) {
+    const current = await client
+      .from('scheduled_activities')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', draft.id)
+      .maybeSingle();
+    if (current.error && isMissingTable(current.error)) return saveLocalActivity(userId, draft);
+    throwIfError(current.error, 'readActivity');
+    existing = current.data as ActivityRow | null;
+  }
+
+  const hadGoogleEvent = Boolean(existing?.google_event_id);
+  const syncStatus: ScheduledActivity['syncStatus'] = hadGoogleEvent ? 'changed' : 'pending';
+  const row = {
+    id: draft.id || crypto.randomUUID(),
+    user_id: userId,
+    title: draft.title.trim(),
+    activity_date: draft.date,
+    start_time: draft.startTime,
+    end_time: draft.endTime,
+    reminder_minutes: draft.reminderMinutes,
+    notes: draft.notes.trim(),
+    time_zone: draft.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    sync_status: syncStatus,
+    google_event_id: existing?.google_event_id ?? null,
+    google_calendar_id: existing?.google_calendar_id ?? null,
+    sync_error: null,
+    updated_at: now,
+  };
+
+  const { data, error } = await client
+    .from('scheduled_activities')
+    .upsert(row)
+    .select('*')
+    .single();
+  if (error && isMissingTable(error)) return saveLocalActivity(userId, draft);
+  throwIfError(error, 'saveActivity');
+  activityStoreIsLocal = false;
+  return rowToActivity(data as ActivityRow);
+}
+
+export async function deleteScheduledActivity(
+  userId: string,
+  activity: ScheduledActivity,
+): Promise<ScheduledActivity | null> {
+  const client = requireClient();
+  if (!activity.googleEventId) {
+    const { error } = await client.from('scheduled_activities').delete().eq('user_id', userId).eq('id', activity.id);
+    if (error && isMissingTable(error)) {
+      writeLocalActivities(userId, readLocalActivities(userId).filter((item) => item.id !== activity.id));
+      return null;
+    }
+    throwIfError(error, 'deleteActivity');
+    activityStoreIsLocal = false;
+    return null;
+  }
+
+  const { data, error } = await client
+    .from('scheduled_activities')
+    .update({
+      sync_status: 'delete_pending',
+      sync_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId)
+    .eq('id', activity.id)
+    .select('*')
+    .single();
+  if (error && isMissingTable(error)) {
+    const updated = { ...activity, syncStatus: 'delete_pending' as const, syncError: null, updatedAt: new Date().toISOString() };
+    const items = readLocalActivities(userId).map((item) => item.id === activity.id ? updated : item);
+    writeLocalActivities(userId, items);
+    return updated;
+  }
+  throwIfError(error, 'markActivityDeleted');
+  activityStoreIsLocal = false;
+  return rowToActivity(data as ActivityRow);
 }
 
 export function subscribeUserData(userId: string, onChange: () => void) {

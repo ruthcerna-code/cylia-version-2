@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { DailyLog } from '../types';
+import type { ActivitySuggestion } from '../utils/activities';
 
 const SCALES = [
   { key: 'fatigue', label: 'Cansancio', hint: '1 nada · 5 mucho' },
@@ -19,6 +20,8 @@ export default function DesignRegister({
   existing,
   onSave,
   onSaveAndAnalyze,
+  suggestion,
+  onSchedule,
 }: {
   dateStr: string;
   dateLabel: string;
@@ -27,6 +30,8 @@ export default function DesignRegister({
   existing?: DailyLog;
   onSave: (log: DailyLog) => void;
   onSaveAndAnalyze: (log: DailyLog) => void;
+  suggestion?: ActivitySuggestion | null;
+  onSchedule?: (title: string) => void;
 }) {
   const [values, setValues] = useState({
     fatigue: existing?.fatigue || 3,
@@ -134,6 +139,14 @@ export default function DesignRegister({
       </section>
       <button type="button" onClick={() => onSaveAndAnalyze(buildLog())} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-base font-extrabold text-[#1B1F5E]">Guardar y analizar</button>
       <button type="button" onClick={() => onSave(buildLog())} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-[15px] font-extrabold text-[#1B1F5E]">Solo guardar</button>
+      {suggestion && onSchedule && (
+        <section className="flex flex-col gap-2 rounded-[20px] bg-white p-4" aria-labelledby="schedule-suggestion">
+          <h2 id="schedule-suggestion" className="m-0 text-base font-extrabold">Agendar una actividad para mí</h2>
+          <p className="m-0 text-sm text-[#3B4070]">Sugerencia opcional: <strong className="text-[#1B1F5E]">{suggestion.title}</strong></p>
+          <p className="m-0 text-sm text-[#3B4070]">{suggestion.note}</p>
+          <button type="button" onClick={() => onSchedule(suggestion.title)} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Agendar una actividad para mí</button>
+        </section>
+      )}
     </div>
   );
 }
