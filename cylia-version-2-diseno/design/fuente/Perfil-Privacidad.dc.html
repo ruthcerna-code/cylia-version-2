@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>CYCLIA · Privacidad y notificaciones</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&amp;family=Nunito+Sans:wght@400;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#3A44C4}a:hover{color:#262C8F}
+.cy-bg{background-image:url(/_blob/453dea8e03cf7de0e2cf695f0d004675);background-size:390px 844px;background-repeat:no-repeat}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:44px;text-decoration:none;color:#5B6190;font:700 11px 'Nunito Sans',sans-serif}
+.tab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:#3A44C4}
+</style>
+</helmet>
+<div class="cy-bg" style="width: 390px; height: 844px; position: relative; overflow: hidden; background-color: #E3F1FB; font-family: 'Nunito Sans', sans-serif; color: #1B1F5E">
+<main style="position: absolute; left: 0; right: 0; top: 0; bottom: 82px; overflow-y: auto">
+<header style="padding: 44px 18px 10px; display: flex; flex-direction: column; gap: 6px">
+<a href="Perfil.dc.html" style="align-self: flex-start; display: flex; align-items: center; gap: 4px; min-height: 44px; text-decoration: none; font-weight: 800; font-size: 15px"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"></path></svg>Perfil</a>
+<h1 style="margin: 0; font-size: 26px; font-weight: 800">Privacidad y notificaciones</h1>
+</header>
+<div style="padding: 8px 14px 24px; display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: #4A4F7A">NOTIFICACIONES Y APARIENCIA</span>
+<section style="background: #FFFFFF; border-radius: 20px; padding: 4px 16px">
+<sc-for list="{{items}}" as="t" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: {{t.line}}">
+<span style="flex: 1; display: flex; flex-direction: column"><strong style="font-size: 15px">{{t.name}}</strong><span style="font-size: 13px; color: #4A4F7A">{{t.sub}}</span></span>
+<button type="button" role="switch" aria-checked="{{t.on}}" aria-label="{{t.name}}" onClick="{{t.pick}}" style="width: 52px; height: 32px; border-radius: 16px; border: none; background: {{t.track}}; padding: 3px; display: flex; justify-content: {{t.side}}; cursor: pointer"><span style="width: 26px; height: 26px; border-radius: 13px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(27, 31, 94, 0.3)"></span></button>
+</div>
+</sc-for>
+</section>
+<span style="margin-top: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: #4A4F7A">TUS DATOS</span>
+<section style="background: #A9C4F0; border-radius: 20px; padding: 16px; display: flex; gap: 12px">
+<svg aria-hidden="true" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#1B1F5E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path><path d="M9 12l2 2 4-4"></path></svg>
+<p style="margin: 0; font-size: 14px; line-height: 1.5">Tus registros son privados y se usan solo para personalizar tus recomendaciones.</p>
+</section>
+<section style="background: #FFFFFF; border-radius: 20px; padding: 4px 16px">
+<button type="button" style="width: 100%; min-height: 52px; display: flex; align-items: center; justify-content: space-between; border: none; border-bottom: 1px solid #E1E5F5; background: transparent; color: #1B1F5E; font: 800 15px 'Nunito Sans', sans-serif; cursor: pointer; padding: 0">Exportar mis datos<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#3A44C4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"></path></svg></button>
+<button type="button" style="width: 100%; min-height: 52px; display: flex; align-items: center; justify-content: space-between; border: none; background: transparent; color: #1B1F5E; font: 800 15px 'Nunito Sans', sans-serif; cursor: pointer; padding: 0">Política de privacidad<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#3A44C4" stroke-width="2.2" stroke-linecap="round"><path d="M9 5l7 7-7 7"></path></svg></button>
+</section>
+<button type="button" style="margin-top: 6px; height: 50px; border-radius: 25px; border: none; background: #F49A9E; color: #1B1F5E; font: 800 15px 'Nunito Sans', sans-serif; cursor: pointer">Eliminar mi cuenta y mis datos</button>
+</div>
+</main>
+<nav aria-label="Navegación principal" style="position: absolute; left: 0; right: 0; bottom: 0; height: 82px; box-sizing: border-box; padding: 10px 6px 0; background: #FFFFFF; border-top: 1px solid #E1E5F5; display: flex">
+<a class="tab" href="Inicio.dc.html"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</a>
+<a class="tab" href="Ciclo.dc.html"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Ciclo</a>
+<a class="tab" href="Registro.dc.html"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8M8 12h8"></path></svg>Registro</a>
+<a class="tab" href="Chat.dc.html"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"></path></svg>Cyclia IA</a>
+<a class="tab on" href="Perfil.dc.html" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>Perfil</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(p){ super(p); this.state = { on: [true, true, false, false] }; }
+renderVals() {
+const N = [['Recordatorio de registro','Todos los días a las 20:00'],['Aviso de próximo periodo','2 días antes'],['Consejo de fase','Al comenzar cada fase'],['Modo oscuro','Colores de la app']];
+const on = this.state.on;
+return { items: N.map((n,i)=>({ name:n[0], sub:n[1], on: on[i]?'true':'false', track: on[i]?'#F49A9E':'#E8D46A', side: on[i]?'flex-end':'flex-start', line: i<3?'1px solid #E1E5F5':'none', pick:()=>{ const v=on.slice(); v[i]=!v[i]; this.setState({ on:v }); } })) };
+}
+}
+</script>
+</body>
+</html>
