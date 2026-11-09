@@ -9,6 +9,10 @@ export interface UserProfile {
   periodLength: number; // in days, e.g., 5
   cycleLength: number; // in days, e.g., 28
   contraceptive: string; // "Ninguno" or custom
+  /** manual: the saved day counts are the reference. records: use an average when enough observed cycles exist. */
+  lengthSource?: 'manual' | 'records';
+  /** Whether the user wants cycle reminders. Delivery is a separate, not-yet-built step. */
+  cycleReminders?: boolean;
   isCeliac?: boolean;
   hasDiabetes?: boolean;
   hasObesity?: boolean;

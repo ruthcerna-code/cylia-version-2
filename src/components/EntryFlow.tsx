@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import WelcomeScreen from './WelcomeScreen';
+import { PrivacyAcceptance } from './LegalDrafts';
 
 const SLIDES = [
   {
@@ -21,6 +22,15 @@ const GOALS = [
   { id: 'bienestar', title: 'Bienestar diario', text: 'Un check-in corto y constante.' },
 ];
 
+function RememberRow({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <label className="flex min-h-12 items-center gap-3 rounded-2xl bg-white px-4 text-sm font-semibold" style={{ color: 'var(--emeraude-deep)' }}>
+      <input type="checkbox" className="h-5 w-5" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      Mantener la sesión por 24 horas
+    </label>
+  );
+}
+
 function Frame({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh justify-center bg-transparent">
@@ -33,32 +43,73 @@ export function EntryFlow({
   configured,
   processing,
   error,
-  email,
+  username,
   password,
-  signUp,
-  onEmailChange,
+  startAtOther,
+  onUsernameChange,
   onPasswordChange,
-  onToggleSignUp,
-  onGoogle,
   onAnonymous,
-  onEmailSubmit,
+  onAccountSubmit,
+  onOtherAccount,
 }: {
   configured: boolean;
   processing: boolean;
   error: string;
-  email: string;
+  username: string;
   password: string;
-  signUp: boolean;
-  onEmailChange: (value: string) => void;
+  startAtOther?: boolean;
+  onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
-  onToggleSignUp: () => void;
-  onGoogle: () => void;
   onAnonymous: () => void;
-  onEmailSubmit: (event: React.FormEvent) => void;
+  onAccountSubmit: (event: React.FormEvent, remember: boolean) => void;
+  onOtherAccount: (event: React.FormEvent, remember: boolean) => void;
 }) {
-  const [step, setStep] = useState<'welcome' | 'intro' | 'auth'>('welcome');
+  const [step, setStep] = useState<'welcome' | 'intro' | 'auth' | 'otra'>(startAtOther ? 'otra' : 'welcome');
+  const [remember, setRemember] = useState(false);
   const [slide, setSlide] = useState(0);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [privacyError, setPrivacyError] = useState('');
   const current = SLIDES[slide];
+  const acceptPrivacyOrWarn = () => {
+    if (privacyAccepted) return true;
+    setPrivacyError('Para entrar, marca que leíste la Política de privacidad.');
+    return false;
+  };
+
+  if (step === 'otra') {
+    return (
+      <div className="h-dvh flex justify-center" style={{ background: 'var(--perle)' }}>
+        <div className="channel-frame !min-h-0 h-full flex flex-col">
+          <header className="shrink-0 flex h-14 items-center px-5" style={{ background: 'var(--perle)' }}>
+            <button type="button" onClick={() => setStep('welcome')} className="cursor-pointer text-sm font-semibold" style={{ color: 'var(--emeraude)' }}>← Inicio</button>
+          </header>
+          <main className="flex-1 overflow-y-auto px-5 pb-8">
+            <h1 className="font-serif text-4xl" style={{ color: 'var(--emeraude)' }}>Crear cuenta</h1>
+            <p className="text-sm mt-2 mb-6" style={{ color: 'var(--emeraude-deep)' }}>
+              El usuario es un correo y la contraseña se crea ahora. Si el correo ya existe, la contraseña tiene que ser la misma con la que se creó.
+            </p>
+            {error && <p className="text-xs text-red-700 bg-red-50 rounded-2xl p-3 mb-4">{error}</p>}
+            <PrivacyAcceptance
+              checked={privacyAccepted}
+              error={privacyError}
+              onChange={(value) => {
+                setPrivacyAccepted(value);
+                if (value) setPrivacyError('');
+              }}
+            />
+            <form onSubmit={(event) => { if (!acceptPrivacyOrWarn()) { event.preventDefault(); return; } onOtherAccount(event, remember); }} className="mt-6 flex flex-col gap-3">
+              <input value={username} onChange={(event) => onUsernameChange(event.target.value)} type="email" required autoComplete="email" placeholder="Correo" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
+              <input value={password} onChange={(event) => onPasswordChange(event.target.value)} type="password" required minLength={4} autoComplete="new-password" placeholder="Contraseña" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
+              <RememberRow checked={remember} onChange={setRemember} />
+              <button type="submit" disabled={processing || !configured || !privacyAccepted} className="btn-fucsia min-h-12 w-full rounded-full py-3 text-sm font-semibold cursor-pointer disabled:opacity-50">
+                {processing ? 'Creando…' : 'Crear cuenta'}
+              </button>
+            </form>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   if (step === 'welcome') {
     return (
@@ -67,10 +118,14 @@ export function EntryFlow({
         body="Entiende cómo tu biología influye en tu energía, tu concentración y tu bienestar, día a día."
         primaryLabel="Comenzar"
         onPrimary={() => setStep('intro')}
-        secondaryLabel={processing ? 'Abriendo…' : 'Ya tengo cuenta'}
-        onSecondary={onGoogle}
+        secondaryLabel="Ya tengo cuenta"
+        onSecondary={() => setStep('auth')}
+        extra={(
+          <button type="button" onClick={() => { onUsernameChange(''); onPasswordChange(''); setStep('otra'); }} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-white text-[15px] font-bold text-[#1B1F5E]">
+            Sin cuenta
+          </button>
+        )}
         error={error}
-        extra={<button type="button" onClick={() => setStep('auth')} className="cursor-pointer text-xs font-bold text-[#D2DDF8]">Entrar con correo o modo anónimo</button>}
       />
     );
   }
@@ -132,7 +187,7 @@ export function EntryFlow({
       <main className="flex-1 overflow-y-auto px-5 pt-6 pb-8">
       <h1 className="font-serif text-4xl" style={{ color: 'var(--emeraude)' }}>Entra a Cyclia</h1>
       <p className="text-sm mt-2 mb-6" style={{ color: 'var(--emeraude-deep)' }}>
-        Entra con Gmail. Si tu correo no es de Gmail, la contraseña también es una cuenta válida.
+        Entra con el usuario que creó la administración, o continúa en modo anónimo.
       </p>
       {!configured && (
         <p className="text-xs rounded-2xl p-3 mb-4" style={{ background: 'var(--menthe)', color: 'var(--emeraude)' }}>
@@ -140,29 +195,33 @@ export function EntryFlow({
         </p>
       )}
       {error && <p className="text-xs text-red-700 bg-red-50 rounded-2xl p-3 mb-4">{error}</p>}
-      <button type="button" disabled={processing || !configured} onClick={onGoogle} className="btn-fucsia w-full rounded-full py-3.5 text-sm font-semibold cursor-pointer">
-        {processing ? 'Abriendo…' : 'Continuar con Google'}
-      </button>
-      <button type="button" disabled={processing || !configured} onClick={onAnonymous} className="btn-emeraude w-full rounded-full py-3.5 text-sm font-semibold cursor-pointer mt-3">
+      <PrivacyAcceptance
+        checked={privacyAccepted}
+        error={privacyError}
+        onChange={(value) => {
+          setPrivacyAccepted(value);
+          if (value) setPrivacyError('');
+        }}
+      />
+      <button type="button" disabled={processing || !configured || !privacyAccepted} onClick={() => { if (acceptPrivacyOrWarn()) onAnonymous(); }} className="btn-fucsia mt-6 w-full rounded-full py-3.5 text-sm font-semibold cursor-pointer disabled:opacity-50">
         Entrar en modo anónimo
       </button>
-      <form onSubmit={onEmailSubmit} className="mt-6 flex flex-col gap-3">
-        <input value={email} onChange={(event) => onEmailChange(event.target.value)} type="email" required placeholder="Correo" className="rounded-2xl px-5 py-5 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
-        <input value={password} onChange={(event) => onPasswordChange(event.target.value)} type="password" required minLength={6} placeholder="Contraseña" className="rounded-2xl px-5 py-5 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
-        <button type="submit" disabled={processing || !configured} className="rounded-full py-3 text-sm font-semibold cursor-pointer" style={{ color: 'var(--emeraude)', border: '1px solid var(--emeraude)' }}>
-          {signUp ? 'Crear cuenta' : 'Entrar con correo'}
-        </button>
-        <button type="button" onClick={onToggleSignUp} className="text-xs font-semibold cursor-pointer" style={{ color: 'var(--fucsia)' }}>
-          {signUp ? 'Ya tengo cuenta' : 'Crear cuenta con correo'}
+      <form onSubmit={(event) => { if (!acceptPrivacyOrWarn()) { event.preventDefault(); return; } onAccountSubmit(event, remember); }} className="mt-6 flex flex-col gap-3">
+        <input value={username} onChange={(event) => onUsernameChange(event.target.value)} type="text" required autoComplete="username" placeholder="Usuario" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
+        <input value={password} onChange={(event) => onPasswordChange(event.target.value)} type="password" required minLength={4} autoComplete="current-password" placeholder="Contraseña" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
+        <RememberRow checked={remember} onChange={setRemember} />
+        <button type="submit" disabled={processing || !configured || !privacyAccepted} className="min-h-12 rounded-full py-3 text-sm font-semibold cursor-pointer disabled:opacity-50" style={{ color: 'var(--emeraude)', border: '1px solid var(--emeraude)' }}>
+          {processing ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
+      <button type="button" onClick={() => { onUsernameChange(''); onPasswordChange(''); setStep('otra'); }} className="mt-4 min-h-12 cursor-pointer text-sm font-bold" style={{ color: 'var(--emeraude)' }}>Entrar con otra cuenta</button>
       </main>
     </div>
     </div>
   );
 }
 
-export function RegionScreen({ onSelect }: { onSelect: (region: 'Chile' | 'Perú') => void }) {
+export function RegionScreen({ onSelect, onLeave }: { onSelect: (region: 'Chile' | 'Perú') => void; onLeave?: () => void }) {
   return (
     <Frame>
       <p className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--emeraude)' }}>Región</p>
@@ -176,11 +235,12 @@ export function RegionScreen({ onSelect }: { onSelect: (region: 'Chile' | 'Perú
           </button>
         ))}
       </div>
+      {onLeave && <button type="button" onClick={onLeave} className="mt-6 cursor-pointer text-xs font-bold" style={{ color: 'var(--emeraude)' }}>Entrar con otra cuenta</button>}
     </Frame>
   );
 }
 
-export function ObjectivesScreen({ onSave }: { onSave: (goals: string[]) => void }) {
+export function ObjectivesScreen({ onSave, onLeave }: { onSave: (goals: string[]) => void; onLeave?: () => void }) {
   const [selected, setSelected] = useState<string[]>(['bienestar']);
   const toggle = (id: string) => {
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -201,6 +261,7 @@ export function ObjectivesScreen({ onSave }: { onSave: (goals: string[]) => void
         })}
       </div>
       <button type="button" disabled={selected.length === 0} onClick={() => onSave(selected)} className="btn-fucsia mt-auto w-full rounded-full py-3.5 text-sm font-semibold cursor-pointer">Guardar</button>
+      {onLeave && <button type="button" onClick={onLeave} className="mt-4 cursor-pointer text-xs font-bold" style={{ color: 'var(--emeraude)' }}>Entrar con otra cuenta</button>}
     </Frame>
   );
 }

@@ -16,7 +16,10 @@ create table if not exists public.profiles (
   is_celiac boolean not null default false,
   has_diabetes boolean not null default false,
   has_obesity boolean not null default false,
-  has_depression boolean not null default false
+  has_depression boolean not null default false,
+  cycle_length_source text not null default 'manual',
+  cycle_reminders boolean not null default false,
+  constraint profiles_cycle_length_source_check check (cycle_length_source in ('manual', 'records'))
 );
 
 create table if not exists public.daily_logs (
@@ -87,8 +90,8 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- Actividades agendadas en Cyclia y conexión de Google Calendar.
--- La sincronización es manual y solo de Cyclia hacia Google.
+-- Actividades agendadas en la base de Cyclia.
+-- google_event_id y google_calendar_id quedan vacíos: la conexión externa se retiró.
 
 create table if not exists public.scheduled_activities (
   id uuid primary key,
@@ -119,20 +122,19 @@ create policy scheduled_activities_own on public.scheduled_activities
 
 grant select, insert, update, delete on public.scheduled_activities to authenticated;
 
-create table if not exists public.calendar_connections (
+-- Mi Foco: una fila por usuaria. El consentimiento del módulo vive en el payload.
+create table if not exists public.focus_entries (
   user_id uuid primary key references auth.users (id) on delete cascade,
-  google_email text not null default '',
-  calendar_id text,
-  calendar_name text,
-  refresh_token text not null,
-  last_sync_at timestamptz,
+  payload jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
 
-alter table public.calendar_connections enable row level security;
+alter table public.focus_entries enable row level security;
 
-drop policy if exists calendar_connections_own on public.calendar_connections;
-create policy calendar_connections_own on public.calendar_connections
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists focus_entries_own on public.focus_entries;
+create policy focus_entries_own on public.focus_entries
+  for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
-grant select, insert, update, delete on public.calendar_connections to authenticated;
+grant select, insert, update, delete on public.focus_entries to authenticated;

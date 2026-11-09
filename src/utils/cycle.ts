@@ -164,6 +164,57 @@ export function getPhaseForDay(day: number, periodLength: number, cycleLength: n
   return 'Lutea';
 }
 
+export interface CycleProjection {
+  index: number;
+  periodStart: string;
+  periodEnd: string;
+  estimated: true;
+}
+
+/**
+ * Adds calendar days to a YYYY-MM-DD date, at local noon so the day does not shift.
+ */
+export function addCalendarDays(dateStr: string, days: number): string {
+  const date = new Date(`${dateStr}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return formatDateStr(date);
+}
+
+/**
+ * First future period start after `fromDate`.
+ * Uses the same day count as the calendar: cycleLength - cycle day + 1.
+ * Today is not included when it is already day 1 of the current cycle.
+ */
+export function nextPeriodStart(lastPeriodDate: string, cycleLength: number, fromDate = formatDateStr(new Date())): string {
+  const cycleDay = getCycleDay(fromDate, lastPeriodDate, cycleLength);
+  const daysUntil = cycleLength - cycleDay + 1;
+  return addCalendarDays(fromDate, daysUntil);
+}
+
+/**
+ * Estimates the next menstrual cycles from the registered anchor.
+ * Results are not records: callers must not persist them as period history.
+ */
+export function projectNextCycles(
+  lastPeriodDate: string,
+  cycleLength: number,
+  periodLength: number,
+  count = 3,
+  fromDate = formatDateStr(new Date()),
+): CycleProjection[] {
+  const firstStart = nextPeriodStart(lastPeriodDate, cycleLength, fromDate);
+  return Array.from({ length: count }, (_, index) => {
+    const periodStart = addCalendarDays(firstStart, index * cycleLength);
+    const periodEnd = addCalendarDays(periodStart, Math.max(periodLength, 1) - 1);
+    return {
+      index: index + 1,
+      periodStart,
+      periodEnd,
+      estimated: true,
+    };
+  });
+}
+
 /**
  * Formats a Date object to YYYY-MM-DD string in local time.
  */

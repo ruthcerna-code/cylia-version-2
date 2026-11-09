@@ -26,10 +26,10 @@ npm run dev             # http://localhost:3001
 Variables de entorno (ver `.env.example`):
 
 - `GEMINI_API_KEY`: clave para las llamadas a la API de Gemini (servidor).
-- `APP_URL`: URL donde se publica la app.
+- `APP_URL`: origen de la app. En local es `http://localhost:3001`.
 - `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`: URL del proyecto y clave pública de Supabase (Project Settings → API).
 
-Para producción: `npm run build` y luego `npm start`.
+Para ver la versión compilada en local: `npm run build` y luego `npm start`.
 
 ## Diseño de la app (`design/`)
 

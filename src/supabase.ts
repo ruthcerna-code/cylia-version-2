@@ -14,38 +14,17 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
 export type SessionUser = {
   id: string;
   email?: string;
-  hasGoogle: boolean;
-  hasEmailAccount: boolean;
   isAnonymous: boolean;
 };
-
-export function isGmailAddress(email?: string | null): boolean {
-  const host = (email || '').trim().toLowerCase().split('@')[1] || '';
-  return host === 'gmail.com' || host === 'googlemail.com';
-}
-
-export function canSeeRegisteredData(user: SessionUser): boolean {
-  return user.hasGoogle || user.hasEmailAccount;
-}
 
 export function toSessionUser(user: {
   id: string;
   email?: string | null;
   is_anonymous?: boolean;
-  identities?: { provider?: string }[] | null;
-  app_metadata?: { provider?: string; providers?: string[] };
 }): SessionUser {
-  const providers = user.app_metadata?.providers || [];
-  const identities = user.identities || [];
-  const hasGoogle = providers.includes('google')
-    || identities.some((identity) => identity.provider === 'google');
-  const hasEmailIdentity = providers.includes('email')
-    || identities.some((identity) => identity.provider === 'email');
   return {
     id: user.id,
     email: user.email || undefined,
-    hasGoogle,
-    hasEmailAccount: !user.is_anonymous && hasEmailIdentity && !isGmailAddress(user.email),
     isAnonymous: Boolean(user.is_anonymous),
   };
 }
@@ -66,6 +45,8 @@ type ProfileRow = {
   has_diabetes: boolean;
   has_obesity: boolean;
   has_depression: boolean;
+  cycle_length_source?: string | null;
+  cycle_reminders?: boolean | null;
 };
 
 type LogRow = {
@@ -110,86 +91,13 @@ export function authErrorMessage(error: { message?: string; code?: string }): st
   if (code === 'anonymous_provider_disabled' || message.includes('anonymous')) {
     return 'El acceso anónimo no está habilitado en Supabase. Actívalo en Authentication → Providers.';
   }
-  if (message.includes('google') || message.includes('unsupported provider')) {
-    return 'El acceso con Gmail no está habilitado en Supabase. Actívalo en Authentication → Sign In / Providers → Google.';
-  }
-  if (code === 'email_provider_disabled' || message.includes('email signups are disabled') || message.includes('provider is not enabled')) {
-    return 'El acceso con correo no está habilitado en Supabase.';
-  }
-  if (code === 'invalid_credentials' || message.includes('invalid login credentials')) {
-    return 'Correo o contraseña incorrectos.';
-  }
-  if (code === 'user_already_exists' || code === 'email_exists' || message.includes('already registered')) {
-    return 'Este correo ya está registrado.';
-  }
-  if (code === 'weak_password' || message.includes('password')) {
-    return 'La contraseña debe tener al menos 6 caracteres.';
-  }
-  if (message.includes('email')) {
-    return 'El correo electrónico no es válido.';
-  }
   return 'No se pudo iniciar sesión en Supabase.';
-}
-
-export async function connectGoogle(linkExisting = false) {
-  const client = requireClient();
-  const options = {
-    redirectTo: window.location.origin,
-    queryParams: { prompt: 'select_account' },
-    skipBrowserRedirect: true,
-  };
-  if (linkExisting) {
-    const linked = await client.auth.linkIdentity({ provider: 'google', options });
-    if (!linked.error && linked.data?.url) {
-      window.location.assign(linked.data.url);
-      return;
-    }
-    await client.auth.signOut();
-  }
-  const { data, error } = await client.auth.signInWithOAuth({ provider: 'google', options });
-  if (error) throw new Error(authErrorMessage(error));
-  if (!data?.url) {
-    throw new Error('No se pudo abrir Gmail. Revisa que Google esté activo en Supabase.');
-  }
-  window.location.assign(data.url);
-}
-
-export async function signInWithGoogle() {
-  await connectGoogle(false);
 }
 
 export async function signInAnonymously() {
   const client = requireClient();
   const { error } = await client.auth.signInAnonymously();
   if (error) throw new Error(authErrorMessage(error));
-}
-
-function assertPasswordAccount(email: string) {
-  if (isGmailAddress(email)) {
-    throw new Error('Este correo es una cuenta de Gmail. Entra con el botón de Gmail.');
-  }
-}
-
-export async function signInWithEmail(email: string, password: string) {
-  assertPasswordAccount(email);
-  const client = requireClient();
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(authErrorMessage(error));
-  const sessionUser = data.user ? toSessionUser(data.user) : null;
-  if (sessionUser?.hasGoogle && !sessionUser.hasEmailAccount) {
-    await client.auth.signOut();
-    throw new Error('Esta cuenta se creó con Gmail. Entra con el botón de Gmail.');
-  }
-}
-
-export async function signUpWithEmail(email: string, password: string) {
-  assertPasswordAccount(email);
-  const client = requireClient();
-  const { data, error } = await client.auth.signUp({ email, password });
-  if (error) throw new Error(authErrorMessage(error));
-  if (!data.session) {
-    throw new Error('Cuenta creada. Revisa tu correo para confirmarla antes de entrar.');
-  }
 }
 
 export async function signOut() {
@@ -215,6 +123,8 @@ function profileToRow(userId: string, profile: UserProfile): ProfileRow {
     has_diabetes: Boolean(profile.hasDiabetes),
     has_obesity: Boolean(profile.hasObesity),
     has_depression: Boolean(profile.hasDepression),
+    cycle_length_source: profile.lengthSource === 'records' ? 'records' : 'manual',
+    cycle_reminders: Boolean(profile.cycleReminders),
   };
 }
 
@@ -234,6 +144,8 @@ function rowToProfile(row: ProfileRow): UserProfile {
     hasDiabetes: row.has_diabetes,
     hasObesity: row.has_obesity,
     hasDepression: row.has_depression,
+    lengthSource: row.cycle_length_source === 'records' ? 'records' : 'manual',
+    cycleReminders: Boolean(row.cycle_reminders),
   };
 }
 
@@ -466,9 +378,9 @@ function saveLocalActivity(userId: string, draft: ActivityDraft): ScheduledActiv
     reminderMinutes: draft.reminderMinutes,
     notes: draft.notes.trim(),
     timeZone: draft.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    syncStatus: existing?.googleEventId ? 'changed' : 'pending',
-    googleEventId: existing?.googleEventId ?? null,
-    googleCalendarId: existing?.googleCalendarId ?? null,
+    syncStatus: 'synced',
+    googleEventId: null,
+    googleCalendarId: null,
     syncError: null,
     updatedAt: new Date().toISOString(),
   };
@@ -520,8 +432,6 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
     existing = current.data as ActivityRow | null;
   }
 
-  const hadGoogleEvent = Boolean(existing?.google_event_id);
-  const syncStatus: ScheduledActivity['syncStatus'] = hadGoogleEvent ? 'changed' : 'pending';
   const row = {
     id: draft.id || crypto.randomUUID(),
     user_id: userId,
@@ -532,9 +442,9 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
     reminder_minutes: draft.reminderMinutes,
     notes: draft.notes.trim(),
     time_zone: draft.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    sync_status: syncStatus,
-    google_event_id: existing?.google_event_id ?? null,
-    google_calendar_id: existing?.google_calendar_id ?? null,
+    sync_status: 'synced' as const,
+    google_event_id: null,
+    google_calendar_id: null,
     sync_error: null,
     updated_at: now,
   };
@@ -555,37 +465,14 @@ export async function deleteScheduledActivity(
   activity: ScheduledActivity,
 ): Promise<ScheduledActivity | null> {
   const client = requireClient();
-  if (!activity.googleEventId) {
-    const { error } = await client.from('scheduled_activities').delete().eq('user_id', userId).eq('id', activity.id);
-    if (error && isMissingTable(error)) {
-      writeLocalActivities(userId, readLocalActivities(userId).filter((item) => item.id !== activity.id));
-      return null;
-    }
-    throwIfError(error, 'deleteActivity');
-    activityStoreIsLocal = false;
+  const { error } = await client.from('scheduled_activities').delete().eq('user_id', userId).eq('id', activity.id);
+  if (error && isMissingTable(error)) {
+    writeLocalActivities(userId, readLocalActivities(userId).filter((item) => item.id !== activity.id));
     return null;
   }
-
-  const { data, error } = await client
-    .from('scheduled_activities')
-    .update({
-      sync_status: 'delete_pending',
-      sync_error: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .eq('id', activity.id)
-    .select('*')
-    .single();
-  if (error && isMissingTable(error)) {
-    const updated = { ...activity, syncStatus: 'delete_pending' as const, syncError: null, updatedAt: new Date().toISOString() };
-    const items = readLocalActivities(userId).map((item) => item.id === activity.id ? updated : item);
-    writeLocalActivities(userId, items);
-    return updated;
-  }
-  throwIfError(error, 'markActivityDeleted');
+  throwIfError(error, 'deleteActivity');
   activityStoreIsLocal = false;
-  return rowToActivity(data as ActivityRow);
+  return null;
 }
 
 export function subscribeUserData(userId: string, onChange: () => void) {

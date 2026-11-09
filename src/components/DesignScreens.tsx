@@ -206,31 +206,13 @@ export function PrivacyClauses() {
     <section className="rounded-[20px] bg-[#A9C4F0] p-4 text-sm leading-relaxed text-[#1B1F5E]">
       <h2 className="m-0 text-base font-extrabold">Cláusulas de privacidad</h2>
       <ul className="mb-0 mt-2 list-disc space-y-1.5 pl-4">
-        <li>Tus registros de ciclo, síntomas y conversaciones son privados.</li>
-        <li>Para ver tus datos registrados debes conectar tu cuenta de Gmail.</li>
-        <li>Esos datos se usan solo para personalizar tus recomendaciones de bienestar.</li>
+        <li>El borrador de privacidad describe los datos, las finalidades y lo que todavía está pendiente de revisión.</li>
+        <li>Las filas de tu cuenta se leen con tu sesión. Eso no significa que ningún proveedor pueda acceder a la infraestructura.</li>
+        <li>El asistente depende de una autorización aparte. Las actividades se guardan en Cyclia.</li>
         <li>Cyclia es educativa y no reemplaza a un profesional de salud.</li>
-        <li>Puedes exportar o eliminar tus datos desde Privacidad.</li>
+        <li>Desde Privacidad y datos puedes consultar decisiones, retirar autorizaciones y enviar solicitudes. Enviar una solicitud no borra la cuenta.</li>
       </ul>
     </section>
-  );
-}
-
-export function DataPrivacyGate({ onConnect }: { onConnect: () => void }) {
-  return (
-    <div className="flex flex-col gap-4 px-4 py-4">
-      <header className="rounded-[24px] bg-[#3A44C4] px-5 py-8 text-white">
-        <span className="font-serif text-[15px] tracking-[0.18em] text-[#F9C4C6]">CYCLIA</span>
-        <h1 className="m-0 mt-2 text-[26px] font-extrabold">Tus datos</h1>
-        <p className="m-0 mt-1 text-sm text-[#DCE5FA]">Conecta Gmail para ver lo que ya registraste.</p>
-      </header>
-      <section className="rounded-[20px] bg-white p-4">
-        <h2 className="m-0 text-base font-extrabold">Cuenta de Gmail</h2>
-        <p className="mt-1 text-sm leading-relaxed text-[#3B4070]">Sin Gmail no se muestran tu ciclo, tus registros ni tu historial. Al conectar, ves solo la información de tu cuenta.</p>
-        <button type="button" onClick={onConnect} className="mt-3 flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Conectar Gmail</button>
-      </section>
-      <PrivacyClauses />
-    </div>
   );
 }
 

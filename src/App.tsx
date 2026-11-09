@@ -5,13 +5,23 @@ import Onboarding from './components/Onboarding';
 import { EntryFlow, MoodGrid, ObjectivesScreen, RegionScreen } from './components/EntryFlow';
 import DesignHome from './components/DesignHome';
 import DesignRegister from './components/DesignRegister';
-import { ActivityScreen, CycleDataScreen, DataPrivacyGate, GoalsScreen, PhaseScreen, PrivacyScreen } from './components/DesignScreens';
+import { ActivityScreen, CycleDataScreen, GoalsScreen, PhaseScreen, PrivacyScreen } from './components/DesignScreens';
+import UserAdminScreen from './components/UserAdminScreen';
 import CalendarView from './components/CalendarView';
 import DailyCheckin from './components/DailyCheckin';
 import ChatPanel from './components/ChatPanel';
 import HealthProfileModal from './components/HealthProfileModal';
 import SymptomChart from './components/SymptomChart';
-import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
+import CycleProjectionScreen from './components/CycleProjectionScreen';
+import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, nextPeriodStart, PHASE_DETAILS } from './utils/cycle';
+import { accountSessionExpired, bindAccountSessionSync, clearAccountSession, fetchAccountMe, loginWithAccount, loginWithEmail, type AccountRole } from './accountApi';
+import { fetchConsentStatus, saveConsentDecisions, supabaseBearer, type ConsentStatus } from './consentApi';
+import { PRIVACY_LOGIN_KEY } from './consentCopy';
+import ConsentScreen from './components/ConsentScreen';
+import PrivacyDataScreen from './components/PrivacyDataScreen';
+import CyclePrivacySettings from './components/CyclePrivacySettings';
+import FocusModule, { FocusMorningGate } from './components/FocusModule';
+import { downloadOwnData } from './dataExport';
 import { compareActivities, explainActivityError, formatActivityWhen, LOCAL_ACTIVITY_STORE_NOTE, suggestActivity } from './utils/activities';
 import { generateActivityForDay } from './utils/activity';
 import {
@@ -29,13 +39,8 @@ import {
   saveProfile,
   saveScheduledActivity,
   signInAnonymously,
-  canSeeRegisteredData,
-  signInWithEmail,
-  connectGoogle,
-  signInWithGoogle,
   toSessionUser,
   signOut,
-  signUpWithEmail,
   subscribeUserData,
   supabase,
   type SessionUser,
@@ -119,14 +124,19 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
-  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'agenda' | 'chat' | 'humor' | 'perfil'>('inicio');
+  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'agenda' | 'chat' | 'humor' | 'perfil' | 'foco'>('inicio');
   const [activities, setActivities] = useState<ScheduledActivity[]>([]);
   const [activitiesError, setActivitiesError] = useState('');
   const [activityStorageNote, setActivityStorageNote] = useState('');
   const [agendaSeed, setAgendaSeed] = useState<AgendaSeed | null>(null);
   const [homeSheet, setHomeSheet] = useState<null | 'fase' | 'actividad'>(null);
-  const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion'>(null);
-  const [profileSheet, setProfileSheet] = useState<null | 'ciclo' | 'objetivos' | 'privacidad'>(null);
+  const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion' | 'proyeccion'>(null);
+  const [profileSheet, setProfileSheet] = useState<null | 'ajustes' | 'ciclo' | 'objetivos' | 'privacidad' | 'datos' | 'usuarios'>(null);
+  const [privacyBack, setPrivacyBack] = useState<null | 'ajustes'>(null);
+  const [consentStatus, setConsentStatus] = useState<ConsentStatus | null>(null);
+  const geminiEnabledRef = useRef(false);
+  geminiEnabledRef.current = consentStatus?.purposes.gemini_assistant === 'accept';
+  const [account, setAccount] = useState<{ username: string; role: AccountRole } | null>(null);
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
   const [region, setRegion] = useState<string | null>(() => localStorage.getItem('cyclia_region'));
   const [objectivesDone, setObjectivesDone] = useState(() => localStorage.getItem('cyclia_objectives_done') === '1');
@@ -157,29 +167,20 @@ export default function App() {
   };
 
   // Authentication Panel States
-  const [gmailError, setGmailError] = useState('');
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [otherAccount, setOtherAccount] = useState(false);
   const [authPanelError, setAuthPanelError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
 
   const guestMigrationStarted = useRef(false);
   const chatMigrationStarted = useRef(false);
+  const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
     localStorage.setItem('cyclia_theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
-
-  const handleConnectGoogle = async () => {
-    setGmailError('');
-    try {
-      await connectGoogle(Boolean(user?.isAnonymous));
-    } catch (err: any) {
-      setGmailError(err?.message || 'No se pudo abrir Gmail.');
-    }
-  };
 
   const showNotice = (message: string) => {
     setNotificationMsg(message);
@@ -193,37 +194,74 @@ export default function App() {
       return;
     }
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    bindAccountSessionSync();
+    const rememberUser = (sessionUser: { id: string; email?: string | null; is_anonymous?: boolean } | null) => {
       if (!active) return;
-      const sessionUser = data.session?.user;
-      setUser(sessionUser ? toSessionUser(sessionUser) : null);
-      if (!sessionUser) setIsLoadingAuth(false);
-      const oauthError = new URLSearchParams(window.location.search).get('error_description')
-        || new URLSearchParams(window.location.search).get('error');
-      if (oauthError) {
-        const text = decodeURIComponent(oauthError.replace(/\+/g, ' '));
-        setAuthPanelError(text);
-        setGmailError(text);
-      }
-    });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      if (session?.user) {
-        setUser(toSessionUser(session.user));
-        setIsLoadingAuth(true);
-      } else {
+      if (!sessionUser) {
+        if (userIdRef.current === null) {
+          setIsLoadingAuth(false);
+          return;
+        }
+        userIdRef.current = null;
         setUser(null);
+        setAccount(null);
         setProfile(null);
         setLogs({});
         setChatHistory([]);
+        setConsentStatus(null);
         setIsLoadingAuth(false);
+        return;
       }
+      if (userIdRef.current === sessionUser.id) return;
+      userIdRef.current = sessionUser.id;
+      setUser(toSessionUser(sessionUser));
+      setIsLoadingAuth(true);
+    };
+    const stopWaiting = window.setTimeout(() => {
+      if (active && userIdRef.current === null) setIsLoadingAuth(false);
+    }, 2500);
+    supabase.auth.getSession().then(async ({ data }) => {
+      window.clearTimeout(stopWaiting);
+      if (accountSessionExpired()) {
+        clearAccountSession();
+        try { await supabase.auth.signOut(); } catch { /* La sesión local ya se limpia. */ }
+        rememberUser(null);
+        return;
+      }
+      rememberUser(data.session?.user ?? null);
+    }).catch(() => {
+      window.clearTimeout(stopWaiting);
+      rememberUser(null);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      rememberUser(session?.user ?? null);
     });
     return () => {
       active = false;
+      window.clearTimeout(stopWaiting);
       data.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setAccount(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchAccountMe(user.id).then(async (next) => {
+      if (cancelled) return;
+      if (next === 'expired') {
+        clearAccountSession();
+        try { await signOut(); } catch { /* La sesión local ya se limpia. */ }
+        return;
+      }
+      setAccount(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -241,7 +279,18 @@ export default function App() {
         ]);
         if (cancelled) return;
 
-        if (!profileRow && !guestMigrationStarted.current) {
+        let consent: ConsentStatus | null = null;
+        try {
+          consent = await fetchConsentStatus();
+          if (sessionStorage.getItem(PRIVACY_LOGIN_KEY) === '1' && consent.purposes.privacy_notice !== 'accept') {
+            consent = await saveConsentDecisions('privacy_settings', [{ purpose: 'privacy_notice', action: 'accept' }]);
+          }
+        } catch (error) {
+          console.error('No se pudieron leer las decisiones de privacidad:', error);
+        }
+        if (!cancelled) setConsentStatus(consent);
+
+        if (!profileRow && consent?.purposes.health_cycle === 'accept' && !guestMigrationStarted.current) {
           guestMigrationStarted.current = true;
           const result = await migrateLocalGuestProfile(uid);
           if (cancelled) return;
@@ -252,7 +301,7 @@ export default function App() {
           }
         }
 
-        if (messageRows.length === 0 && !chatMigrationStarted.current) {
+        if (messageRows.length === 0 && consent?.purposes.gemini_assistant === 'accept' && !chatMigrationStarted.current) {
           chatMigrationStarted.current = true;
           const result = await migrateLocalChat(uid);
           if (cancelled) return;
@@ -285,10 +334,10 @@ export default function App() {
       cancelled = true;
       unsubscribe();
     };
-  }, [user]);
+  }, [user?.id]);
 
   const refreshActivities = async () => {
-    if (!user || !canSeeRegisteredData(user)) {
+    if (!user) {
       setActivities([]);
       setActivitiesError('');
       setActivityStorageNote('');
@@ -305,21 +354,7 @@ export default function App() {
 
   useEffect(() => {
     void refreshActivities();
-  }, [user]);
-
-  const calendarReturnHandled = useRef(false);
-  useEffect(() => {
-    if (!user || calendarReturnHandled.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const calendar = params.get('calendar');
-    if (!calendar) return;
-    calendarReturnHandled.current = true;
-    window.history.replaceState({}, '', window.location.pathname);
-    setAppTab('agenda');
-    showNotice(calendar === 'connected'
-      ? 'Google Calendar conectado. Elige el calendario y sincroniza cuando quieras.'
-      : (params.get('reason') || 'No se pudo conectar Google Calendar.'));
-  }, [user]);
+  }, [user?.id]);
 
   const handleSaveActivity = async (draft: Parameters<typeof saveScheduledActivity>[1]) => {
     if (!user) return;
@@ -328,6 +363,7 @@ export default function App() {
       setActivities((current) => [...current.filter((item) => item.id !== saved.id), saved].sort(compareActivities));
       setActivitiesError('');
       setActivityStorageNote(activitiesStoredOnThisDevice() ? LOCAL_ACTIVITY_STORE_NOTE : '');
+      return saved;
     } catch (error) {
       throw new Error(explainActivityError(error));
     }
@@ -418,11 +454,16 @@ export default function App() {
   // Automatically trigger AI Analysis after check-in for deep insights
   const triggerAiAnalysis = async (currentLog: DailyLog, allLogs: Record<string, DailyLog>) => {
     if (!user) return;
+    if (!geminiEnabledRef.current) {
+      showNotice('El registro se guardó. El análisis con inteligencia artificial no se envió porque esa autorización no está vigente.');
+      return;
+    }
     setIsAnalyzing(true);
     try {
+      const token = await supabaseBearer();
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           profile,
           log: currentLog,
@@ -695,26 +736,56 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
     }
   };
 
-  if (isLoadingAuth && !user) {
+  const leaveForAccountLogin = async () => {
+    setOtherAccount(true);
+    userIdRef.current = null;
+    clearAccountSession();
+    setUser(null);
+    setAccount(null);
+    setProfile(null);
+    setLogs({});
+    setChatHistory([]);
+    setConsentStatus(null);
+    setIsLoadingAuth(false);
+    try {
+      sessionStorage.removeItem(PRIVACY_LOGIN_KEY);
+    } catch {
+      // El navegador puede bloquear sessionStorage.
+    }
+    try {
+      await signOut();
+    } catch {
+      // La sesión local ya se limpió.
+    }
+  };
+
+  if (isLoadingAuth) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#2E37B0] p-6 text-center text-white">
         <h2 className="font-serif text-4xl font-light tracking-[0.16em] text-[#F9C4C6]">CYCLIA</h2>
         <p className="mt-3 text-sm text-[#D2DDF8]">Preparando tu espacio</p>
+        <button type="button" onClick={() => { void leaveForAccountLogin(); }} className="mt-6 cursor-pointer text-xs font-bold text-[#D2DDF8]">Entrar con otra cuenta</button>
       </div>
     );
   }
 
+  if (user && !isLoadingAuth && consentStatus?.requiredComplete !== true) {
+    return (
+      <ConsentScreen
+        variant={profile ? 'existing' : 'new'}
+        onSaved={(status) => setConsentStatus(status)}
+        onExit={() => { void leaveForAccountLogin(); }}
+      />
+    );
+  }
+
   if (!user) {
-    const handleEmailAuth = async (e: React.FormEvent) => {
+    const handleAccountAuth = async (e: React.FormEvent, remember: boolean) => {
       e.preventDefault();
       setAuthPanelError('');
       setIsAuthProcessing(true);
       try {
-        if (isSignUpMode) {
-          await signUpWithEmail(loginEmail, loginPassword);
-        } else {
-          await signInWithEmail(loginEmail, loginPassword);
-        }
+        await loginWithAccount(loginUsername, loginPassword, remember);
       } catch (err: any) {
         console.error("Error de autenticación:", err);
         setAuthPanelError(err?.message || "Ocurrió un error. Verifica tus credenciales.");
@@ -723,14 +794,16 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       }
     };
 
-    const handleGoogleAuth = async () => {
+    const handleOtherAccount = async (e: React.FormEvent, remember: boolean) => {
+      e.preventDefault();
       setAuthPanelError('');
       setIsAuthProcessing(true);
       try {
-        await signInWithGoogle();
+        await loginWithEmail(loginUsername, loginPassword, remember);
       } catch (err: any) {
-        console.error('Error en acceso con Gmail:', err);
-        setAuthPanelError(err?.message || 'No se pudo iniciar sesión con Gmail.');
+        console.error('Error al entrar con otra cuenta:', err);
+        setAuthPanelError(err?.message || 'No se pudo entrar con ese correo.');
+      } finally {
         setIsAuthProcessing(false);
       }
     };
@@ -738,6 +811,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
     const handleGuestAuth = async () => {
       setAuthPanelError('');
       setIsAuthProcessing(true);
+      clearAccountSession();
       try {
         await signInAnonymously();
       } catch (err: any) {
@@ -753,31 +827,35 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         configured={isSupabaseConfigured}
         processing={isAuthProcessing}
         error={authPanelError}
-        email={loginEmail}
+        username={loginUsername}
         password={loginPassword}
-        signUp={isSignUpMode}
-        onEmailChange={setLoginEmail}
+        startAtOther={otherAccount}
+        onUsernameChange={setLoginUsername}
         onPasswordChange={setLoginPassword}
-        onToggleSignUp={() => { setIsSignUpMode(!isSignUpMode); setAuthPanelError(''); }}
-        onGoogle={handleGoogleAuth}
         onAnonymous={handleGuestAuth}
-        onEmailSubmit={handleEmailAuth}
+        onAccountSubmit={handleAccountAuth}
+        onOtherAccount={handleOtherAccount}
       />
     );
   }
 
   if (!region) {
     return (
-      <RegionScreen onSelect={(nextRegion) => {
-        localStorage.setItem('cyclia_region', nextRegion);
-        setRegion(nextRegion);
-      }} />
+      <RegionScreen
+        onLeave={() => { void leaveForAccountLogin(); }}
+        onSelect={(nextRegion) => {
+          localStorage.setItem('cyclia_region', nextRegion);
+          setRegion(nextRegion);
+        }}
+      />
     );
   }
 
   if (!objectivesDone) {
     return (
-      <ObjectivesScreen onSave={(goals) => {
+      <ObjectivesScreen
+        onLeave={() => { void leaveForAccountLogin(); }}
+        onSave={(goals) => {
         localStorage.setItem('cyclia_objectives', JSON.stringify(goals));
         localStorage.setItem('cyclia_objectives_done', '1');
         setSavedGoals(goals);
@@ -791,9 +869,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       <Onboarding
         onComplete={handleSaveProfile}
         accountEmail={user.email}
-        gmailConnected={user.hasGoogle}
-        gmailError={gmailError}
-        onConnectGoogle={handleConnectGoogle}
+        onLeave={() => { void leaveForAccountLogin(); }}
       />
     );
   }
@@ -803,9 +879,9 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
   const selectedPhase = getPhaseForDay(selectedCycleDay, profile.periodLength, profile.cycleLength);
   const phaseDetails = PHASE_DETAILS[selectedPhase];
   const activeLog = logs[selectedDateStr];
-  const dayActivities = activities.filter((item) => item.date === selectedDateStr && item.syncStatus !== 'delete_pending');
+  const dayActivities = activities.filter((item) => item.date === selectedDateStr);
   const activitySuggestion = activeLog ? suggestActivity(selectedPhase, activeLog) : null;
-  const activityDates = activities.filter((item) => item.syncStatus !== 'delete_pending').map((item) => item.date);
+  const activityDates = activities.map((item) => item.date);
   const openAgenda = (title: string, date: string) => {
     setAgendaSeed({ token: Date.now(), title, date });
     setHomeSheet(null);
@@ -838,13 +914,9 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         </div>
       )}
 
-      {gmailError && <p className="bg-[#F49A9E] px-5 py-2 text-xs text-[#1B1F5E]">{gmailError}</p>}
-
       {/* Main Content Area */}
-      <main className={`flex-1 w-full flex flex-col gap-4 ${!canSeeRegisteredData(user) || (appTab === 'inicio' && !homeSheet) ? '' : 'px-4 py-4'}`}>
-        {!canSeeRegisteredData(user) ? (
-          <DataPrivacyGate onConnect={() => { void handleConnectGoogle(); }} />
-        ) : (<>
+      <main className={`flex-1 w-full flex flex-col gap-4 ${appTab === 'inicio' && !homeSheet ? '' : 'px-4 py-4'}`}>
+        <>
         {appTab === 'inicio' && homeSheet === 'fase' && (
           <PhaseScreen current={selectedPhase} onBack={() => setHomeSheet(null)} />
         )}
@@ -918,6 +990,27 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               {activeLog ? 'Ver registro' : 'Registrar hoy'}
             </button>
           </div>
+        )}
+        {appTab === 'foco' && (
+          <FocusModule
+            userId={user.id}
+            profile={profile}
+            onPeriodStart={async (date) => { await handleSaveProfile({ ...profile, lastPeriodDate: date }); }}
+            onSchedule={async (title, date, activityId) => {
+              const saved = await handleSaveActivity({
+                id: activityId,
+                title,
+                date,
+                startTime: '09:00',
+                endTime: '09:30',
+                reminderMinutes: null,
+                notes: 'Desde Mi Foco',
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Santiago',
+              });
+              if (!saved) throw new Error('Sin sesión');
+              return saved.id;
+            }}
+          />
         )}
         {appTab === 'agenda' && (
           <AgendaScreen
@@ -1127,11 +1220,15 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                 </>
               )}
               <div className="my-1 h-px bg-[#E1E5F5]" />
-              <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {formatFriendlyDate(formatDateStr(new Date(new Date().setHours(12, 0, 0, 0) + (profile.cycleLength - getCycleDay(formatDateStr(new Date()), profile.lastPeriodDate, profile.cycleLength) + 1) * 86400000)))}</p>
+              <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {formatFriendlyDate(nextPeriodStart(profile.lastPeriodDate, profile.cycleLength))}</p>
             </section>
             <button type="button" onClick={() => setCycleSheet('evolucion')} className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">↗</span>
               <span><strong className="block text-base">Evolución de bienestar</strong><span className="text-[13px] text-[#3B4070]">Ánimo, estrés, dolor, sueño y cansancio</span></span>
+            </button>
+            <button type="button" onClick={() => setCycleSheet('proyeccion')} className="flex items-center gap-3 rounded-[20px] bg-[#A9C4F0] p-4 text-left text-[#1B1F5E]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">3</span>
+              <span><strong className="block text-base">Próximos 3 ciclos</strong><span className="text-[13px] text-[#3B4070]">Proyección estimada, sin guardar</span></span>
             </button>
             <button type="button" onClick={() => handleUpdatePeriodStart(formatDateStr(new Date()))} className="h-[50px] cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Registrar inicio de periodo hoy</button>
           </div>
@@ -1201,6 +1298,9 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <button type="button" onClick={() => setCycleSheet(null)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Calendario</button>
               <h1 className="m-0 text-[26px] font-extrabold">Evolución de bienestar</h1>
             </div>
+          )}
+          {appTab === 'calendario' && cycleSheet === 'proyeccion' && (
+            <CycleProjectionScreen profile={profile} onBack={() => setCycleSheet(null)} />
           )}
 
           {/* Detailed Recommended Activity for Selected Day */}
@@ -1391,6 +1491,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               previousInteractionId={previousInteractionId}
               environmentId={environmentId}
               onUpdateAgentState={updateAgentState}
+              assistantEnabled={consentStatus?.purposes.gemini_assistant === 'accept'}
             />
           </div>
         )}
@@ -1426,19 +1527,41 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             }}
           />
         )}
+        {appTab === 'perfil' && profileSheet === 'usuarios' && account?.role === 'admin' && (
+          <UserAdminScreen onBack={() => setProfileSheet(null)} />
+        )}
+        {appTab === 'perfil' && profileSheet === 'ajustes' && (
+          <CyclePrivacySettings
+            profile={profile}
+            onBack={() => setProfileSheet(null)}
+            onManagePrivacy={() => {
+              setPrivacyBack('ajustes');
+              setProfileSheet('datos');
+            }}
+            onSave={handleSaveProfile}
+          />
+        )}
+        {appTab === 'perfil' && profileSheet === 'datos' && consentStatus && (
+          <PrivacyDataScreen
+            status={consentStatus}
+            onBack={() => {
+              setProfileSheet(privacyBack);
+              setPrivacyBack(null);
+            }}
+            backLabel={privacyBack === 'ajustes' ? 'Ajustes' : 'Perfil'}
+            onChanged={(status) => setConsentStatus(status)}
+          />
+        )}
         {appTab === 'perfil' && profileSheet === 'privacidad' && (
           <PrivacyScreen
             darkMode={darkMode}
             onBack={() => setProfileSheet(null)}
             onToggleDark={() => setDarkMode((value) => !value)}
             onExport={() => {
-              const blob = new Blob([JSON.stringify({ profile, logs }, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = 'cyclia-datos.json';
-              link.click();
-              URL.revokeObjectURL(url);
+              if (!window.confirm('Este archivo contiene información personal y de salud. Guárdalo en un lugar de confianza.')) return;
+              void downloadOwnData().catch((error: unknown) => {
+                showNotice(error instanceof Error ? error.message : 'No pudimos preparar tu archivo.');
+              });
             }}
             onDelete={() => { if (confirm('¿Eliminar los datos de esta cuenta en este dispositivo?')) handleResetAppData(); }}
           />
@@ -1452,9 +1575,12 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </header>
             <nav className="flex flex-col gap-2.5 py-4">
               {[
+                ['Ajustes del ciclo y privacidad', 'Referencia, avisos y exportación', () => setProfileSheet('ajustes')],
                 ['Datos del ciclo y salud', 'Fechas, duración, condiciones', () => setProfileSheet('ciclo')],
-                ['Privacidad y notificaciones', darkMode ? 'Modo oscuro activo' : 'Recordatorios, tus datos', () => setProfileSheet('privacidad')],
+                ['Privacidad y datos', 'Decisiones, documentos y solicitudes', () => { setPrivacyBack(null); setProfileSheet('datos'); }],
+                ['Privacidad y notificaciones', darkMode ? 'Modo oscuro activo' : 'Recordatorios y apariencia', () => setProfileSheet('privacidad')],
                 ['Objetivos', 'Elige tu foco', () => setProfileSheet('objetivos')],
+                ...(account?.role === 'admin' ? [['Administración de usuarios', 'Crear y eliminar cuentas', () => setProfileSheet('usuarios')] as const] : []),
                 ['Ayuda y soporte', 'Preguntas frecuentes, contacto', () => setAppTab('chat')],
               ].map(([title, subtitle, action]) => (
                 <button key={String(title)} type="button" onClick={action as () => void} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-left">
@@ -1469,7 +1595,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <button
                 type="button"
                 onClick={async () => {
-                  if (confirm('¿Estás segura de que deseas cerrar sesión?')) await signOut();
+                  if (confirm('¿Estás segura de que deseas cerrar sesión?')) {
+                    clearAccountSession();
+                    await signOut();
+                  }
                 }}
                 className="mx-auto mt-2 flex h-12 cursor-pointer items-center rounded-full bg-[#F49A9E] px-7 text-[15px] font-extrabold text-[#1B1F5E]"
               >
@@ -1478,17 +1607,18 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </nav>
           </div>
         )}
-        </>)}
+        </>
 
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-6 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
+      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-7 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
         {([
           ['inicio', 'Inicio', '⌂'],
           ['calendario', 'Ciclo', '▦'],
           ['registro', 'Registro', '+'],
           ['agenda', 'Agendar actividades', '◷'],
           ['chat', 'Cyclia IA', '✦'],
+          ['foco', 'Mi Foco', '◎'],
           ['perfil', 'Perfil', '•'],
         ] as const).map(([id, label, icon]) => (
           <button
@@ -1498,7 +1628,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             className={`flex cursor-pointer flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-extrabold leading-tight ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
           >
             <span className="text-lg leading-none">{icon}</span>
-            {id === 'agenda' ? <span className="text-center">Agendar<br />actividades</span> : label}
+            {id === 'agenda' ? <span className="text-center">Agendar<br />actividades</span> : id === 'foco' ? <span className="text-center">Mi<br />Foco</span> : label}
           </button>
         ))}
       </nav>
@@ -1581,6 +1711,14 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       )}
 
       {/* Edit Health Profile Modal */}
+      {appTab !== 'foco' && (
+        <FocusMorningGate
+          userId={user.id}
+          profile={profile}
+          onPeriodStart={async (date) => { await handleSaveProfile({ ...profile, lastPeriodDate: date }); }}
+        />
+      )}
+
       {isEditingHealth && (
         <HealthProfileModal
           profile={profile}

@@ -1,0 +1,1 @@
+-- Sin datos iniciales. Las cuentas las crea la aplicación.

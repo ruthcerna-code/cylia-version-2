@@ -5,15 +5,13 @@ import WelcomeScreen from './WelcomeScreen';
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
   accountEmail?: string;
-  gmailConnected?: boolean;
-  gmailError?: string;
-  onConnectGoogle?: () => void;
+  onLeave?: () => void;
 }
 
 const FIELD_CLASS =
   'w-full bg-[#F8F9FE] border-2 border-[#C9D3EF] rounded-2xl px-5 py-5 text-lg font-medium text-[#1B1F5E] outline-none transition focus:border-[#3A44C4] focus:ring-4 focus:ring-[#3A44C4]/15';
 
-export default function Onboarding({ onComplete, accountEmail, gmailConnected, gmailError, onConnectGoogle }: OnboardingProps) {
+export default function Onboarding({ onComplete, accountEmail, onLeave }: OnboardingProps) {
   // Load existing profile from localStorage to pre-populate if they are starting over
   const getStoredProfile = (): UserProfile | null => {
     try {
@@ -460,9 +458,8 @@ export default function Onboarding({ onComplete, accountEmail, gmailConnected, g
           : 'Entiende cómo tu biología influye en tu energía, tu concentración y tu bienestar, día a día.'}
         primaryLabel={initialProfile ? 'Revisar y actualizar' : 'Comenzar'}
         onPrimary={() => setStep(1)}
-        secondaryLabel={!gmailConnected && onConnectGoogle ? 'Ya tengo cuenta' : undefined}
-        onSecondary={!gmailConnected && onConnectGoogle ? onConnectGoogle : undefined}
-        error={gmailError}
+        secondaryLabel={onLeave ? 'Entrar con otra cuenta' : undefined}
+        onSecondary={onLeave}
       />
     );
   }

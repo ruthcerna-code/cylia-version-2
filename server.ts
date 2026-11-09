@@ -1,16 +1,19 @@
 import express from "express";
+import os from "os";
 import path from "path";
 import dotenv from "dotenv";
 import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
-import { registerCalendarRoutes } from "./calendarRoutes";
+import { ensureAdminAccount, registerAccountRoutes } from "./accounts";
+import { registerConsentRoutes } from "./consentRoutes";
+import { assertConsentFromRequest, ConsentError } from "./consentHttp";
 
 dotenv.config();
 
 const app = express();
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
+app.set("trust proxy", 1);
 app.use(express.json());
 
 // Lazy-initialized GoogleGenAI client to prevent startup crash if API key is missing
@@ -157,6 +160,7 @@ async function runAntigravityInteraction(
 // Endpoint for analyzing a daily check-in
 app.post("/api/analyze", async (req, res) => {
   try {
+    await assertConsentFromRequest(req, "gemini_assistant");
     const { profile, log, history, previousInteractionId, environmentId } = req.body;
 
     if (!profile) {
@@ -238,6 +242,10 @@ Genera un análisis comprensivo y personalizado de acuerdo con su fase biológic
       });
     }
   } catch (error: any) {
+    if (error instanceof ConsentError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
     console.error("Error en endpoint de análisis:", error);
     res.status(500).json({ error: error.message || "Error al procesar la solicitud con la IA" });
   }
@@ -246,6 +254,7 @@ Genera un análisis comprensivo y personalizado de acuerdo con su fase biológic
 // Endpoint for conversational chat
 app.post("/api/chat", async (req, res) => {
   try {
+    await assertConsentFromRequest(req, "gemini_assistant");
     const { profile, logs, message, chatHistory, previousInteractionId, environmentId } = req.body;
 
     const ai = getAI();
@@ -330,36 +339,65 @@ Responde a la usuaria de forma natural y cercana, respetando el tono de Cyclia. 
       });
     }
   } catch (error: any) {
+    if (error instanceof ConsentError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
     console.error("Error en endpoint de chat:", error);
     res.status(500).json({ error: error.message || "Error al procesar el chat con la IA" });
   }
 });
 
-registerCalendarRoutes(app);
+registerAccountRoutes(app);
+registerConsentRoutes(app);
+
+function localNetworkAddresses(): string[] {
+  const addresses: string[] = [];
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries || []) {
+      const ipv4 = entry.family === "IPv4" || entry.family === 4;
+      if (!ipv4 || entry.internal) continue;
+      if (entry.address.startsWith("169.254.")) continue;
+      addresses.push(entry.address);
+    }
+  }
+  return addresses;
+}
 
 // Setup Vite Dev Server / Static Files Serving
 async function startServer() {
+  try {
+    await ensureAdminAccount();
+  } catch (error) {
+    console.error("[Cuentas] No se pudo preparar el usuario administrador:", error);
+  }
+
   const distPath = path.join(process.cwd(), "dist");
   const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(path.join(distPath, "index.html"));
 
   if (!isProduction) {
     console.log("[Server] Starting in development mode with Vite middleware...");
     app.use(express.static(path.join(process.cwd(), "public")));
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
     console.log("[Server] Starting in production mode serving static files from:", distPath);
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api")) return next();
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`Cyclia server is running on http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Cyclia está en http://localhost:${PORT}`);
+    for (const address of localNetworkAddresses()) {
+      console.log(`En esta red: http://${address}:${PORT}`);
+    }
   });
 }
 
