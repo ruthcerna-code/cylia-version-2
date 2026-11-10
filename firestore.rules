@@ -1,0 +1,175 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isDate(value) {
+      return value is string && value.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    function isTime(value) {
+      return value == null || (value is string && value.size() <= 8);
+    }
+
+    function oneOf(value, options) {
+      return value in options;
+    }
+
+    function optionalEnum(field, options) {
+      return !(field in request.resource.data)
+        || request.resource.data[field] == null
+        || oneOf(request.resource.data[field], options);
+    }
+
+    function optionalInt(field, low, high) {
+      return !(field in request.resource.data)
+        || request.resource.data[field] == null
+        || (request.resource.data[field] is int
+            && request.resource.data[field] >= low
+            && request.resource.data[field] <= high);
+    }
+
+    function scale(field) {
+      return field in request.resource.data
+        && request.resource.data[field] is int
+        && request.resource.data[field] >= 1
+        && request.resource.data[field] <= 5;
+    }
+
+    match /credentials/{uid} {
+      allow read, write: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.role == 'user'
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.age is int
+        && request.resource.data.age >= 12
+        && request.resource.data.age <= 100
+        && isDate(request.resource.data.birthDate)
+        && request.resource.data.weight is number
+        && request.resource.data.weight >= 30
+        && request.resource.data.weight <= 250
+        && request.resource.data.height is number
+        && request.resource.data.height >= 100
+        && request.resource.data.height <= 250
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 120
+        && isDate(request.resource.data.lastPeriodDate)
+        && request.resource.data.periodLength is int
+        && request.resource.data.periodLength >= 1
+        && request.resource.data.periodLength <= 10
+        && request.resource.data.cycleLength is int
+        && request.resource.data.cycleLength >= 21
+        && request.resource.data.cycleLength <= 45
+        && oneOf(request.resource.data.hormonalMethod, ['ninguna', 'pastilla', 'diu_hormonal', 'implante', 'inyeccion', 'anillo_parche'])
+        && oneOf(request.resource.data.specialSituation, ['ninguna', 'embarazo', 'posparto_lactancia', 'terapia_hormonal', 'sin_regla'])
+        && oneOf(request.resource.data.perimenopauseMode, ['off', 'offered', 'on'])
+        && oneOf(request.resource.data.lengthSource, ['manual', 'records']);
+      allow delete: if isOwner(uid);
+
+      match /daily_logs/{day} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && isDate(day)
+          && request.resource.data.date == day
+          && scale('sleepQuality')
+          && scale('fatigue')
+          && scale('pain')
+          && scale('stress')
+          && scale('mood')
+          && optionalInt('energy', 1, 5)
+          && optionalInt('concentration', 1, 5)
+          && optionalEnum('sleepState', ['bien', 'regular', 'mal'])
+          && optionalEnum('cervicalFluid', ['seco', 'pegajoso', 'cremoso', 'clara_de_huevo'])
+          && optionalEnum('feltState', ['Serena', 'Enfocada', 'Radiante', 'Reflexiva', 'Sensible'])
+          && optionalEnum('energyFeel', ['baja', 'estable', 'radiante', 'inquieta'])
+          && optionalEnum('headache', ['ninguno', 'leve', 'medio'])
+          && optionalEnum('bloating', ['ninguno', 'leve', 'medio'])
+          && optionalEnum('breastSensitivity', ['ninguno', 'leve', 'medio'])
+          && optionalEnum('pelvicCramps', ['ninguno', 'leve', 'medio']);
+        allow delete: if isOwner(uid);
+      }
+
+      match /period_records/{id} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && isDate(request.resource.data.startDate)
+          && (request.resource.data.endDate == null || isDate(request.resource.data.endDate))
+          && optionalEnum('volume', ['leve', 'moderado', 'abundante', 'muy_abundante'])
+          && optionalInt('pain', 0, 3);
+        allow delete: if isOwner(uid);
+      }
+
+      match /messages/{id} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && oneOf(request.resource.data.role, ['user', 'assistant'])
+          && request.resource.data.content is string
+          && request.resource.data.content.size() > 0
+          && request.resource.data.content.size() <= 8000
+          && request.resource.data.createdAt is int;
+        allow delete: if isOwner(uid);
+      }
+
+      match /activities/{id} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 200
+          && isDate(request.resource.data.date)
+          && isTime(request.resource.data.startTime)
+          && isTime(request.resource.data.endTime)
+          && optionalEnum('importance', ['alta', 'media', 'baja'])
+          && oneOf(request.resource.data.planStatus, ['pendiente', 'en_curso', 'hecha', 'pospuesta']);
+        allow delete: if isOwner(uid);
+      }
+
+      match /day_plans/{day} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && isDate(day)
+          && request.resource.data.planDate == day
+          && request.resource.data.availableMinutes is int
+          && request.resource.data.availableMinutes >= 0
+          && request.resource.data.availableMinutes <= 1440
+          && request.resource.data.bufferMinutes is int
+          && request.resource.data.bufferMinutes >= 0
+          && request.resource.data.bufferMinutes <= 180;
+        allow delete: if isOwner(uid);
+      }
+
+      match /consent_events/{id} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && oneOf(request.resource.data.purpose, ['terms', 'privacy_notice', 'health_cycle', 'gemini_assistant'])
+          && oneOf(request.resource.data.action, ['accept', 'reject', 'withdraw'])
+          && oneOf(request.resource.data.source, ['new_user', 'existing_user', 'privacy_settings'])
+          && request.resource.data.policyVersion is string
+          && request.resource.data.statementText is string
+          && request.resource.data.statementText.size() <= 4000;
+        allow update, delete: if false;
+      }
+
+      match /data_requests/{id} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && oneOf(request.resource.data.kind, ['access', 'correction', 'deletion', 'other'])
+          && request.resource.data.detail is string
+          && request.resource.data.detail.size() <= 2000;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

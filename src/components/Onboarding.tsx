@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { UserProfile } from '../types';
+import { HormonalMethod, SpecialSituation, UserProfile } from '../types';
+import { ageFromBirthDate, HORMONAL_LABELS, HORMONAL_METHODS, SITUATION_LABELS, SPECIAL_SITUATIONS, validateBirthDate, validateCycleLength, validateEmail, validateHeight, validateName, validatePeriodDate, validatePeriodLength, validateProfile, validateWeight } from '../utils/profileFields';
 import WelcomeScreen from './WelcomeScreen';
 
 interface OnboardingProps {
@@ -26,20 +27,18 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
 
   const [step, setStep] = useState<number>(0);
   const [name, setName] = useState(initialProfile?.name || '');
-  const [age, setAge] = useState<number | ''>(initialProfile?.age || '');
   const [birthDate, setBirthDate] = useState(initialProfile?.birthDate || '');
+  const [age, setAge] = useState<number | ''>(initialProfile?.birthDate ? (ageFromBirthDate(initialProfile.birthDate) ?? '') : '');
   const [weight, setWeight] = useState<number | ''>(initialProfile?.weight || '');
   const [height, setHeight] = useState<number | ''>(initialProfile?.height || '');
   const [email, setEmail] = useState(initialProfile?.email || accountEmail || '');
   const [lastPeriodDate, setLastPeriodDate] = useState(initialProfile?.lastPeriodDate || '');
   const [periodLength, setPeriodLength] = useState<number | ''>(initialProfile?.periodLength || '');
   const [cycleLength, setCycleLength] = useState<number | ''>(initialProfile?.cycleLength || '');
-  const [hasContraceptive, setHasContraceptive] = useState<boolean | null>(
-    initialProfile ? initialProfile.contraceptive !== 'Ninguno' : null
-  );
-  const [contraceptiveName, setContraceptiveName] = useState(
-    initialProfile && initialProfile.contraceptive !== 'Ninguno' ? initialProfile.contraceptive : ''
-  );
+  const [periodLengthKnown, setPeriodLengthKnown] = useState(initialProfile?.periodLengthKnown !== false);
+  const [cycleLengthKnown, setCycleLengthKnown] = useState(initialProfile?.cycleLengthKnown !== false);
+  const [hormonalMethod, setHormonalMethod] = useState<HormonalMethod | null>(initialProfile?.hormonalMethod || null);
+  const [specialSituation, setSpecialSituation] = useState<SpecialSituation | null>(initialProfile?.specialSituation || null);
   const [isCeliac, setIsCeliac] = useState(initialProfile?.isCeliac || false);
   const [hasDiabetes, setHasDiabetes] = useState(initialProfile?.hasDiabetes || false);
   const [hasObesity, setHasObesity] = useState(initialProfile?.hasObesity || false);
@@ -50,81 +49,85 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
     setError('');
     
     // Perform validations before moving to next steps
-    if (step === 1 && !name.trim()) {
-      setError('Por favor, ingresa tu nombre.');
-      return;
+    if (step === 1) {
+      const nameError = validateName(name);
+      if (nameError) {
+        setError(nameError);
+        return;
+      }
     }
     if (step === 2) {
-      if (age === '' || isNaN(Number(age))) {
-        setError('Por favor, ingresa una edad válida.');
+      const birthError = validateBirthDate(birthDate);
+      if (birthError) {
+        setError(birthError);
         return;
       }
-      if (Number(age) < 12) {
-        setError('La edad registrada debe ser de al menos 12 años.');
+      const calculated = ageFromBirthDate(birthDate);
+      if (calculated == null) {
+        setError('No pude calcular la edad con esa fecha.');
+        return;
+      }
+      setAge(calculated);
+    }
+    if (step === 3 && age !== ageFromBirthDate(birthDate)) {
+      setError('La edad debe coincidir con la fecha de nacimiento.');
+      return;
+    }
+    if (step === 4) {
+      const weightError = validateWeight(Number(weight));
+      if (weightError) {
+        setError(weightError);
         return;
       }
     }
-    if (step === 3 && !birthDate) {
-      setError('Por favor, selecciona tu fecha de nacimiento.');
-      return;
-    }
-    if (step === 4 && (weight === '' || Number(weight) <= 0)) {
-      setError('Por favor, ingresa tu peso en kg.');
-      return;
-    }
-    if (step === 5 && (height === '' || Number(height) <= 0)) {
-      setError('Por favor, ingresa tu estatura en cm.');
-      return;
+    if (step === 5) {
+      const heightError = validateHeight(Number(height));
+      if (heightError) {
+        setError(heightError);
+        return;
+      }
     }
     if (step === 6) {
-      // Email is optional, can be empty, but if provided, must look like email
-      if (email.trim() && !email.includes('@')) {
-        setError('Por favor, ingresa un correo electrónico válido o déjalo vacío.');
+      const emailError = validateEmail(email);
+      if (emailError) {
+        setError(emailError);
         return;
       }
     }
-    if (step === 7 && !lastPeriodDate) {
-      setError('Por favor, selecciona una fecha válida.');
-      return;
+    if (step === 7) {
+      const periodError = validatePeriodDate(lastPeriodDate);
+      if (periodError) {
+        setError(periodError);
+        return;
+      }
     }
     if (step === 8) {
-      if (periodLength === '' || isNaN(Number(periodLength))) {
-        setError('Por favor, ingresa la duración.');
-        return;
-      }
-      const pNum = Number(periodLength);
-      if (pNum < 2 || pNum > 10) {
-        setError('La duración de la menstruación debe estar entre 2 y 10 días.');
+      setPeriodLengthKnown(true);
+      const lengthError = validatePeriodLength(Number(periodLength));
+      if (lengthError) {
+        setError(lengthError);
         return;
       }
     }
     if (step === 9) {
-      if (cycleLength === '' || isNaN(Number(cycleLength))) {
-        setError('Por favor, ingresa la duración.');
-        return;
-      }
-      const cNum = Number(cycleLength);
-      if (cNum < 21 || cNum > 40) {
-        setError('La duración del ciclo promedio debe estar entre 21 y 40 días.');
+      setCycleLengthKnown(true);
+      const cycleError = validateCycleLength(Number(cycleLength));
+      if (cycleError) {
+        setError(cycleError);
         return;
       }
     }
-    if (step === 10 && hasContraceptive === null) {
-      setError('Por favor, selecciona una opción.');
+    if (step === 10 && !hormonalMethod) {
+      setError('Elige una opción.');
       return;
     }
-    if (step === 11 && hasContraceptive && !contraceptiveName.trim()) {
-      setError('Por favor, indica qué método utilizas.');
+    if (step === 11 && !specialSituation) {
+      setError('Elige la situación que corresponde.');
       return;
     }
 
-    // Go to next step
-    if (step === 10 && !hasContraceptive) {
-      setStep(12);
-    } else if (step === 11) {
-      setStep(12);
-    } else if (step === 12) {
-      handleFinish(hasContraceptive ? contraceptiveName : 'Ninguno');
+    if (step === 12) {
+      handleFinish();
     } else {
       setStep(step + 1);
     }
@@ -132,52 +135,54 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
 
   const prevStep = () => {
     setError('');
-    if (step > 0) {
-      if (step === 12) {
-        if (!hasContraceptive) {
-          setStep(10);
-        } else {
-          setStep(11);
-        }
-      } else {
-        setStep(step - 1);
-      }
-    }
+    if (step > 0) setStep(step - 1);
   };
 
-  const handleFinish = (contraValue: string) => {
+  const handleFinish = () => {
+    const calculated = ageFromBirthDate(birthDate);
+    const method = hormonalMethod || 'ninguna';
     const profile: UserProfile = {
-      name,
-      age: Number(age),
+      name: name.trim(),
+      age: calculated ?? Number(age),
       birthDate,
       weight: Number(weight),
       height: Number(height),
       email: email.trim(),
       lastPeriodDate,
-      periodLength: Number(periodLength),
-      cycleLength: Number(cycleLength),
-      contraceptive: contraValue,
+      periodLength: periodLengthKnown ? Number(periodLength) : 5,
+      cycleLength: cycleLengthKnown ? Number(cycleLength) : 28,
+      periodLengthKnown,
+      cycleLengthKnown,
+      hormonalMethod: method,
+      specialSituation: specialSituation || 'ninguna',
+      perimenopauseMode: 'off',
+      contraceptive: HORMONAL_LABELS[method],
       isCeliac,
       hasDiabetes,
       hasObesity,
       hasDepression,
     };
+    const problem = validateProfile(profile);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     onComplete(profile);
   };
 
   const getStepTitle = () => {
     switch (step) {
       case 1: return "¿Cómo te llamas?";
-      case 2: return `Encantada, ${name}. ¿Qué edad tienes?`;
-      case 3: return "¿Cuál es tu fecha de nacimiento?";
+      case 2: return `${name.trim() || 'Hola'}, ¿cuál es tu fecha de nacimiento?`;
+      case 3: return `Tienes ${age} años`;
       case 4: return "¿Cuánto pesas aproximadamente?";
       case 5: return "¿Cuánto mides?";
       case 6: return "¿Cuál es tu correo electrónico? (Opcional)";
       case 7: return "¿Cuándo comenzó tu última menstruación?";
-      case 8: return "¿Cuántos días dura habitualmente tu sangrado menstrual?";
-      case 9: return "¿Cuántos días dura el total de tu ciclo promedio?";
-      case 10: return "¿Utilizas algún método anticonceptivo?";
-      case 11: return "¿Cuál método anticonceptivo utilizas?";
+      case 8: return "¿Cuántos días dura habitualmente tu regla?";
+      case 9: return "¿Cuántos días dura habitualmente tu ciclo?";
+      case 10: return "¿Usas anticoncepción hormonal?";
+      case 11: return "¿Hay alguna situación que cambie las predicciones?";
       case 12: return "¿Tienes alguna de las siguientes condiciones de salud?";
       default: return "";
     }
@@ -197,40 +202,33 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               className={FIELD_CLASS}
               onKeyDown={(e) => e.key === 'Enter' && nextStep()}
             />
-            <p className="text-xs text-[#9A9A90] px-2">Solo necesitamos tu primer nombre o apodo.</p>
+            <p className="text-xs text-[#9A9A90] px-2">Texto: letras, espacios y guiones. Sin números.</p>
           </div>
         );
       case 2:
-        return (
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                autoFocus
-                value={age}
-                onChange={(e) => setAge(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="Ej. 28"
-                min="12"
-                max="100"
-                className={FIELD_CLASS}
-                onKeyDown={(e) => e.key === 'Enter' && nextStep()}
-              />
-              <span className="text-lg font-medium text-[#1B4D3E]">años</span>
-            </div>
-            <p className="text-xs text-[#9A9A90] px-2">Validación: Debes ser mayor de 12 años.</p>
-          </div>
-        );
-      case 3:
         return (
           <div className="space-y-2">
             <input
               type="date"
               autoFocus
               value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => {
+                setBirthDate(e.target.value);
+                const calculated = ageFromBirthDate(e.target.value);
+                setAge(calculated ?? '');
+              }}
               className={FIELD_CLASS}
               onKeyDown={(e) => e.key === 'Enter' && nextStep()}
             />
+            <p className="text-xs text-[#9A9A90] px-2">Va antes que la edad. Con esta fecha se calcula.</p>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="space-y-2">
+            <p className="rounded-2xl bg-[#F8F9FE] px-5 py-5 text-lg font-medium text-[#1B1F5E]">{age} años</p>
+            <p className="text-xs text-[#9A9A90] px-2">Número calculado. No se escribe a mano.</p>
           </div>
         );
       case 4:
@@ -306,14 +304,15 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                 value={periodLength}
                 onChange={(e) => setPeriodLength(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="Ej. 5"
-                min="2"
+                min="1"
                 max="10"
                 className={FIELD_CLASS}
                 onKeyDown={(e) => e.key === 'Enter' && nextStep()}
               />
               <span className="text-lg font-medium text-[#1B4D3E]">días</span>
             </div>
-            <p className="text-xs text-[#9A9A90] px-2">Rango válido: entre 2 y 10 días.</p>
+            <p className="text-xs text-[#9A9A90] px-2">De 1 a 10 días. Si no lo sabes, se usan 5.</p>
+            <button type="button" onClick={() => { setPeriodLength(5); setPeriodLengthKnown(false); setError(''); setStep(9); }} className="w-full rounded-2xl border-2 border-[#1E5631]/40 bg-white py-4 text-sm font-semibold text-[#1E5631] cursor-pointer">No sé</button>
           </div>
         );
       case 9:
@@ -327,62 +326,44 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                 onChange={(e) => setCycleLength(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="Ej. 28"
                 min="21"
-                max="40"
+                max="45"
                 className={FIELD_CLASS}
                 onKeyDown={(e) => e.key === 'Enter' && nextStep()}
               />
               <span className="text-lg font-medium text-[#1B4D3E]">días</span>
             </div>
-            <p className="text-xs text-[#9A9A90] px-2">Rango válido: de 21 a 40 días de duración promedio.</p>
+            <p className="text-xs text-[#9A9A90] px-2">De 21 a 45 días. Si no lo sabes, se usan 28.</p>
+            <button type="button" onClick={() => { setCycleLength(28); setCycleLengthKnown(false); setError(''); setStep(10); }} className="w-full rounded-2xl border-2 border-[#1E5631]/40 bg-white py-4 text-sm font-semibold text-[#1E5631] cursor-pointer">No sé</button>
           </div>
         );
       case 10:
         return (
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => {
-                setHasContraceptive(true);
-                // Go to next step
-                setStep(11);
-              }}
-              className={`py-6 rounded-2xl border-2 text-base font-semibold cursor-pointer transition-all ${
-                hasContraceptive === true
-                  ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]'
-                  : 'border-[#1E5631]/40 bg-white text-[#1E5631] hover:border-[#1E5631] hover:bg-[#F5F6F8]'
-              }`}
-            >
-              Sí, utilizo
-            </button>
-            <button
-              onClick={() => {
-                setHasContraceptive(false);
-                setError('');
-                // Complete directly as "Ninguno"
-                handleFinish('Ninguno');
-              }}
-              className={`py-6 rounded-2xl border-2 text-base font-semibold cursor-pointer transition-all ${
-                hasContraceptive === false
-                  ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]'
-                  : 'border-[#1E5631]/40 bg-white text-[#1E5631] hover:border-[#1E5631] hover:bg-[#F5F6F8]'
-              }`}
-            >
-              No utilizo
-            </button>
+          <div className="grid grid-cols-1 gap-3">
+            {HORMONAL_METHODS.map((method) => (
+              <button
+                key={method}
+                type="button"
+                onClick={() => { setHormonalMethod(method); setError(''); setStep(11); }}
+                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${hormonalMethod === method ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-white text-[#1E5631]'}`}
+              >
+                {HORMONAL_LABELS[method]}
+              </button>
+            ))}
           </div>
         );
       case 11:
         return (
-          <div className="space-y-2">
-            <input
-              type="text"
-              autoFocus
-              value={contraceptiveName}
-              onChange={(e) => setContraceptiveName(e.target.value)}
-              placeholder="Ej. Pastillas anticonceptivas, DIU, etc."
-              className={FIELD_CLASS}
-              onKeyDown={(e) => e.key === 'Enter' && nextStep()}
-            />
-            <p className="text-xs text-[#9A9A90] px-2">Indica el tipo o marca para tenerlo de referencia.</p>
+          <div className="grid grid-cols-1 gap-3">
+            {SPECIAL_SITUATIONS.map((situation) => (
+              <button
+                key={situation}
+                type="button"
+                onClick={() => { setSpecialSituation(situation); setError(''); setStep(12); }}
+                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${specialSituation === situation ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-white text-[#1E5631]'}`}
+              >
+                {SITUATION_LABELS[situation]}
+              </button>
+            ))}
           </div>
         );
       case 12:

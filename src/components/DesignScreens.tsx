@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { MenstrualPhase, UserProfile } from '../types';
 import { PHASE_DETAILS } from '../utils/cycle';
+import { validateCycleLength, validatePeriodLength } from '../utils/profileFields';
 
 const ORDER: MenstrualPhase[] = ['Menstrual', 'Folicular', 'Ovulacion', 'Lutea'];
 const PHASE_BG: Record<MenstrualPhase, { bg: string; fg: string; label: string }> = {
@@ -16,7 +17,7 @@ export function PhaseScreen({ current, onBack }: { current: MenstrualPhase; onBa
   const info = PHASE_DETAILS[selected];
   const tone = PHASE_BG[selected];
   const blocks = [
-    ['Qué pasa en tu cuerpo', info.hormones],
+    ['Referencia, no es una medición', info.hormones],
     ['Energía y ánimo', info.description],
     ['Productividad', info.productivity.join('. ')],
     ['Bienestar', info.tips[0]],
@@ -132,6 +133,7 @@ export function CycleDataScreen({
     { key: 'hasObesity', label: 'Obesidad' },
     { key: 'hasDepression', label: 'Depresión o ansiedad' },
   ];
+  const [lengthError, setLengthError] = useState('');
   const field = 'h-[46px] rounded-xl border-[1.5px] border-[#C9D3EF] bg-[#F8F9FE] px-3 text-[15px] font-semibold text-[#1B1F5E] outline-none';
   return (
     <div className="flex flex-col gap-3 pt-2">
@@ -142,8 +144,10 @@ export function CycleDataScreen({
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Nombre<input className={field} value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Inicio del último periodo<input className={field} type="date" value={lastPeriodDate} onChange={(event) => setLastPeriodDate(event.target.value)} /></label>
         <div className="grid grid-cols-2 gap-2.5">
-          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Duración del ciclo<input className={field} type="number" min={21} max={40} value={cycleLength} onChange={(event) => setCycleLength(event.target.value)} /></label>
-          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Duración del periodo<input className={field} type="number" min={2} max={10} value={periodLength} onChange={(event) => setPeriodLength(event.target.value)} /></label>
+          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Duración del ciclo<input className={field} type="number" min={21} max={45} value={cycleLength} onChange={(event) => setCycleLength(event.target.value)} /></label>
+          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Duración del periodo<input className={field} type="number" min={1} max={10} value={periodLength} onChange={(event) => setPeriodLength(event.target.value)} /></label>
+          <p className="m-0 text-[12px] font-semibold text-[#4A4F7A]">El ciclo va de 21 a 45 días. Si no se sabe, la primera predicción usa 28. La regla va de 1 a 10 días; si no se sabe, usa 5.</p>
+          {lengthError && <p className="m-0 text-sm font-bold text-[#9C3B45]" role="alert">{lengthError}</p>}
         </div>
       </section>
       <section className="rounded-[20px] bg-white p-4">
@@ -162,7 +166,17 @@ export function CycleDataScreen({
       </button>
       <button
         type="button"
-        onClick={() => onSave({ ...profile, name: name.trim() || profile.name, lastPeriodDate, cycleLength: Number(cycleLength) || profile.cycleLength, periodLength: Number(periodLength) || profile.periodLength, ...flags })}
+        onClick={() => {
+          const cycleDays = Number(cycleLength);
+          const periodDays = Number(periodLength);
+          const error = validateCycleLength(cycleDays) || validatePeriodLength(periodDays);
+          if (error) {
+            setLengthError(error);
+            return;
+          }
+          setLengthError('');
+          onSave({ ...profile, name: name.trim() || profile.name, lastPeriodDate, cycleLength: cycleDays, periodLength: periodDays, cycleLengthKnown: true, periodLengthKnown: true, ...flags });
+        }}
         className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-base font-extrabold text-[#1B1F5E]"
       >
         Guardar cambios

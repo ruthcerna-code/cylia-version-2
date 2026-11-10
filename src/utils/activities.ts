@@ -10,8 +10,22 @@ const GENERAL: ActivitySuggestion = {
   note: 'No hay información suficiente para una sugerencia más específica. Esta es una actividad general de bienestar: puedes aceptarla, modificarla o reemplazarla. No es una indicación médica.',
 };
 
-export function suggestActivity(phase: MenstrualPhase | null, log?: DailyLog | null): ActivitySuggestion {
-  if (!phase || !log) return GENERAL;
+export function suggestActivity(phase: MenstrualPhase | null, log?: DailyLog | null, options?: { lowerLoad?: boolean }): ActivitySuggestion {
+  const low: ActivitySuggestion = {
+    title: 'Tareas de bajo esfuerzo',
+    note: 'Según lo que registraste, conviene bajar la carga hoy. Puedes aceptarlo, modificarlo o dejarlo. No es una indicación médica.',
+  };
+  if (log?.energy != null && log.energy <= 2) return low;
+  if (options?.lowerLoad) return low;
+  if (!phase || !log) {
+    if (log?.energy != null && log.energy >= 4) {
+      return {
+        title: 'Hay espacio para una tarea más exigente',
+        note: 'Según la energía que registraste, puedes elegir una tarea de más esfuerzo. No es una indicación médica.',
+      };
+    }
+    return GENERAL;
+  }
 
   const load = (log.fatigue + log.stress + log.pain) / 3;
   const needsRest = load >= 3.5 || log.mood >= 4 || log.sleepQuality >= 4;
@@ -45,8 +59,24 @@ export function suggestActivity(phase: MenstrualPhase | null, log?: DailyLog | n
 }
 
 export function compareActivities(a: ScheduledActivity, b: ScheduledActivity): number {
-  const byDate = a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime);
+  const byDate = a.date.localeCompare(b.date) || (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
   return byDate || a.title.localeCompare(b.title);
+}
+
+export function overlappingActivity(
+  items: ScheduledActivity[],
+  candidate: { id?: string; date: string; startTime: string; endTime: string },
+): ScheduledActivity | null {
+  const start = parseTime(candidate.startTime);
+  const end = parseTime(candidate.endTime);
+  if (start == null || end == null) return null;
+  return items.find((item) => {
+    if (item.id === candidate.id || item.date !== candidate.date) return false;
+    const otherStart = parseTime(item.startTime);
+    const otherEnd = parseTime(item.endTime);
+    if (otherStart == null || otherEnd == null) return false;
+    return start < otherEnd && otherStart < end;
+  }) || null;
 }
 
 export function pendingSyncCount(items: ScheduledActivity[]): number {
@@ -122,5 +152,6 @@ export function formatActivityWhen(activity: Pick<ScheduledActivity, 'date' | 's
   const [year, month, day] = activity.date.split('-').map(Number);
   const date = new Date(year, (month || 1) - 1, day || 1);
   const label = new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+  if (!activity.startTime || !activity.endTime) return `${label} · sin hora`;
   return `${label} · ${activity.startTime}–${activity.endTime}`;
 }

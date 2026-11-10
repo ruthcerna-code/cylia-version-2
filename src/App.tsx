@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, DailyLog, ChatMessage, MenstrualPhase, ScheduledActivity } from './types';
+import { UserProfile, DailyLog, ChatMessage, MenstrualPhase, PeriodRecord, ScheduledActivity } from './types';
 import AgendaScreen, { type AgendaSeed } from './components/AgendaScreen';
 import Onboarding from './components/Onboarding';
 import { EntryFlow, MoodGrid, ObjectivesScreen, RegionScreen } from './components/EntryFlow';
@@ -13,16 +13,22 @@ import ChatPanel from './components/ChatPanel';
 import HealthProfileModal from './components/HealthProfileModal';
 import SymptomChart from './components/SymptomChart';
 import CycleProjectionScreen from './components/CycleProjectionScreen';
-import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, nextPeriodStart, PHASE_DETAILS } from './utils/cycle';
-import { accountSessionExpired, bindAccountSessionSync, clearAccountSession, fetchAccountMe, loginWithAccount, loginWithEmail, type AccountRole } from './accountApi';
+import PhaseKnowledge from './components/PhaseKnowledge';
+import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
+import { analyzeCycle } from './utils/cycleModel';
+import { accountSessionExpired, beginEntry, bindAccountSessionSync, clearAccountSession, fetchAccountMe, finishAccountSession, type AccountRole, type PendingEntry } from './accountApi';
 import { fetchConsentStatus, saveConsentDecisions, supabaseBearer, type ConsentStatus } from './consentApi';
 import { PRIVACY_LOGIN_KEY } from './consentCopy';
 import ConsentScreen from './components/ConsentScreen';
 import PrivacyDataScreen from './components/PrivacyDataScreen';
 import CyclePrivacySettings from './components/CyclePrivacySettings';
-import FocusModule, { FocusMorningGate } from './components/FocusModule';
+import OrganizaDia from './components/OrganizaDia';
 import { downloadOwnData } from './dataExport';
 import { compareActivities, explainActivityError, formatActivityWhen, LOCAL_ACTIVITY_STORE_NOTE, suggestActivity } from './utils/activities';
+import { compareRecords, dayRecordNote, indicatorNote } from './utils/recordCompare';
+import { suggestCare } from './utils/care';
+import DayMatch from './components/DayMatch';
+import { buildAnalysisContext } from './utils/analysisContext';
 import { generateActivityForDay } from './utils/activity';
 import {
   deleteAccountData,
@@ -32,13 +38,13 @@ import {
   fetchActivities,
   fetchLogs,
   fetchMessages,
+  fetchPeriodRecords,
   fetchProfile,
   isSupabaseConfigured,
   saveLogs,
   saveMessage,
   saveProfile,
   saveScheduledActivity,
-  signInAnonymously,
   toSessionUser,
   signOut,
   subscribeUserData,
@@ -116,6 +122,7 @@ export default function App() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [logs, setLogs] = useState<Record<string, DailyLog>>({});
+  const [periods, setPeriods] = useState<PeriodRecord[]>([]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(formatDateStr(new Date()));
   const [isCheckinOpen, setIsCheckinOpen] = useState(false);
@@ -126,6 +133,7 @@ export default function App() {
   const [notificationMsg, setNotificationMsg] = useState('');
   const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'agenda' | 'chat' | 'humor' | 'perfil' | 'foco'>('inicio');
   const [activities, setActivities] = useState<ScheduledActivity[]>([]);
+  const [activitiesReady, setActivitiesReady] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
   const [activityStorageNote, setActivityStorageNote] = useState('');
   const [agendaSeed, setAgendaSeed] = useState<AgendaSeed | null>(null);
@@ -169,7 +177,8 @@ export default function App() {
   // Authentication Panel States
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [otherAccount, setOtherAccount] = useState(false);
+  const [entryNotice, setEntryNotice] = useState<'' | 'created' | 'calendar'>('');
+  const [pendingEntry, setPendingEntry] = useState<PendingEntry | null>(null);
   const [authPanelError, setAuthPanelError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
 
@@ -224,7 +233,7 @@ export default function App() {
       window.clearTimeout(stopWaiting);
       if (accountSessionExpired()) {
         clearAccountSession();
-        try { await supabase.auth.signOut(); } catch { /* La sesión local ya se limpia. */ }
+        try { await signOut(); } catch { /* La sesión local ya se limpia. */ }
         rememberUser(null);
         return;
       }
@@ -272,10 +281,11 @@ export default function App() {
 
     const refresh = async () => {
       try {
-        const [profileRow, logRows, messageRows] = await Promise.all([
+        const [profileRow, logRows, messageRows, periodRows] = await Promise.all([
           fetchProfile(uid),
           fetchLogs(uid),
           fetchMessages(uid),
+          fetchPeriodRecords(uid),
         ]);
         if (cancelled) return;
 
@@ -314,6 +324,7 @@ export default function App() {
 
         setProfile(profileRow);
         setLogs(logRows);
+        setPeriods(periodRows);
         setChatHistory(messageRows);
         setIsLoadingAuth(false);
       } catch (error) {
@@ -349,6 +360,8 @@ export default function App() {
       setActivityStorageNote(activitiesStoredOnThisDevice() ? LOCAL_ACTIVITY_STORE_NOTE : '');
     } catch (error) {
       setActivitiesError(explainActivityError(error));
+    } finally {
+      setActivitiesReady(true);
     }
   };
 
@@ -465,11 +478,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          profile,
-          log: currentLog,
-          history: listLogs(allLogs)
-            .filter(l => l.date !== currentLog.date)
-            .slice(-4) // Send recent 4 logs
+          context: buildAnalysisContext(profile, periods, allLogs, currentLog.date),
         })
       });
 
@@ -506,11 +515,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profile,
-          log: activeLog,
-          history: listLogs(logs)
-            .filter(l => l.date !== selectedDateStr)
-            .slice(-4),
+          context: buildAnalysisContext(profile, periods, logs, selectedDateStr),
           previousInteractionId,
           environmentId,
         })
@@ -662,8 +667,7 @@ export default function App() {
         sleepDetails: sleepQuality <= 2 ? "Dormí de corrido toda la noche" : "Me costó conciliar el sueño al principio",
         additionalNotes: "Registro automático de demostración histórica.",
         behavior,
-        aiAnalysis: `### Análisis de Tendencia - Fase ${phase}
-Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu cuerpo está respondiendo de manera típica. Los niveles de dolor y fatiga se correlacionan directamente con tus fluctuaciones hormonales.`
+        aiAnalysis: `Texto de demostración del día ${cycleDay}. No sale de un análisis de tus registros ni mide hormonas.`
       };
 
       updatedLogs[dateStr] = logDoc;
@@ -737,7 +741,8 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
   };
 
   const leaveForAccountLogin = async () => {
-    setOtherAccount(true);
+    setEntryNotice('');
+    setPendingEntry(null);
     userIdRef.current = null;
     clearAccountSession();
     setUser(null);
@@ -780,43 +785,34 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
   }
 
   if (!user) {
-    const handleAccountAuth = async (e: React.FormEvent, remember: boolean) => {
+    const handleEnter = async (e: React.FormEvent, remember: boolean) => {
       e.preventDefault();
       setAuthPanelError('');
+      setEntryNotice('');
       setIsAuthProcessing(true);
       try {
-        await loginWithAccount(loginUsername, loginPassword, remember);
+        const pending = await beginEntry(loginUsername, loginPassword, remember);
+        setPendingEntry(pending);
+        setEntryNotice(pending.created ? 'created' : 'calendar');
       } catch (err: any) {
-        console.error("Error de autenticación:", err);
-        setAuthPanelError(err?.message || "Ocurrió un error. Verifica tus credenciales.");
+        console.error('Error de autenticación:', err);
+        setAuthPanelError(err?.message || 'No se pudo entrar.');
       } finally {
         setIsAuthProcessing(false);
       }
     };
 
-    const handleOtherAccount = async (e: React.FormEvent, remember: boolean) => {
-      e.preventDefault();
+    const handleContinue = async () => {
+      if (!pendingEntry) return;
       setAuthPanelError('');
       setIsAuthProcessing(true);
       try {
-        await loginWithEmail(loginUsername, loginPassword, remember);
+        await finishAccountSession(pendingEntry);
+        setEntryNotice('');
+        setPendingEntry(null);
       } catch (err: any) {
-        console.error('Error al entrar con otra cuenta:', err);
-        setAuthPanelError(err?.message || 'No se pudo entrar con ese correo.');
-      } finally {
-        setIsAuthProcessing(false);
-      }
-    };
-
-    const handleGuestAuth = async () => {
-      setAuthPanelError('');
-      setIsAuthProcessing(true);
-      clearAccountSession();
-      try {
-        await signInAnonymously();
-      } catch (err: any) {
-        console.error("Error en acceso anónimo:", err);
-        setAuthPanelError(err?.message || 'No se pudo iniciar la sesión anónima en Supabase.');
+        setAuthPanelError(err?.message || 'No se pudo abrir la sesión.');
+        setEntryNotice('');
       } finally {
         setIsAuthProcessing(false);
       }
@@ -829,12 +825,11 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         error={authPanelError}
         username={loginUsername}
         password={loginPassword}
-        startAtOther={otherAccount}
+        entryNotice={entryNotice}
         onUsernameChange={setLoginUsername}
         onPasswordChange={setLoginPassword}
-        onAnonymous={handleGuestAuth}
-        onAccountSubmit={handleAccountAuth}
-        onOtherAccount={handleOtherAccount}
+        onEnter={handleEnter}
+        onContinue={() => { void handleContinue(); }}
       />
     );
   }
@@ -875,12 +870,15 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
   }
 
   // Calculate current state metrics based on active selection date
-  const selectedCycleDay = getCycleDay(selectedDateStr, profile.lastPeriodDate, profile.cycleLength);
-  const selectedPhase = getPhaseForDay(selectedCycleDay, profile.periodLength, profile.cycleLength);
+  const cycleView = analyzeCycle(profile, periods, selectedDateStr, logs);
+  const selectedCycleDay = cycleView.cycleDay;
+  const selectedPhase: MenstrualPhase = cycleView.phase ?? 'Folicular';
   const phaseDetails = PHASE_DETAILS[selectedPhase];
   const activeLog = logs[selectedDateStr];
   const dayActivities = activities.filter((item) => item.date === selectedDateStr);
-  const activitySuggestion = activeLog ? suggestActivity(selectedPhase, activeLog) : null;
+  const activitySuggestion = activeLog || cycleView.lowerLoad
+    ? suggestActivity(cycleView.tasksUsePhases ? selectedPhase : null, activeLog, { lowerLoad: cycleView.lowerLoad })
+    : null;
   const activityDates = activities.map((item) => item.date);
   const openAgenda = (title: string, date: string) => {
     setAgendaSeed({ token: Date.now(), title, date });
@@ -893,7 +891,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
   const selectedActivity = generateActivityForDay(
     profile.name,
-    selectedPhase,
+    cycleView.showPhases ? selectedPhase : null,
     selectedCycleDay,
     {
       isCeliac: profile.isCeliac,
@@ -937,11 +935,15 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             dateLabel={formatFriendlyDate(selectedDateStr)}
             todayStr={selectedDateStr}
             cycleDay={selectedCycleDay}
-            cycleLength={profile.cycleLength}
-            periodLength={profile.periodLength}
+            cycleLength={cycleView.averageLength}
+            periodLength={cycleView.periodLength}
             lastPeriodDate={profile.lastPeriodDate}
             phase={selectedPhase}
+            showPhases={cycleView.showPhases}
+            approximate={cycleView.approximate}
+            statusNote={cycleView.note}
             activityTitle={selectedActivity.title}
+            care={suggestCare(profile, periods, logs, selectedDateStr)}
             onOpenPhase={() => setHomeSheet('fase')}
             onRegister={() => setAppTab('registro')}
             onChat={() => { setHomeSheet(null); setAppTab('chat'); }}
@@ -992,23 +994,21 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           </div>
         )}
         {appTab === 'foco' && (
-          <FocusModule
+          <OrganizaDia
             userId={user.id}
-            profile={profile}
-            onPeriodStart={async (date) => { await handleSaveProfile({ ...profile, lastPeriodDate: date }); }}
-            onSchedule={async (title, date, activityId) => {
-              const saved = await handleSaveActivity({
-                id: activityId,
-                title,
-                date,
-                startTime: '09:00',
-                endTime: '09:30',
-                reminderMinutes: null,
-                notes: 'Desde Mi Foco',
-                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Santiago',
-              });
+            date={formatDateStr(new Date())}
+            activities={activities}
+            activitiesReady={activitiesReady}
+            log={logs[formatDateStr(new Date())]}
+            onSave={async (draft) => {
+              const saved = await handleSaveActivity(draft);
               if (!saved) throw new Error('Sin sesión');
-              return saved.id;
+              return saved;
+            }}
+            onEnergy={(feel, score) => {
+              const today = formatDateStr(new Date());
+              const current = logs[today];
+              if (current) void handleSaveLog({ ...current, energy: score, energyFeel: feel });
             }}
           />
         )}
@@ -1018,6 +1018,9 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             loadError={activitiesError}
             storageNote={activityStorageNote}
             seed={agendaSeed}
+            profile={profile}
+            periods={periods}
+            logs={logs}
             onSeedApplied={() => setAgendaSeed(null)}
             onSave={handleSaveActivity}
             onDelete={handleDeleteActivity}
@@ -1028,8 +1031,9 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           <DesignRegister
             dateStr={selectedDateStr}
             dateLabel={formatFriendlyDate(selectedDateStr)}
-            phaseLabel={phaseDetails.name}
+            phaseLabel={cycleView.showPhases ? `${phaseDetails.name}${cycleView.approximate ? ' aproximada' : ''}` : 'Según tu registro'}
             cycleDay={selectedCycleDay}
+            showVasomotor={profile.age >= 40 || cycleView.mode === 'perimenopause' || cycleView.mode === 'menopause'}
             existing={activeLog}
             suggestion={activitySuggestion}
             onSchedule={(title) => openAgenda(title, selectedDateStr)}
@@ -1113,7 +1117,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
             {/* Cognitive & Physical Stats Progress Bars */}
             <div className="space-y-5">
-              <h4 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest">Indicadores de Fase</h4>
+              <h4 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest">Referencia, no es tu registro</h4>
               <div>
                 <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-[#9A9A90] mb-1.5">
                   <span>Concentración</span>
@@ -1200,11 +1204,15 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               selectedDateStr={selectedDateStr}
               onSelectDate={setSelectedDateStr}
               activityDates={activityDates}
+              showPhases={cycleView.showPhases}
+              cycleLength={cycleView.averageLength}
+              periodLength={cycleView.periodLength}
             />
             <section className="flex flex-col gap-1.5 rounded-[20px] bg-white p-4">
               <span className="text-xs font-extrabold tracking-wide text-[#4A4F7A]">DÍA SELECCIONADO</span>
               <h2 className="m-0 text-[17px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h2>
-              <p className="m-0 text-sm text-[#3B4070]">Día {selectedCycleDay} del ciclo · {phaseDetails.name} · {activeLog ? 'Con registro' : 'Sin registro'}</p>
+              <p className="m-0 text-sm text-[#3B4070]">{cycleView.showPhases ? `Día ${selectedCycleDay} del ciclo · ${phaseDetails.name}${cycleView.approximate ? ' aproximada' : ''}` : cycleView.note} · {activeLog ? 'Con registro' : 'Sin registro'}</p>
+              {dayRecordNote(activeLog) && <p className="m-0 text-sm text-[#3B4070]">{dayRecordNote(activeLog)}</p>}
               <button type="button" onClick={() => setCycleSheet('dia')} className="w-fit cursor-pointer py-2 text-[15px] font-extrabold text-[#3A44C4]">Ver detalle del día</button>
               {dayActivities.length > 0 && (
                 <ul className="m-0 list-none p-0 text-sm text-[#3B4070]">
@@ -1220,7 +1228,13 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                 </>
               )}
               <div className="my-1 h-px bg-[#E1E5F5]" />
-              <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {formatFriendlyDate(nextPeriodStart(profile.lastPeriodDate, profile.cycleLength))}</p>
+              <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {cycleView.nextPeriod ? formatFriendlyDate(cycleView.nextPeriod) : 'En pausa con los datos actuales.'}</p>
+              {cycleView.alerts[0] && <p className="m-0 text-sm text-[#3B4070]">{cycleView.alerts[0].message}</p>}
+              {cycleView.offerPerimenopause && <p className="m-0 text-sm text-[#3B4070]">Desde los 40 años, tus ciclos muestran variación. Puedes activar el modo perimenopausia en la ficha si quieres que las sugerencias sigan tu registro diario.</p>}
+              <div className="my-1 h-px bg-[#E1E5F5]" />
+              <h3 className="m-0 text-sm font-extrabold">Tus registros y la proyección</h3>
+              {compareRecords(profile, periods, logs).map((line) => <p key={line} className="m-0 text-sm text-[#3B4070]">{line}</p>)}
+              <p className="m-0 text-xs text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
             </section>
             <button type="button" onClick={() => setCycleSheet('evolucion')} className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">↗</span>
@@ -1228,8 +1242,9 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </button>
             <button type="button" onClick={() => setCycleSheet('proyeccion')} className="flex items-center gap-3 rounded-[20px] bg-[#A9C4F0] p-4 text-left text-[#1B1F5E]">
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">3</span>
-              <span><strong className="block text-base">Próximos 3 ciclos</strong><span className="text-[13px] text-[#3B4070]">Proyección estimada, sin guardar</span></span>
+              <span><strong className="block text-base">Proyección de tu ciclo</strong><span className="text-[13px] text-[#3B4070]">Tres ciclos, fases y ovulación estimada</span></span>
             </button>
+            <PhaseKnowledge profile={profile} periods={periods} logs={logs} userId={user.id} />
             <button type="button" onClick={() => handleUpdatePeriodStart(formatDateStr(new Date()))} className="h-[50px] cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Registrar inicio de periodo hoy</button>
           </div>
           {appTab === 'calendario' && cycleSheet === 'dia' && (
@@ -1244,6 +1259,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                 <>
                   <section className="rounded-[20px] bg-white p-4">
                     <h2 className="m-0 text-base font-extrabold">Cómo te sentiste</h2>
+                    {indicatorNote(activeLog) && <p className="m-0 mt-2 text-sm leading-relaxed text-[#3B4070]">{indicatorNote(activeLog)}</p>}
                     <div className="mt-3 grid grid-cols-2 gap-2.5">
                       {[
                         ['Cansancio', activeLog.fatigue],
@@ -1300,7 +1316,14 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </div>
           )}
           {appTab === 'calendario' && cycleSheet === 'proyeccion' && (
-            <CycleProjectionScreen profile={profile} onBack={() => setCycleSheet(null)} />
+            <CycleProjectionScreen
+              profile={profile}
+              periods={periods}
+              logs={logs}
+              userId={user.id}
+              onBack={() => setCycleSheet(null)}
+              onOpenCalendar={(date) => { setSelectedDateStr(date); setCycleSheet(null); }}
+            />
           )}
 
           {/* Detailed Recommended Activity for Selected Day */}
@@ -1483,6 +1506,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                 currentPhase: selectedPhase,
                 cycleDay: selectedCycleDay
               }}
+              periods={periods}
               logs={Object.values(logs)}
               chatHistory={chatHistory}
               onAddMessage={handleAddMessage}
@@ -1618,7 +1642,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
           ['registro', 'Registro', '+'],
           ['agenda', 'Agendar actividades', '◷'],
           ['chat', 'Cyclia IA', '✦'],
-          ['foco', 'Mi Foco', '◎'],
+          ['foco', 'Organiza tu día', '◎'],
           ['perfil', 'Perfil', '•'],
         ] as const).map(([id, label, icon]) => (
           <button
@@ -1628,7 +1652,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             className={`flex cursor-pointer flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-extrabold leading-tight ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
           >
             <span className="text-lg leading-none">{icon}</span>
-            {id === 'agenda' ? <span className="text-center">Agendar<br />actividades</span> : id === 'foco' ? <span className="text-center">Mi<br />Foco</span> : label}
+            {id === 'agenda' ? <span className="text-center">Agendar<br />actividades</span> : id === 'foco' ? <span className="text-center">Organiza<br />tu día</span> : label}
           </button>
         ))}
       </nav>
@@ -1655,11 +1679,12 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 mb-6">
+            <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+              <DayMatch care={suggestCare(profile, periods, logs, selectedDateStr)} />
               {isAnalyzing ? (
-                <div className="text-center py-12 space-y-4">
-                  <div className="w-10 h-10 border-4 border-t-[#1E5631] border-[#d7e6d4] rounded-full animate-spin mx-auto"></div>
-                  <p className="text-sm font-semibold text-[#1E5631] animate-pulse">Cyclia está analizando tu registro hormonal e historial diario...</p>
+                <div className="rounded-[20px] bg-white py-8 text-center">
+                  <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#E7EAF8] border-t-[#3A44C4]"></div>
+                  <p className="mt-3 text-sm font-extrabold text-[#1B1F5E]">Cyclia está leyendo tu registro.</p>
                 </div>
               ) : analysisError ? (
                 <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -1672,22 +1697,12 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                   </button>
                 </div>
               ) : activeLog?.aiAnalysis ? (
-                <div className="space-y-4 text-sm text-[#3A3A35] leading-relaxed">
-                  <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl mb-4">
-                    <p className="text-xs font-bold uppercase text-emerald-800 mb-1">💡 Conclusión Biológica</p>
-                    <p className="text-xs text-emerald-950 font-medium leading-normal">
-                      Este análisis ha sido personalizado según tu fase menstrual ({selectedPhase}) y el registro de tu estado de ánimo, dolores y calidad de sueño.
-                    </p>
-                  </div>
-                  
-                  {/* Parsing sections from response */}
-                  <div className="whitespace-pre-wrap leading-relaxed bg-[#F5F6F8] p-5 rounded-2xl border border-[#d7e6d4] max-h-[400px] overflow-y-auto">
-                    {activeLog.aiAnalysis}
-                  </div>
+                <div className="whitespace-pre-wrap rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#3B4070]">
+                  {activeLog.aiAnalysis}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <p className="text-sm text-[#7A7A70]">No hay análisis disponible aún. Haz clic en el botón de abajo para generarlo por IA.</p>
+                <div className="rounded-[20px] bg-white p-4 text-center">
+                  <p className="text-sm text-[#3B4070]">La gráfica de arriba ya compara tu registro con la propuesta. El texto de la asistente es aparte.</p>
                   <button
                     onClick={handleRequestAnalysisManually}
                     className="mt-4 bg-[#1E5631] hover:bg-[#1B4D3E] text-white font-semibold py-2.5 px-6 rounded-full text-xs uppercase tracking-wide cursor-pointer"
@@ -1711,14 +1726,6 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       )}
 
       {/* Edit Health Profile Modal */}
-      {appTab !== 'foco' && (
-        <FocusMorningGate
-          userId={user.id}
-          profile={profile}
-          onPeriodStart={async (date) => { await handleSaveProfile({ ...profile, lastPeriodDate: date }); }}
-        />
-      )}
-
       {isEditingHealth && (
         <HealthProfileModal
           profile={profile}

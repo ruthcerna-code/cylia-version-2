@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { getCycleDay, getPhaseForDay, formatDateStr } from '../utils/cycle';
+import { dayWithinCycle, getCycleDay, getPhaseForDay, formatDateStr } from '../utils/cycle';
 
 interface CalendarViewProps {
   profile: UserProfile;
   selectedDateStr: string;
   onSelectDate: (dateStr: string) => void;
   activityDates?: string[];
+  showPhases?: boolean;
+  cycleLength?: number;
+  periodLength?: number;
 }
 
 const MONTH_NAMES = [
@@ -14,7 +17,7 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
 
-export default function CalendarView({ profile, selectedDateStr, onSelectDate, activityDates = [] }: CalendarViewProps) {
+export default function CalendarView({ profile, selectedDateStr, onSelectDate, activityDates = [], showPhases = true, cycleLength = profile.cycleLength, periodLength = profile.periodLength }: CalendarViewProps) {
   const today = new Date();
   const todayStr = formatDateStr(today);
 
@@ -54,8 +57,8 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate, a
     const paddedDay = String(dayNum).padStart(2, '0');
     const fullDateStr = `${currentYear}-${paddedMonth}-${paddedDay}`;
     
-    const cycleDay = getCycleDay(fullDateStr, profile.lastPeriodDate, profile.cycleLength);
-    const phase = getPhaseForDay(cycleDay, profile.periodLength, profile.cycleLength);
+    const cycleDay = dayWithinCycle(getCycleDay(fullDateStr, profile.lastPeriodDate, cycleLength), cycleLength);
+    const phase = getPhaseForDay(cycleDay, periodLength, cycleLength);
     
     return {
       dateStr: fullDateStr,
@@ -81,7 +84,9 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate, a
 
     // Decide phase-based color classes matching the "Natural Tones" layout specification
     let bgClass = "bg-gray-100 text-gray-500";
-    if (phase === 'Menstrual') {
+    if (!showPhases) {
+      bgClass = "bg-[#E7EAF8] text-[#1B1F5E] hover:bg-[#D5DCF3]";
+    } else if (phase === 'Menstrual') {
       bgClass = "bg-[#F49A9E] text-[#1B1F5E] hover:bg-[#E57F86]";
     } else if (phase === 'Folicular') {
       bgClass = "bg-[#A9C4F0] text-[#1B1F5E] hover:bg-[#96b4ea]";
@@ -152,7 +157,7 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate, a
       </div>
 
       {/* Color Legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-[#EFEFEF] justify-center sm:justify-start">
+      {showPhases && <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-[#EFEFEF] justify-center sm:justify-start">
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
           <span className="w-2.5 h-2.5 rounded-full bg-[#F49A9E] inline-block shadow-sm"></span>
           <span>Menstrual</span>
@@ -169,7 +174,7 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate, a
           <span className="w-2.5 h-2.5 rounded-full bg-[#3A44C4] inline-block shadow-sm"></span>
           <span>Lútea</span>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

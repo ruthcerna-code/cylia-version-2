@@ -85,7 +85,11 @@ async function openAccountSession(path: string, payload: Record<string, string>,
     body: JSON.stringify(payload),
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'No se pudo iniciar sesión.');
+  if (!response.ok) {
+    const failure = new Error(body.error || 'No se pudo iniciar sesión.') as Error & { code?: string };
+    failure.code = typeof body.code === 'string' ? body.code : '';
+    throw failure;
+  }
   if (!supabase) throw new Error('Faltan las claves de Supabase en el archivo .env.');
   persistAccountToken(body.token, remember);
   const { error } = await supabase.auth.setSession({
@@ -103,8 +107,66 @@ export function loginWithAccount(username: string, password: string, remember: b
   return openAccountSession('/api/auth/login', { username, password }, remember);
 }
 
+export type PendingEntry = {
+  created: boolean;
+  remember: boolean;
+  token: string;
+  accessToken: string;
+  refreshToken: string;
+};
+
+export async function beginEntry(username: string, password: string, remember: boolean): Promise<PendingEntry> {
+  const email = username.includes('@');
+  const response = await fetch(email ? '/api/auth/email' : '/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(email ? { email: username, password } : { username, password }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const failure = new Error(body.error || 'No se pudo entrar.') as Error & { code?: string };
+    failure.code = typeof body.code === 'string' ? body.code : '';
+    throw failure;
+  }
+  return {
+    created: Boolean(body.created),
+    remember,
+    token: String(body.token || ''),
+    accessToken: String(body.supabase?.access_token || ''),
+    refreshToken: String(body.supabase?.refresh_token || ''),
+  };
+}
+
+export async function finishAccountSession(pending: PendingEntry): Promise<void> {
+  if (!supabase) throw new Error('Faltan las claves de Supabase en el archivo .env.');
+  persistAccountToken(pending.token, pending.remember);
+  const { error } = await supabase.auth.setSession({
+    access_token: pending.accessToken,
+    refresh_token: pending.refreshToken,
+  });
+  if (error) {
+    clearAccountSession();
+    throw new Error(error.message);
+  }
+}
+
+export function confirmEmailCode(email: string, code: string, remember: boolean): Promise<{ username: string; role: AccountRole }> {
+  return openAccountSession('/api/auth/confirm', { email, code }, remember);
+}
+
 export function loginWithEmail(email: string, password: string, remember: boolean): Promise<{ username: string; role: AccountRole }> {
   return openAccountSession('/api/auth/email', { email, password }, remember);
+}
+
+export async function requestProvisionalPassword(email: string): Promise<string> {
+  const response = await fetch('/api/auth/provisional', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'No se pudo enviar la clave provisoria.');
+  return String(body.message || 'Enviamos la clave provisoria a tu correo.');
 }
 
 export async function fetchAccountMe(supabaseUserId: string): Promise<{ username: string; role: AccountRole } | null | 'expired'> {

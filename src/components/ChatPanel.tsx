@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UserProfile, DailyLog, ChatMessage } from '../types';
+import { UserProfile, DailyLog, ChatMessage, PeriodRecord } from '../types';
 import { supabaseBearer } from '../consentApi';
+import { buildAnalysisContext } from '../utils/analysisContext';
 
 interface ChatPanelProps {
   profile: UserProfile;
+  periods: PeriodRecord[];
   logs: DailyLog[];
   chatHistory: ChatMessage[];
   onAddMessage: (msg: ChatMessage) => void;
@@ -67,14 +69,15 @@ function AgentTrace({ steps }: { steps: any[] }) {
 }
 
 const QUICK_PROMPTS = [
-  { label: "🌸 ¿Cómo influye mi fase actual?", text: "Explícame qué está pasando en mi cuerpo hoy y cómo influye en mis emociones y energía." },
-  { label: "💼 Ideas de productividad hoy", text: "Tengo que organizar mis tareas de hoy, ¿qué tipo de actividades me recomiendas hacer según mi fase actual?" },
-  { label: "🧘‍♀️ Ejercicios y autocuidado", text: "Recomiéndame una rutina de autocuidado y ejercicio ideal para mi fase actual del ciclo." },
-  { label: "🥑 ¿Qué comer esta semana?", text: "Sugerencias de alimentación saludable y nutrientes clave para asimilar mejor esta fase." }
+  { label: "🌸 ¿Cómo va mi ciclo hoy?", text: "Con el día y la fase que sí llegaron, y con mis registros, dime qué muestra hoy. No inventes hormonas." },
+  { label: "💼 Ideas para hoy", text: "Con mi energía y mi cansancio registrados, ¿qué opciones hay para organizar el día?" },
+  { label: "🧘‍♀️ Movimiento suave", text: "Sugiere un movimiento acorde a la energía y el cansancio de mi registro. No es una orden." },
+  { label: "🥑 Ideas de comida", text: "Ideas de comida acordes a lo que registré. No cambies un tratamiento." }
 ];
 
 export default function ChatPanel({
   profile,
+  periods,
   logs,
   chatHistory,
   onAddMessage,
@@ -120,10 +123,9 @@ export default function ChatPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          profile,
-          logs: logs.slice(-5), // Send last 5 logs for context
+          context: buildAnalysisContext(profile, periods, logs),
           message: text,
-          chatHistory: chatHistory.slice(-10), // Send last 10 messages for context
+          chatHistory: chatHistory.slice(-10),
           previousInteractionId,
           environmentId,
         })

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UserProfile } from '../types';
 import { addCalendarDays, formatFriendlyDate, getCycleDay } from '../utils/cycle';
+import { focusFlagsFor } from '../utils/cycleModel';
 import {
   PHASE_COLOR,
   PHASE_LABEL,
@@ -156,7 +157,7 @@ export default function FocusModule({
     const sentToday = state.shownOn.filter((item) => item.startsWith(today)).length;
     const lastShown = state.shownOn.length ? state.shownOn[state.shownOn.length - 1].slice(0, 10) : null;
     const realTasks = state.tasks.filter((task) => !task.example);
-    const due = notesForToday(realTasks, state.checkins, profile, state.flags, sentToday, state.reduced, lastShown)
+    const due = notesForToday(realTasks, state.checkins, profile, focusFlagsFor(profile, state.flags), sentToday, state.reduced, lastShown)
       .some((note) => note.kind === 'lighten');
     if (!due) return;
     const tomorrow = addCalendarDays(today, 1);
@@ -181,6 +182,7 @@ export default function FocusModule({
   }, [state, profile, onSchedule]);
 
   if (!state) return <p className="px-1 pt-6 text-sm text-[#5C564C]">Cargando tu foco…</p>;
+  const flags = focusFlagsFor(profile, state.flags);
   if (!state.consentedAt) {
     return <Consent onAccept={() => update({ ...state, consentedAt: new Date().toISOString() })} />;
   }
@@ -197,7 +199,7 @@ export default function FocusModule({
   const now = new Date();
   const notesReady = now.getHours() > notifyHour || (now.getHours() === notifyHour && now.getMinutes() >= (notifyMinute || 0));
   const generated = state.notifyEnabled && notesReady
-    ? notesForToday(realTasks, state.checkins, profile, state.flags, sentToday, state.reduced, lastShown)
+    ? notesForToday(realTasks, state.checkins, profile, flags, sentToday, state.reduced, lastShown)
     : [];
   const lightenId = `ligero-${addCalendarDays(today, 1)}`;
   const notes = state.lightened && !state.shownOn.some((item) => item.endsWith(lightenId)) && !generated.some((note) => note.kind === 'lighten')
@@ -315,8 +317,8 @@ export default function FocusModule({
               }}
               onNext={() => {
                 if (!draft.trim()) return;
-                const task = makeTask(draft, profile, state.flags, state.checkins, realTasks);
-                const suggestion = suggestDate(task.kind, profile, state.flags, state.checkins);
+                const task = makeTask(draft, profile, flags, state.checkins, realTasks);
+                const suggestion = suggestDate(task.kind, profile, flags, state.checkins);
                 setProposal(task);
                 setKindNote(suggestion.note);
                 setScreen('propuesta');
@@ -359,7 +361,7 @@ export default function FocusModule({
               onVoice={() => setVoiceNote(dictate(setDraft) ? 'Te escucho…' : 'Este navegador no ofrece dictado. Puedes escribir la meta.')}
               onNext={() => {
                 if (!draft.trim()) return;
-                setGoalCards(splitGoal(draft).map((title) => makeTask(title, profile, state.flags, state.checkins, realTasks)));
+                setGoalCards(splitGoal(draft).map((title) => makeTask(title, profile, flags, state.checkins, realTasks)));
                 setScreen('tarjetas');
               }}
               onBack={() => setScreen('crear')}
@@ -383,7 +385,7 @@ export default function FocusModule({
               <h1 className="m-0 font-serif text-4xl">¿Qué pasó?</h1>
               {REASONS.map((reason) => (
                 <button key={reason.id} type="button" className={quiet} onClick={() => {
-                  const result = applyPostpone(active, reason.id, profile, state.flags, state.checkins);
+                  const result = applyPostpone(active, reason.id, profile, flags, state.checkins);
                   setToast(result.message);
                   setScreen('hoy');
                   void (async () => {
@@ -450,7 +452,7 @@ export default function FocusModule({
                 ['menopause', 'Estoy en menopausia'],
               ] as const).map(([id, label]) => (
                 <button key={id} type="button" className={quiet} onClick={() => update({ ...state, flags: { ...state.flags, [id]: !state.flags[id] } })}>
-                  {state.flags[id] ? '✓ ' : ''}{label}
+                  {flags[id] ? '✓ ' : ''}{label}
                 </button>
               ))}
             </section>

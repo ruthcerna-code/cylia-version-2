@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import type { Express, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
+import { gmailConfigured, sendConfirmationCode, sendProvisionalPassword } from './mail';
 
 const ADMIN_USERNAME = 'administrador';
 const ADMIN_PASSWORD = '1234';
@@ -47,9 +48,22 @@ function readAccounts(): AccountFile {
 
 function writeAccounts(file: AccountFile) {
   fs.mkdirSync(dataDir(), { recursive: true });
-  const temp = `${accountsPath()}.tmp`;
+  const target = accountsPath();
+  const temp = `${target}.tmp`;
   fs.writeFileSync(temp, JSON.stringify(file, null, 2));
-  fs.renameSync(temp, accountsPath());
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      fs.renameSync(temp, target);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY') throw error;
+      const until = Date.now() + 40;
+      while (Date.now() < until) { /* Windows puede tener el archivo un instante. */ }
+    }
+  }
+  fs.copyFileSync(temp, target);
+  try { fs.rmSync(temp, { force: true }); } catch { /* El temporal puede quedar si el archivo sigue ocupado. */ }
 }
 
 function sessionSecret(): string {
@@ -100,6 +114,45 @@ function assertEmail(email: string) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 120) {
     throw new Error('Ingresa un correo válido.');
   }
+}
+
+function provisionalPassword(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  return Array.from(crypto.randomBytes(10), (byte) => alphabet[byte % alphabet.length]).join('');
+}
+
+const provisionalSentAt = new Map<string, number>();
+
+type PendingSignup = {
+  email: string;
+  passwordHash: string;
+  codeHash: string;
+  expiresAt: number;
+  sentAt: number;
+};
+
+function pendingPath(): string {
+  return path.join(dataDir(), 'pending-signups.json');
+}
+
+function readPending(): PendingSignup[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(pendingPath(), 'utf8')) as PendingSignup[];
+    const now = Date.now();
+    return Array.isArray(parsed) ? parsed.filter((item) => item.expiresAt > now) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePending(items: PendingSignup[]) {
+  fs.mkdirSync(dataDir(), { recursive: true });
+  const now = Date.now();
+  fs.writeFileSync(pendingPath(), JSON.stringify(items.filter((item) => item.expiresAt > now), null, 2));
+}
+
+function confirmationCode(): string {
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 function signToken(account: Account): string {
@@ -242,7 +295,7 @@ export async function ensureAdminAccount() {
   }
 }
 
-async function sendAccountSession(res: Response, file: AccountFile, account: Account) {
+async function sendAccountSession(res: Response, file: AccountFile, account: Account, created = false) {
   let session: { accessToken: string; refreshToken: string };
   try {
     session = await attachSupabase(account);
@@ -253,10 +306,11 @@ async function sendAccountSession(res: Response, file: AccountFile, account: Acc
     return;
   }
   writeAccounts(file);
-  res.json({
+  res.status(created ? 201 : 200).json({
     token: signToken(account),
     username: account.username,
     role: account.role,
+    created,
     supabaseUserId: account.supabaseUserId,
     supabase: { access_token: session.accessToken, refresh_token: session.refreshToken },
   });
@@ -266,11 +320,19 @@ export function registerAccountRoutes(app: Express) {
   app.post('/api/auth/login', async (req, res) => {
     try {
       const username = normalizeUsername(req.body?.username);
-      const password = String(req.body?.password || '');
+      const password = String(req.body?.password || '').trim();
       const file = readAccounts();
       const account = file.users.find((item) => item.username === username);
       if (!account || !verifyPassword(password, account.passwordHash)) {
-        res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
+        const emailAccount = Boolean(account && username.includes('@'));
+        res.status(401).json(account
+          ? {
+            error: emailAccount
+              ? 'No reconocemos esa clave.'
+              : 'No reconocemos esa clave. Esta cuenta usa la contraseña con la que se creó.',
+            code: emailAccount ? 'unrecognized' : 'unrecognized_local',
+          }
+          : { error: 'Usuario o contraseña incorrectos.' });
         return;
       }
       await sendAccountSession(res, file, account);
@@ -280,24 +342,82 @@ export function registerAccountRoutes(app: Express) {
     }
   });
 
+  app.post('/api/auth/provisional', async (req, res) => {
+    const email = normalizeUsername(req.body?.email || req.body?.username);
+    let createdId = '';
+    let previousHash = '';
+    try {
+      assertEmail(email);
+      if (!gmailConfigured()) {
+        res.status(503).json({ error: 'Falta GMAIL_USER y GMAIL_APP_PASSWORD en el servidor para enviar la clave.' });
+        return;
+      }
+      const lastSent = provisionalSentAt.get(email) || 0;
+      if (Date.now() - lastSent < 60_000) {
+        res.status(429).json({ error: 'Espera un minuto antes de pedir otra clave.' });
+        return;
+      }
+      const file = readAccounts();
+      const existing = file.users.find((item) => item.username === email);
+      if (existing?.role === 'admin') {
+        res.status(400).json({ error: 'La cuenta de administración no usa clave provisoria.' });
+        return;
+      }
+      const password = provisionalPassword();
+      if (existing) {
+        previousHash = existing.passwordHash;
+        existing.passwordHash = hashPassword(password);
+        writeAccounts(file);
+      } else {
+        const session = await provisionSupabaseUser();
+        const created: Account = {
+          id: crypto.randomUUID(),
+          username: email,
+          passwordHash: hashPassword(password),
+          role: 'user',
+          supabaseUserId: session.supabaseUserId,
+          refreshToken: session.refreshToken,
+          createdAt: new Date().toISOString(),
+        };
+        createdId = created.id;
+        file.users.push(created);
+        writeAccounts(file);
+      }
+      await sendProvisionalPassword(email, password);
+      provisionalSentAt.set(email, Date.now());
+      res.json({ ok: true, message: 'Enviamos la clave provisoria a tu correo. Entra con ella.' });
+    } catch (error) {
+      if (createdId || previousHash) {
+        const file = readAccounts();
+        if (createdId) file.users = file.users.filter((item) => item.id !== createdId);
+        const restored = previousHash ? file.users.find((item) => item.username === email) : undefined;
+        if (restored && previousHash) restored.passwordHash = previousHash;
+        writeAccounts(file);
+      }
+      const message = error instanceof Error ? error.message : 'No se pudo enviar la clave provisoria.';
+      const status = /Falta GMAIL/.test(message) ? 503 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
   app.post('/api/auth/email', async (req, res) => {
     try {
       const email = normalizeUsername(req.body?.email || req.body?.username);
-      const password = String(req.body?.password || '');
+      const password = String(req.body?.password || '').trim();
       assertEmail(email);
       assertPassword(password);
       const file = readAccounts();
       const existing = file.users.find((item) => item.username === email);
       if (existing) {
         if (!verifyPassword(password, existing.passwordHash)) {
-          res.status(401).json({ error: 'Este correo ya tiene cuenta. La contraseña tiene que ser la que usaste al crearla.' });
+          res.status(401).json({ error: 'No reconocemos esa clave.', code: 'unrecognized' });
           return;
         }
-        await sendAccountSession(res, file, existing);
+        await sendAccountSession(res, file, existing, false);
         return;
       }
       const session = await provisionSupabaseUser();
-      const created: Account = {
+      const createdAccount: Account = {
         id: crypto.randomUUID(),
         username: email,
         passwordHash: hashPassword(password),
@@ -306,8 +426,55 @@ export function registerAccountRoutes(app: Express) {
         refreshToken: session.refreshToken,
         createdAt: new Date().toISOString(),
       };
+      file.users.push(createdAccount);
+      writeAccounts(file);
+      await sendAccountSession(res, file, createdAccount, true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo crear la cuenta.';
+      const status = /Falta GMAIL/.test(message) ? 503 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.post('/api/auth/confirm', async (req, res) => {
+    try {
+      const email = normalizeUsername(req.body?.email || req.body?.username);
+      const code = String(req.body?.code || '').trim();
+      assertEmail(email);
+      if (!/^\d{6}$/.test(code)) {
+        res.status(400).json({ error: 'El código tiene 6 números.' });
+        return;
+      }
+      const pending = readPending();
+      const signup = pending.find((item) => item.email === email);
+      if (!signup) {
+        res.status(400).json({ error: 'Pide el código de nuevo. Este ya no está vigente.' });
+        return;
+      }
+      if (!verifyPassword(code, signup.codeHash)) {
+        res.status(401).json({ error: 'Ese código no coincide.' });
+        return;
+      }
+      const file = readAccounts();
+      const existing = file.users.find((item) => item.username === email);
+      if (existing) {
+        writePending(pending.filter((item) => item.email !== email));
+        await sendAccountSession(res, file, existing);
+        return;
+      }
+      const session = await provisionSupabaseUser();
+      const created: Account = {
+        id: crypto.randomUUID(),
+        username: email,
+        passwordHash: signup.passwordHash,
+        role: 'user',
+        supabaseUserId: session.supabaseUserId,
+        refreshToken: session.refreshToken,
+        createdAt: new Date().toISOString(),
+      };
       file.users.push(created);
       writeAccounts(file);
+      writePending(pending.filter((item) => item.email !== email));
       res.status(201).json({
         token: signToken(created),
         username: created.username,
@@ -316,7 +483,7 @@ export function registerAccountRoutes(app: Express) {
         supabase: { access_token: session.accessToken, refresh_token: session.refreshToken },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo crear la cuenta.';
+      const message = error instanceof Error ? error.message : 'No se pudo confirmar el correo.';
       res.status(400).json({ error: message });
     }
   });
@@ -352,7 +519,13 @@ export function registerAccountRoutes(app: Express) {
       return;
     }
     stored.refreshToken = refreshToken;
-    writeAccounts(file);
+    try {
+      writeAccounts(file);
+    } catch (error) {
+      console.error('No se pudieron guardar las cuentas:', error);
+      res.status(500).json({ error: 'No se pudo guardar la sesión en este equipo.' });
+      return;
+    }
     res.json({ ok: true });
   });
 

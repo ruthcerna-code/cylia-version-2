@@ -44,6 +44,7 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
 
   const handleSubmit = () => {
     const newLog: DailyLog = {
+      ...(existingLog || {}),
       date: dateStr,
       sleepQuality,
       fatigue,
@@ -53,7 +54,7 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
       sleepDetails: sleepDetails.trim(),
       additionalNotes: additionalNotes.trim(),
       behavior: behavior.trim(),
-      aiAnalysis: existingLog?.aiAnalysis // Keep existing if it was analyzed
+      aiAnalysis: existingLog?.aiAnalysis,
     };
     onSave(newLog);
   };

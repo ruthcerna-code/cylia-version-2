@@ -97,8 +97,8 @@ export function registerConsentRoutes(app: Express) {
     try {
       const { client, userId } = await requireSession(req);
       const [profileResult, logsResult, activitiesResult, messagesResult, requestsResult] = await Promise.all([
-        client.from('profiles').select('name, age, birth_date, weight, height, email, last_period_date, period_length, cycle_length, contraceptive, is_celiac, has_diabetes, has_obesity, has_depression, cycle_length_source, cycle_reminders').eq('id', userId).maybeSingle(),
-        client.from('daily_logs').select('date, sleep_quality, fatigue, pain, stress, mood, sleep_details, additional_notes, behavior, ai_analysis').eq('user_id', userId),
+        client.from('profiles').select('name, age, birth_date, weight, height, email, last_period_date, period_length, cycle_length, contraceptive, is_celiac, has_diabetes, has_obesity, has_depression, cycle_length_source, cycle_reminders, hormonal_method, special_situation, period_length_known, cycle_length_known, perimenopause_mode').eq('id', userId).maybeSingle(),
+        client.from('daily_logs').select('date, sleep_quality, fatigue, pain, stress, mood, sleep_details, additional_notes, behavior, ai_analysis, energy, concentration, sleep_state, spotting, symptoms, hot_flash_count, hot_flash_intensity, night_sweat_count, night_sweat_intensity, cervical_fluid, felt_state, energy_feel, headache_level, bloating_level, breast_sensitivity_level, pelvic_cramp_level').eq('user_id', userId),
         client.from('scheduled_activities').select('title, activity_date, start_time, end_time, reminder_minutes, notes, time_zone, sync_status').eq('user_id', userId),
         client.from('messages').select('role, content, timestamp').eq('user_id', userId),
         client.from('data_requests').select('kind, detail, created_at').eq('user_id', userId),
@@ -114,6 +114,12 @@ export function registerConsentRoutes(app: Express) {
       if (!focusResult.error) focus = focusResult.data;
       else if (!/does not exist|schema cache|could not find the table/i.test(focusResult.error.message)) {
         console.error('[Exportación] No se pudo leer Mi Foco:', focusResult.error.message);
+      }
+      let periodRows: unknown[] = [];
+      const periodResult = await client.from('period_records').select('start_date, end_date, volume, pain').eq('user_id', userId);
+      if (!periodResult.error) periodRows = periodResult.data ?? [];
+      else if (!/does not exist|schema cache|could not find the table/i.test(periodResult.error.message)) {
+        console.error('[Exportación] No se pudieron leer las reglas:', periodResult.error.message);
       }
       const consent = await readConsentRows(client);
       const profile = profileResult.data;
@@ -132,6 +138,7 @@ export function registerConsentRoutes(app: Express) {
           cycleReminders: Boolean(profile.cycle_reminders),
         } : null,
         dailyLogs: logsResult.data ?? [],
+        periodRecords: periodRows,
         activities: activitiesResult.data ?? [],
         messages: messagesResult.data ?? [],
         focus: focus?.payload ?? null,

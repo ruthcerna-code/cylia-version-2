@@ -1,7 +1,9 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import type { ActivityDraft } from '../supabase';
-import type { ScheduledActivity } from '../types';
-import { formatActivityWhen, resolveSchedule } from '../utils/activities';
+import type { DailyLog, PeriodRecord, ScheduledActivity, UserProfile } from '../types';
+import { compareActivities, overlappingActivity, resolveSchedule } from '../utils/activities';
+import { formatFriendlyDate } from '../utils/cycle';
+import { agendaCycleReminder, compareRecords, dayRecordNote } from '../utils/recordCompare';
 
 export type AgendaSeed = { token: number; title: string; date: string };
 
@@ -29,6 +31,9 @@ export default function AgendaScreen({
   loadError,
   storageNote,
   seed,
+  profile,
+  periods,
+  logs,
   onSeedApplied,
   onSave,
   onDelete,
@@ -38,6 +43,9 @@ export default function AgendaScreen({
   loadError: string;
   storageNote: string;
   seed: AgendaSeed | null;
+  profile: UserProfile;
+  periods: PeriodRecord[];
+  logs: Record<string, DailyLog>;
   onSeedApplied: () => void;
   onSave: (draft: ActivityDraft) => Promise<void | { id: string }>;
   onDelete: (activity: ScheduledActivity) => Promise<void>;
@@ -65,7 +73,17 @@ export default function AgendaScreen({
     }, 0);
   }, [seed]);
 
-  const visible = activities;
+  const visible = activities.filter((item) => item.startTime && item.endTime).sort(compareActivities);
+  const untimed = activities.length - visible.length;
+  const days = visible.reduce<Array<{ date: string; items: ScheduledActivity[] }>>((groups, activity) => {
+    const last = groups[groups.length - 1];
+    if (last?.date === activity.date) last.items.push(activity);
+    else groups.push({ date: activity.date, items: [activity] });
+    return groups;
+  }, []);
+  const reminder = agendaCycleReminder(profile, periods, form.date);
+  const dayNote = dayRecordNote(logs[form.date]);
+  const reading = compareRecords(profile, periods, logs);
 
   const editActivity = (activity: ScheduledActivity) => {
     setForm({
@@ -88,6 +106,12 @@ export default function AgendaScreen({
     const resolved = resolveSchedule(form);
     if (resolved.error || !resolved.end) {
       setFormError(resolved.error || 'Revisa los datos de la actividad.');
+      setFormMessage('');
+      return;
+    }
+    const clash = overlappingActivity(activities, { id: form.id || undefined, date: form.date, startTime: form.startTime, endTime: resolved.end });
+    if (clash) {
+      setFormError(`Este horario se cruza con ${clash.title}.`);
       setFormMessage('');
       return;
     }
@@ -159,6 +183,11 @@ export default function AgendaScreen({
           Fecha
           <input id="agenda-date" type="date" required value={form.date} onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))} className="h-12 rounded-xl border-[1.5px] border-[#C9D3EF] bg-[#F8F9FE] px-3 text-sm font-semibold text-[#1B1F5E]" />
         </label>
+        <p className="m-0 rounded-2xl bg-[#E7EAF8] px-3 py-3 text-sm text-[#1B1F5E]" role="status">
+          <strong className="block">{reminder.title}</strong>
+          {reminder.detail}
+          {dayNote ? ` ${dayNote}` : ''}
+        </p>
         <label className="flex flex-col gap-1.5 text-sm font-extrabold" htmlFor="agenda-start">
           Hora de inicio
           <input id="agenda-start" type="time" required value={form.startTime} onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))} className="h-12 rounded-xl border-[1.5px] border-[#C9D3EF] bg-[#F8F9FE] px-3 text-sm font-semibold text-[#1B1F5E]" />
@@ -186,6 +215,11 @@ export default function AgendaScreen({
         </label>
         {formError && <p id={formErrorId} className="m-0 text-sm font-bold text-[#9C3B45]" role="alert">{formError}</p>}
         {formMessage && <p className="m-0 text-sm font-extrabold text-[#1B1F5E]" role="status">{formMessage}</p>}
+        <section className="rounded-2xl bg-[#F8F9FE] px-3 py-3">
+          <h3 className="m-0 text-sm font-extrabold">Tus registros y la proyección</h3>
+          {reading.map((line) => <p key={line} className="m-0 mt-2 text-sm leading-relaxed text-[#3B4070]">{line}</p>)}
+          <p className="m-0 mt-2 text-xs text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
+        </section>
         <button type="submit" disabled={saving} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-base font-extrabold text-[#1B1F5E] disabled:opacity-60">
           {saving ? 'Guardando…' : 'Guardar actividad'}
         </button>
@@ -196,20 +230,36 @@ export default function AgendaScreen({
         {loadError && <p className="m-0 rounded-[20px] bg-white p-4 text-sm text-[#9C3B45]" role="alert">{loadError}</p>}
         {storageNote && <p className="m-0 rounded-[20px] bg-[#FFF6CF] p-4 text-sm text-[#1B1F5E]" role="status">{storageNote}</p>}
         {!visible.length && !loadError && (
-          <p className="m-0 rounded-[20px] bg-white p-4 text-sm text-[#3B4070]">Aún no has agendado actividades en Cyclia. Crea tu primera actividad.</p>
+          <p className="m-0 rounded-[20px] bg-white p-4 text-sm text-[#3B4070]">Aún no hay actividades con hora. Las tareas sin hora se ordenan en Organiza tu día.</p>
         )}
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {visible.map((activity) => (
-            <li key={activity.id} className="rounded-[20px] bg-white p-4">
-              <h3 className="m-0 text-base font-extrabold">{activity.title}</h3>
-              <p className="m-0 mt-1 text-sm text-[#3B4070]">{formatActivityWhen(activity)}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => editActivity(activity)} className="h-10 cursor-pointer rounded-full bg-[#F6E27F] px-4 text-sm font-extrabold text-[#1B1F5E]">Editar</button>
-                <button type="button" onClick={() => { void removeActivity(activity); }} className="h-10 cursor-pointer rounded-full border border-[#C9D3EF] bg-white px-4 text-sm font-extrabold text-[#1B1F5E]">Eliminar</button>
-              </div>
-            </li>
+        {untimed > 0 && (
+          <p className="m-0 rounded-[20px] bg-[#E7EAF8] p-4 text-sm text-[#1B1F5E]">Hay {untimed} {untimed === 1 ? 'tarea sin hora' : 'tareas sin hora'}. El orden del día está en Organiza tu día.</p>
+        )}
+        <div className="flex flex-col gap-3">
+          {days.map((day) => (
+            <section key={day.date} className="rounded-[20px] bg-white p-4">
+              <h3 className="m-0 text-base font-extrabold capitalize">{formatFriendlyDate(day.date)}</h3>
+              <p className="m-0 mt-1 text-sm text-[#3B4070]">{agendaCycleReminder(profile, periods, day.date).title}</p>
+              <ul className="m-0 mt-3 list-none p-0">
+                {day.items.map((activity) => (
+                  <li key={activity.id} className="grid grid-cols-[4.5rem_1fr] gap-3 border-t border-[#E7EAF8] py-3 first:border-t-0 first:pt-0">
+                    <div className="text-sm font-extrabold leading-5 text-[#1B1F5E]">
+                      <span className="block">{activity.startTime}</span>
+                      <span className="block font-bold text-[#4A4F7A]">{activity.endTime}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="m-0 text-[15px] font-extrabold leading-5">{activity.title}</h4>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => editActivity(activity)} className="h-10 cursor-pointer rounded-full bg-[#F6E27F] px-4 text-sm font-extrabold text-[#1B1F5E]">Editar</button>
+                        <button type="button" onClick={() => { void removeActivity(activity); }} className="h-10 cursor-pointer rounded-full border border-[#C9D3EF] bg-white px-4 text-sm font-extrabold text-[#1B1F5E]">Eliminar</button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       </section>
     </div>
   );

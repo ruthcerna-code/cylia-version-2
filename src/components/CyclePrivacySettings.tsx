@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { UserProfile } from '../types';
 import { downloadOwnData } from '../dataExport';
-
-const DAY_LIMIT = 366;
+import { validateCycleLength, validatePeriodLength } from '../utils/profileFields';
 
 function wholeDays(value: string): number | null {
   const text = value.trim();
   if (!/^[1-9]\d*$/.test(text)) return null;
   const number = Number(text);
-  if (!Number.isSafeInteger(number) || number > DAY_LIMIT) return null;
+  if (!Number.isSafeInteger(number)) return null;
   return number;
 }
 
@@ -61,10 +60,8 @@ export default function CyclePrivacySettings({
   const cycleDays = wholeDays(cycleLength);
   const periodDays = wholeDays(periodLength);
   const fieldError = cycleDays === null || periodDays === null
-    ? 'Escribe un número entero de días, entre 1 y 366.'
-    : periodDays >= cycleDays
-      ? 'La menstruación tiene que durar menos días que el ciclo, para que el calendario pueda distinguirlos.'
-      : '';
+    ? 'Escribe un número entero de días.'
+    : validateCycleLength(cycleDays) || validatePeriodLength(periodDays) || '';
   const savedSource = profile.lengthSource === 'records' ? 'records' : 'manual';
   const dirty = cycleDays !== profile.cycleLength
     || periodDays !== profile.periodLength
@@ -146,12 +143,12 @@ export default function CyclePrivacySettings({
           <label className="flex flex-col gap-1.5 text-[13px] font-extrabold text-[#1B1F5E]">
             Duración promedio del ciclo — días
             <input className={fieldClass} inputMode="numeric" aria-describedby="cycle-help" value={cycleLength} onChange={(event) => { setCycleLength(event.target.value); setStatus('idle'); }} />
-            <span id="cycle-help" className="text-[12px] font-semibold leading-snug text-[#4A4F7A]">Este valor se utiliza como referencia para las estimaciones de tu calendario.</span>
+            <span id="cycle-help" className="text-[12px] font-semibold leading-snug text-[#4A4F7A]">De 21 a 45 días. Si no hay historial, la primera predicción usa 28.</span>
           </label>
           <label className="flex flex-col gap-1.5 text-[13px] font-extrabold text-[#1B1F5E]">
             Duración promedio de la menstruación — días
             <input className={fieldClass} inputMode="numeric" aria-describedby="period-help" value={periodLength} onChange={(event) => { setPeriodLength(event.target.value); setStatus('idle'); }} />
-            <span id="period-help" className="text-[12px] font-semibold leading-snug text-[#4A4F7A]">Indica cuántos días suele durar tu menstruación.</span>
+            <span id="period-help" className="text-[12px] font-semibold leading-snug text-[#4A4F7A]">De 1 a 10 días. Si no se sabe, la primera predicción usa 5.</span>
           </label>
         </div>
         {fieldError && <p className="m-0 mt-3 text-sm font-semibold text-[#9A3B45]" role="alert">{fieldError}</p>}
