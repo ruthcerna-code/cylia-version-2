@@ -21,20 +21,20 @@ Rama de trabajo: `develop`.
 
 | Dato | Dónde se guarda | Cuándo entra |
 |------|-----------------|--------------|
-| Usuario, contraseña y rol | `data/accounts.json` | Al entrar. Si el correo no existe, la cuenta se crea en ese momento |
-| Sesión de Supabase | Auth de Supabase, vinculada a un usuario anónimo | En el mismo momento del acceso |
+| Usuario, contraseña y rol | Firebase Auth, y la cuenta de administración en `data/accounts.json` | Al entrar. Si el correo no existe, Firebase crea la cuenta en ese momento |
+| Sesión | Firebase Auth | En el mismo momento del acceso |
 | Recordar 24 horas | Navegador, si se marca la casilla | Al entrar. Si no se marca, la sesión termina al cerrar el navegador |
-| Política leída | `sessionStorage` y luego `consent_events` | Antes de entrar y al continuar dentro de la app |
+| Política leída | `sessionStorage` y luego `users/{uid}/consent_events` | Antes de entrar y al continuar dentro de la app |
 | Región y objetivos | Navegador (`cyclia_region`, `cyclia_objectives`) | Después del acceso, antes del perfil |
-| Perfil de ciclo y salud | Supabase, tabla `profiles` | Al terminar el registro y al editar la ficha |
-| Registro del día | Supabase, tabla `daily_logs` | En Registro. Además de las escalas, guarda fluido cervical, estado anímico, energía en palabras y el nivel de cabeza, hinchazón, sensibilidad mamaria y cólicos. Las horas de sueño van en el texto del sueño |
-| Cada regla | Supabase, tabla `period_records` | Al guardar el perfil o marcar el inicio de una regla. Guarda inicio, fin, volumen y dolor |
-| Chat | Supabase, tabla `messages` | En Cyclia IA |
-| Actividades | Supabase, tabla `scheduled_activities` | En Agendar, con hora, y en Organiza tu día, con o sin hora |
-| Plan del día | Supabase, tabla `day_plans` | Minutos disponibles y, si el registro no tiene energía, la energía de hoy |
-| Consentimientos y solicitudes | Supabase, `consent_events` y `data_requests` | Al aceptar, retirar o exportar |
+| Perfil de ciclo y salud | Firestore, documento `users/{uid}` | Al terminar el registro y al editar la ficha |
+| Registro del día | Firestore, `users/{uid}/daily_logs/{fecha}` | En Registro. Además de las escalas, guarda fluido cervical, estado anímico, energía en palabras y el nivel de cabeza, hinchazón, sensibilidad mamaria y cólicos. Las horas de sueño van en el texto del sueño |
+| Cada regla | Firestore, `users/{uid}/period_records` | Al guardar el perfil o marcar el inicio de una regla. Guarda inicio, fin, volumen y dolor |
+| Chat | Firestore, `users/{uid}/messages` | En Cyclia IA |
+| Actividades | Firestore, `users/{uid}/activities` | En Agendar, con hora, y en Organiza tu día, con o sin hora |
+| Plan del día | Firestore, `users/{uid}/day_plans/{fecha}` | Minutos disponibles y, si el registro no tiene energía, la energía de hoy |
+| Consentimientos y solicitudes | Firestore, `consent_events` y `data_requests` | Al aceptar, retirar o exportar |
 
-Las fechas del ciclo y del registro se guardan como texto `AAAA-MM-DD`. Si se borra el usuario de Auth, las filas de Supabase que dependen de él se borran en cascada.
+Las fechas del ciclo y del registro se guardan como texto `AAAA-MM-DD`. Cada persona solo lee y escribe sus documentos: las reglas están en `firestore.rules`.
 
 ## Recorrido y datos que se piden
 
@@ -48,7 +48,7 @@ Las fechas del ciclo y del registro se guardan como texto `AAAA-MM-DD`. Si se bo
 
 ### Validación del perfil
 
-La fecha de nacimiento va antes que la edad. La edad es el número entero de años cumplidos y no se escribe a mano. `saveProfile` vuelve a revisar todo antes de escribir en Supabase.
+La fecha de nacimiento va antes que la edad. La edad es el número entero de años cumplidos y no se escribe a mano. `saveProfile` vuelve a revisar todo antes de escribir en Firestore.
 
 | Campo | Regla | Columna |
 |-------|--------|---------|
@@ -70,31 +70,31 @@ Las reglas están en `src/utils/profileFields.ts`. El registro y la ficha de sal
 
 ## Arquitectura
 
-El navegador habla con Express. Express habla con Gemini cuando el asistente está autorizado. El perfil, los registros, el chat, las actividades, el plan del día y el consentimiento se leen y se escriben en Supabase con la sesión de quien entró.
+El navegador habla con Express. Express habla con Gemini cuando el asistente está autorizado. El perfil, los registros, el chat, las actividades y el plan del día se leen y se escriben en Firestore con la sesión de Firebase de quien entró. El consentimiento y la exportación los escribe el servidor con ese mismo token.
 
 | Capa | Dónde está | Qué hace |
 |------|------------|----------|
 | Navegador | `src/` | React 19, Vite y Tailwind. Una columna de hasta 480 px. |
 | Servidor | `server.ts` | Puerto 3001. Sirve la app, el acceso, el consentimiento, la exportación y Gemini. |
 | Cuentas | `accounts.ts`, `data/accounts.json` | Usuario o correo, contraseña y rol. No se publica. |
-| Datos | Supabase | Postgres y Auth. Cada fila cuelga de `auth.users`. |
+| Datos | Firebase | Auth y Cloud Firestore del proyecto `cyclia-mvp`. Cada documento cuelga de `users/{uid}`. |
 | IA | `POST /api/analyze`, `POST /api/chat` | Gemini recibe el contexto del ciclo y del registro, con la clave del servidor y el consentimiento `gemini_assistant`. |
-| Agenda | `scheduled_activities` | Actividades en la base de Cyclia. No hay Google Calendar. |
+| Agenda | `users/{uid}/activities` | Actividades en Firestore. No hay Google Calendar. |
 
 ### Acceso
 
-No hay entrada con la cuenta de Google ni Firebase. No hay pantalla «Sin cuenta».
+La entrada con correo es Firebase Auth. No hay pantalla «Sin cuenta».
 
 - **Usuario y contraseña.** El usuario es un correo. Si no existe, Cyclia crea la cuenta y avisa en una ventana. Si existe y la contraseña coincide, avisa que mostrará el calendario y abre la sesión. La contraseña queda cifrada en `data/accounts.json`. Cerrar sesión solo limpia este navegador; la cuenta sigue guardada para el próximo ingreso.
 - **Clave que no coincide.** Si el correo ya tiene cuenta y la contraseña es otra, no entra y no crea una cuenta duplicada.
 - **Administración.** La cuenta inicial es `administrador`, con rol admin. Desde Perfil crea y elimina usuarios. Esa cuenta no se puede borrar.
 - **24 horas.** Si se marca, la sesión se conserva 24 horas. Si no, termina al cerrar el navegador.
 
-La contraseña se comprueba en el servidor. Supabase no guarda esa contraseña: guarda un usuario anónimo vinculado, y con ese identificador se guardan el perfil y los registros.
+La contraseña del correo la comprueba Firebase Auth. Con ese usuario se guardan el perfil y los registros. La cuenta `administrador` sigue en el servidor.
 
 ### Modelo de datos
 
-El esquema de perfil, registros, chat, agenda y plan del día está en `supabase/schema.sql`. Consentimiento y solicitudes están en `supabase/migrations/`.
+Las reglas de perfil, registros, chat, agenda, plan del día, foco, consentimiento y solicitudes están en `firestore.rules`.
 
 | Tabla | Clave | Qué guarda |
 |-------|-------|------------|
@@ -146,17 +146,17 @@ Lo que la app muestra a partir de eso:
 |------|--------------|
 | `src/` | App de teléfono: pantallas, validación del perfil, cálculo del ciclo, contexto del análisis, plan del día y acceso |
 | `server.ts` | Servidor Express, Gemini, consentimiento y exportación |
-| `accounts.ts` | Cuentas y su vínculo con Supabase |
-| `data/accounts.json` | Usuarios, contraseñas y roles. No se publica |
+| `accounts.ts` | Cuenta de administración y contraseñas provisionales |
+| `data/accounts.json` | Usuarios, contraseñas y roles locales. No se publica |
 | `public/` | Fondo floral de la app |
-| `supabase/schema.sql` | Tablas principales |
-| `supabase/migrations/` | Consentimiento, preferencias del ciclo, retiro de Google Calendar, Mi Foco y el plan del día |
+| `firestore.rules` | Quién puede leer y escribir cada documento |
+| `src/firebase.ts` | Acceso y datos en Firebase |
 | `design/` | Pantallas HTML para revisar el diseño sin levantar la app |
 | `package.json` | Dependencias y scripts (`dev`, `build`, `start`) |
 
 ## Ejecutar la aplicación
 
-Requisitos: Node.js y Docker, con Supabase local en marcha.
+Requisitos: Node.js. Los datos están en Firebase, proyecto `cyclia-mvp`.
 
 ```bash
 npm install
@@ -168,7 +168,7 @@ Variables de entorno (ver `.env.example`):
 
 - `GEMINI_API_KEY`: clave de Gemini en el servidor.
 - `APP_URL`: origen de la app. En local es `http://localhost:3001`.
-- `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`: URL y clave pública de Supabase. En local la URL es `http://127.0.0.1:54321`.
+- `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID` y `VITE_FIREBASE_APP_ID`: configuración pública de la app web. Si faltan, el código usa el proyecto `cyclia-mvp`.
 - `GMAIL_USER` y `GMAIL_APP_PASSWORD`: cuenta de Gmail y contraseña de aplicación. La entrada principal no las usa: la cuenta se crea con el usuario y la contraseña escritos en la pantalla.
 
 Para ver la versión compilada: `npm run build` y luego `npm start`. Si `dist/index.html` existe, `npm run dev` sirve esa carpeta.
@@ -213,4 +213,4 @@ La gráfica de bienestar usa solo los últimos 7 días. El comportamiento de cad
 
 ## Referencia de diseño (`design/`)
 
-`design/` guarda pantallas en HTML para revisar el diseño sin levantar la app. Se abre `design/index.html`. Los datos de ejemplo son la usuaria Valentina y el día 9 del ciclo. La app en marcha, y los datos que realmente se guardan, son los de `src/` y Supabase.
+`design/` guarda pantallas en HTML para revisar el diseño sin levantar la app. Se abre `design/index.html`. Los datos de ejemplo son la usuaria Valentina y el día 9 del ciclo. La app en marcha, y los datos que realmente se guardan, son los de `src/` y Firebase.

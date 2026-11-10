@@ -79,8 +79,7 @@ function sessionSecret(): string {
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== 'ENOENT' && code !== 'EROFS' && code !== 'EPERM') throw error;
-    const key = process.env.VITE_SUPABASE_ANON_KEY?.trim();
-    if (!key) throw new Error('Falta SESSION_SECRET en el servidor.');
+    const key = process.env.VITE_FIREBASE_API_KEY?.trim() || 'cyclia-mvp';
     return crypto.createHash('sha256').update(`cyclia-session:${key}`).digest('hex');
   }
 }

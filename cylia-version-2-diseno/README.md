@@ -10,7 +10,7 @@ Cyclia es una aplicación de bienestar femenino que conecta el ciclo menstrual c
 |------|--------------|
 | `src/` | Aplicación web (React + Vite + Tailwind) |
 | `server.ts` | Servidor Express: sirve la app en `http://localhost:3001` y conecta con la API de Gemini |
-| `supabase/` | Configuración de la base de datos (Supabase) |
+| `firestore.rules` | Reglas de Cloud Firestore |
 | `design/` | Diseño visual de la app: pantallas HTML navegables, mapa de navegación y fuentes del diseño |
 
 ## Ejecutar la aplicación
@@ -27,7 +27,7 @@ Variables de entorno (ver `.env.example`):
 
 - `GEMINI_API_KEY`: clave para las llamadas a la API de Gemini (servidor).
 - `APP_URL`: origen de la app. En local es `http://localhost:3001`.
-- `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`: URL del proyecto y clave pública de Supabase (Project Settings → API).
+- `VITE_FIREBASE_*`: configuración pública de Firebase. El proyecto es `cyclia-mvp`.
 
 Para ver la versión compilada en local: `npm run build` y luego `npm start`.
 
