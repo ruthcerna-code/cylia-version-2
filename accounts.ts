@@ -23,7 +23,7 @@ type Account = {
 
 type AccountFile = { users: Account[] };
 
-type TokenPayload = { sub: string; role: Role; exp: number };
+type TokenPayload = { sub: string; role: Role; exp: number; username?: string; supabaseUserId?: string };
 
 function dataDir(): string {
   return path.join(process.cwd(), 'data');
@@ -38,6 +38,7 @@ function secretPath(): string {
 }
 
 function readAccounts(): AccountFile {
+  if (process.env.VERCEL) return { users: [] };
   try {
     const parsed = JSON.parse(fs.readFileSync(accountsPath(), 'utf8')) as AccountFile;
     return { users: Array.isArray(parsed.users) ? parsed.users : [] };
@@ -67,16 +68,22 @@ function writeAccounts(file: AccountFile) {
 }
 
 function sessionSecret(): string {
-  fs.mkdirSync(dataDir(), { recursive: true });
+  const configured = process.env.SESSION_SECRET?.trim();
+  if (configured) return configured;
   try {
+    fs.mkdirSync(dataDir(), { recursive: true });
     const existing = fs.readFileSync(secretPath(), 'utf8').trim();
     if (existing) return existing;
-  } catch {
-    // Se crea abajo.
+    const created = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(secretPath(), created, { mode: 0o600 });
+    return created;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT' && code !== 'EROFS' && code !== 'EPERM') throw error;
+    const key = process.env.VITE_SUPABASE_ANON_KEY?.trim();
+    if (!key) throw new Error('Falta SESSION_SECRET en el servidor.');
+    return crypto.createHash('sha256').update(`cyclia-session:${key}`).digest('hex');
   }
-  const created = crypto.randomBytes(32).toString('hex');
-  fs.writeFileSync(secretPath(), created, { mode: 0o600 });
-  return created;
 }
 
 function hashPassword(password: string): string {
@@ -98,8 +105,9 @@ function normalizeUsername(value: unknown): string {
 }
 
 function assertCredentials(username: string, password: string) {
-  if (!/^[a-z0-9][a-z0-9._-]{1,38}[a-z0-9]$/.test(username)) {
-    throw new Error('El usuario debe tener entre 3 y 40 caracteres: letras, números, punto, guion o guion bajo.');
+  if (username.includes('@')) assertEmail(username);
+  else if (!/^[a-z0-9][a-z0-9._-]{1,38}[a-z0-9]$/.test(username)) {
+    throw new Error('El usuario debe tener entre 3 y 40 caracteres: letras, números, punto, guion o guion bajo. También puede ser un correo.');
   }
   assertPassword(password);
 }
@@ -160,6 +168,8 @@ function signToken(account: Account): string {
     sub: account.id,
     role: account.role,
     exp: Date.now() + TOKEN_TTL_MS,
+    username: account.username,
+    supabaseUserId: account.supabaseUserId,
   } satisfies TokenPayload)).toString('base64url');
   const signature = crypto.createHmac('sha256', sessionSecret()).update(body).digest('base64url');
   return `${body}.${signature}`;
@@ -189,11 +199,20 @@ function requireAccount(req: Request, res: Response): Account | null {
     return null;
   }
   const account = readAccounts().users.find((item) => item.id === payload.sub);
-  if (!account) {
-    res.status(401).json({ error: 'Esta cuenta ya no existe.' });
-    return null;
+  if (account) return account;
+  if (payload.role === 'user' && payload.username && payload.supabaseUserId) {
+    return {
+      id: payload.sub,
+      username: payload.username,
+      passwordHash: '',
+      role: 'user',
+      supabaseUserId: payload.supabaseUserId,
+      refreshToken: '',
+      createdAt: '',
+    };
   }
-  return account;
+  res.status(401).json({ error: 'Esta cuenta ya no existe.' });
+  return null;
 }
 
 function supabaseEnv(): { url: string; key: string } {
@@ -210,6 +229,65 @@ function supabaseAuth() {
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
+}
+
+function anonymousDisabled(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : '';
+  return /anonymous/i.test(message);
+}
+
+function passwordTooShort(message: string): boolean {
+  return /password/i.test(message) && /6|least|short|weak|characters/i.test(message);
+}
+
+async function provisionEmailAuth(email: string, password: string): Promise<{ supabaseUserId: string; refreshToken: string; accessToken: string }> {
+  if (password.length < 6) {
+    throw new Error('La contraseña debe tener al menos 6 caracteres.');
+  }
+  const auth = supabaseAuth();
+  const signUp = await auth.auth.signUp({ email, password });
+  const createdSession = signUp.data.session;
+  const createdUser = signUp.data.user;
+  if (createdSession && createdUser) {
+    return {
+      supabaseUserId: createdUser.id,
+      refreshToken: createdSession.refresh_token,
+      accessToken: createdSession.access_token,
+    };
+  }
+  const signIn = await auth.auth.signInWithPassword({ email, password });
+  if (signIn.data.session && signIn.data.user) {
+    return {
+      supabaseUserId: signIn.data.user.id,
+      refreshToken: signIn.data.session.refresh_token,
+      accessToken: signIn.data.session.access_token,
+    };
+  }
+  const message = signIn.error?.message || signUp.error?.message || '';
+  if (passwordTooShort(message)) throw new Error('La contraseña debe tener al menos 6 caracteres.');
+  if (/not confirmed|confirm/i.test(message) || (createdUser && !createdSession)) {
+    throw new Error('La cuenta quedó creada, pero Supabase pide confirmar el correo antes de entrar. En Authentication desactiva Confirm email.');
+  }
+  if (/invalid login|invalid credentials|already registered|already exists/i.test(message)) {
+    throw new Error('No reconocemos esa clave.');
+  }
+  throw new Error(message || 'No se pudo crear la cuenta.');
+}
+
+async function openEmailAuth(email: string, password: string): Promise<{ supabaseUserId: string; refreshToken: string; accessToken: string } | null> {
+  const { data, error } = await supabaseAuth().auth.signInWithPassword({ email, password });
+  if (data.session && data.user) {
+    return {
+      supabaseUserId: data.user.id,
+      refreshToken: data.session.refresh_token,
+      accessToken: data.session.access_token,
+    };
+  }
+  const message = error?.message || '';
+  if (/not confirmed|confirm/i.test(message)) {
+    throw new Error('La cuenta quedó creada, pero Supabase pide confirmar el correo antes de entrar. En Authentication desactiva Confirm email.');
+  }
+  return null;
 }
 
 async function provisionSupabaseUser(): Promise<{ supabaseUserId: string; refreshToken: string; accessToken: string }> {
@@ -295,17 +373,33 @@ export async function ensureAdminAccount() {
   }
 }
 
-async function sendAccountSession(res: Response, file: AccountFile, account: Account, created = false) {
-  let session: { accessToken: string; refreshToken: string };
-  try {
-    session = await attachSupabase(account);
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : '';
-    console.error('[Cuentas] No se pudo abrir la sesión:', detail);
-    res.status(503).json({ error: 'La cuenta es válida, pero Supabase no está disponible. Revisa VITE_SUPABASE_URL.' });
-    return;
+async function sendAccountSession(
+  res: Response,
+  file: AccountFile,
+  account: Account,
+  created = false,
+  ready?: { accessToken: string; refreshToken: string },
+) {
+  let session = ready;
+  if (!session) {
+    try {
+      session = await attachSupabase(account);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '';
+      console.error('[Cuentas] No se pudo abrir la sesión:', detail);
+      res.status(503).json({
+        error: detail || 'La cuenta es válida, pero Supabase no está disponible. Revisa VITE_SUPABASE_URL.',
+        code: 'supabase_session',
+      });
+      return;
+    }
   }
-  writeAccounts(file);
+  try {
+    writeAccounts(file);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'EROFS' && code !== 'ENOENT' && code !== 'EPERM') throw error;
+  }
   res.status(created ? 201 : 200).json({
     token: signToken(account),
     username: account.username,
@@ -332,7 +426,7 @@ export function registerAccountRoutes(app: Express) {
               : 'No reconocemos esa clave. Esta cuenta usa la contraseña con la que se creó.',
             code: emailAccount ? 'unrecognized' : 'unrecognized_local',
           }
-          : { error: 'Usuario o contraseña incorrectos.' });
+          : { error: 'Usuario o contraseña incorrectos.', code: 'unknown_user' });
         return;
       }
       await sendAccountSession(res, file, account);
@@ -413,10 +507,44 @@ export function registerAccountRoutes(app: Express) {
           res.status(401).json({ error: 'No reconocemos esa clave.', code: 'unrecognized' });
           return;
         }
+        const cloud = await openEmailAuth(email, password);
+        if (cloud) {
+          existing.supabaseUserId = cloud.supabaseUserId;
+          existing.refreshToken = cloud.refreshToken;
+          await sendAccountSession(res, file, existing, false, cloud);
+          return;
+        }
         await sendAccountSession(res, file, existing, false);
         return;
       }
-      const session = await provisionSupabaseUser();
+      const returning = await openEmailAuth(email, password);
+      if (returning) {
+        const account: Account = {
+          id: returning.supabaseUserId,
+          username: email,
+          passwordHash: '',
+          role: 'user',
+          supabaseUserId: returning.supabaseUserId,
+          refreshToken: returning.refreshToken,
+          createdAt: new Date().toISOString(),
+        };
+        res.status(200).json({
+          token: signToken(account),
+          username: account.username,
+          role: account.role,
+          created: false,
+          supabaseUserId: account.supabaseUserId,
+          supabase: { access_token: returning.accessToken, refresh_token: returning.refreshToken },
+        });
+        return;
+      }
+      let session: { supabaseUserId: string; refreshToken: string; accessToken: string };
+      try {
+        session = await provisionSupabaseUser();
+      } catch (error) {
+        if (!anonymousDisabled(error)) throw error;
+        session = await provisionEmailAuth(email, password);
+      }
       const createdAccount: Account = {
         id: crypto.randomUUID(),
         username: email,
@@ -427,12 +555,29 @@ export function registerAccountRoutes(app: Express) {
         createdAt: new Date().toISOString(),
       };
       file.users.push(createdAccount);
-      writeAccounts(file);
-      await sendAccountSession(res, file, createdAccount, true);
+      try {
+        writeAccounts(file);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'EROFS' && code !== 'ENOENT' && code !== 'EPERM') throw error;
+      }
+      await sendAccountSession(res, file, createdAccount, true, {
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo crear la cuenta.';
-      const status = /Falta GMAIL/.test(message) ? 503 : 400;
-      res.status(status).json({ error: message });
+      const status = /Falta GMAIL|Supabase no está disponible|No se pudo conectar con Supabase/.test(message) ? 503 : 400;
+      const code = /confirmar el correo/.test(message)
+        ? 'email_confirm'
+        : /al menos 6/.test(message)
+          ? 'password_short'
+          : /anónimo|anonymous/i.test(message)
+            ? 'anonymous_disabled'
+            : status === 503
+              ? 'supabase_down'
+              : 'auth_failed';
+      res.status(status).json({ error: message, code });
     }
   });
 
@@ -515,7 +660,7 @@ export function registerAccountRoutes(app: Express) {
     const file = readAccounts();
     const stored = file.users.find((item) => item.id === account.id);
     if (!stored) {
-      res.status(401).json({ error: 'Esta cuenta ya no existe.' });
+      res.json({ ok: true });
       return;
     }
     stored.refreshToken = refreshToken;
@@ -555,7 +700,18 @@ export function registerAccountRoutes(app: Express) {
         res.status(409).json({ error: 'Ese usuario ya existe.' });
         return;
       }
-      const session = await provisionSupabaseUser();
+      let session: { supabaseUserId: string; refreshToken: string; accessToken: string };
+      try {
+        session = username.includes('@')
+          ? await provisionEmailAuth(username, password)
+          : await provisionSupabaseUser();
+      } catch (error) {
+        if (!username.includes('@') && anonymousDisabled(error)) {
+          res.status(400).json({ error: 'En este servidor la cuenta nueva tiene que ser un correo.' });
+          return;
+        }
+        throw error;
+      }
       const created: Account = {
         id: crypto.randomUUID(),
         username,

@@ -17,8 +17,8 @@ import PhaseKnowledge from './components/PhaseKnowledge';
 import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
 import { analyzeCycle } from './utils/cycleModel';
 import { accountSessionExpired, beginEntry, bindAccountSessionSync, clearAccountSession, fetchAccountMe, finishAccountSession, type AccountRole, type PendingEntry } from './accountApi';
-import { fetchConsentStatus, saveConsentDecisions, supabaseBearer, type ConsentStatus } from './consentApi';
-import { PRIVACY_LOGIN_KEY } from './consentCopy';
+import { fetchConsentStatus, supabaseBearer, type ConsentStatus } from './consentApi';
+import { privacyAcceptedAtLogin, rememberPrivacyAcceptance } from './consentCopy';
 import ConsentScreen from './components/ConsentScreen';
 import PrivacyDataScreen from './components/PrivacyDataScreen';
 import CyclePrivacySettings from './components/CyclePrivacySettings';
@@ -292,9 +292,6 @@ export default function App() {
         let consent: ConsentStatus | null = null;
         try {
           consent = await fetchConsentStatus();
-          if (sessionStorage.getItem(PRIVACY_LOGIN_KEY) === '1' && consent.purposes.privacy_notice !== 'accept') {
-            consent = await saveConsentDecisions('privacy_settings', [{ purpose: 'privacy_notice', action: 'accept' }]);
-          }
         } catch (error) {
           console.error('No se pudieron leer las decisiones de privacidad:', error);
         }
@@ -752,11 +749,7 @@ export default function App() {
     setChatHistory([]);
     setConsentStatus(null);
     setIsLoadingAuth(false);
-    try {
-      sessionStorage.removeItem(PRIVACY_LOGIN_KEY);
-    } catch {
-      // El navegador puede bloquear sessionStorage.
-    }
+    rememberPrivacyAcceptance(false);
     try {
       await signOut();
     } catch {
@@ -774,7 +767,7 @@ export default function App() {
     );
   }
 
-  if (user && !isLoadingAuth && consentStatus?.requiredComplete !== true) {
+  if (user && !isLoadingAuth && consentStatus?.requiredComplete !== true && !privacyAcceptedAtLogin()) {
     return (
       <ConsentScreen
         variant={profile ? 'existing' : 'new'}
@@ -785,13 +778,13 @@ export default function App() {
   }
 
   if (!user) {
-    const handleEnter = async (e: React.FormEvent, remember: boolean) => {
+    const handleEnter = async (e: React.FormEvent) => {
       e.preventDefault();
       setAuthPanelError('');
       setEntryNotice('');
       setIsAuthProcessing(true);
       try {
-        const pending = await beginEntry(loginUsername, loginPassword, remember);
+        const pending = await beginEntry(loginUsername, loginPassword, false);
         setPendingEntry(pending);
         setEntryNotice(pending.created ? 'created' : 'calendar');
       } catch (err: any) {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CONSENT_STATEMENTS, PRIVACY_LOGIN_KEY } from '../consentCopy';
+import { rememberPrivacyAcceptance } from '../consentCopy';
 
 export function DraftBanner() {
   return (
@@ -92,13 +92,6 @@ export function PrivacyDraft() {
   );
 }
 
-const BRIEF = [
-  'Guardamos tu cuenta, tu ciclo y lo que registras.',
-  'Sirve para mostrarte el calendario. El asistente es aparte.',
-  'Queda en la base de Cyclia y solo lo lee tu cuenta.',
-  'Puedes exportar, corregir o eliminar tus datos.',
-];
-
 export function PrivacyAcceptance({
   checked,
   error,
@@ -108,25 +101,9 @@ export function PrivacyAcceptance({
   error: string;
   onChange: (value: boolean) => void;
 }) {
-  const [level, setLevel] = useState(0);
-  const showMore = () => setLevel((current) => (current >= 2 ? 0 : current + 1));
+  const [open, setOpen] = useState(false);
   return (
-    <section className="mt-6 flex flex-col gap-3" aria-labelledby="privacy-login-title">
-      <h2 id="privacy-login-title" className="m-0 font-serif text-2xl" style={{ color: 'var(--emeraude)' }}>Política de privacidad</h2>
-      <div className="rounded-[20px] p-4" style={{ background: 'var(--card)', color: 'var(--emeraude)', border: '1px solid var(--line)' }}>
-        <ul className="m-0 list-disc space-y-1 pl-4 text-sm leading-relaxed" style={{ color: 'var(--emeraude-deep)' }}>
-          {BRIEF.map((line) => <li key={line}>{line}</li>)}
-        </ul>
-        {level >= 1 && (
-          <div className="mt-3">
-            <PrivacySummary tone="auth" />
-          </div>
-        )}
-      </div>
-      <button type="button" onClick={showMore} className="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-full text-sm font-bold" style={{ background: 'var(--card)', color: 'var(--emeraude)', border: '1px solid var(--line)' }}>
-        {level >= 2 ? 'Ver menos' : 'Ver más'}
-      </button>
-      {level >= 2 && <PrivacyDetails />}
+    <section className="flex flex-col gap-3" aria-labelledby="privacy-login-title">
       <label className="flex items-start gap-3 rounded-[20px] p-4 text-sm leading-relaxed" style={{ background: 'var(--menthe)', color: 'var(--emeraude)' }}>
         <input
           type="checkbox"
@@ -135,13 +112,29 @@ export function PrivacyAcceptance({
           aria-invalid={Boolean(error)}
           onChange={(event) => {
             const value = event.target.checked;
-            if (value) sessionStorage.setItem(PRIVACY_LOGIN_KEY, '1');
-            else sessionStorage.removeItem(PRIVACY_LOGIN_KEY);
+            rememberPrivacyAcceptance(value);
             onChange(value);
           }}
         />
-        <span>{CONSENT_STATEMENTS.privacy_notice}</span>
+        <span id="privacy-login-title">
+          He leído la{' '}
+          <button
+            type="button"
+            className="cursor-pointer font-bold underline"
+            style={{ color: 'var(--emeraude)' }}
+            aria-expanded={open}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setOpen((current) => !current);
+            }}
+          >
+            Política de privacidad
+          </button>
+          .
+        </span>
       </label>
+      {open && <PrivacyDraft />}
       {error && <p className="m-0 text-sm font-semibold text-red-700" role="alert">{error}</p>}
     </section>
   );

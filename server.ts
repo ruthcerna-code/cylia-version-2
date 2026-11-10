@@ -15,6 +15,13 @@ const PORT = Number(process.env.PORT) || 3001;
 
 app.set("trust proxy", 1);
 app.use(express.json());
+app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (error instanceof SyntaxError) {
+    res.status(400).json({ error: 'La solicitud no tiene un JSON válido.', code: 'bad_request' });
+    return;
+  }
+  next(error);
+});
 
 // Lazy-initialized GoogleGenAI client to prevent startup crash if API key is missing
 let aiClient: GoogleGenAI | null = null;
@@ -344,7 +351,8 @@ function localNetworkAddresses(): string[] {
   const addresses: string[] = [];
   for (const entries of Object.values(os.networkInterfaces())) {
     for (const entry of entries || []) {
-      const ipv4 = entry.family === "IPv4" || entry.family === 4;
+      const family = entry.family as string | number;
+      const ipv4 = family === "IPv4" || family === 4;
       if (!ipv4 || entry.internal) continue;
       if (entry.address.startsWith("169.254.")) continue;
       addresses.push(entry.address);

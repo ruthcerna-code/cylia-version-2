@@ -7,6 +7,28 @@
 export const CONSENT_VERSION = '2026-11-borrador-1';
 export const PRIVACY_LOGIN_KEY = 'cyclia_privacy_read';
 
+export function privacyAcceptedAtLogin(): boolean {
+  try {
+    return sessionStorage.getItem(PRIVACY_LOGIN_KEY) === '1' || localStorage.getItem(PRIVACY_LOGIN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function rememberPrivacyAcceptance(accepted: boolean): void {
+  try {
+    if (accepted) {
+      sessionStorage.setItem(PRIVACY_LOGIN_KEY, '1');
+      localStorage.setItem(PRIVACY_LOGIN_KEY, '1');
+    } else {
+      sessionStorage.removeItem(PRIVACY_LOGIN_KEY);
+      localStorage.removeItem(PRIVACY_LOGIN_KEY);
+    }
+  } catch {
+    // El navegador puede bloquear el almacenamiento.
+  }
+}
+
 export const CONSENT_PURPOSES = ['terms', 'privacy_notice', 'health_cycle', 'gemini_assistant', 'google_calendar'] as const;
 export type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
 export type ConsentAction = 'accept' | 'reject' | 'withdraw';

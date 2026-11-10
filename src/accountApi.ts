@@ -122,10 +122,18 @@ export async function beginEntry(username: string, password: string, remember: b
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(email ? { email: username, password } : { username, password }),
   });
-  const body = await response.json().catch(() => ({}));
+  const raw = await response.text();
+  let body: { error?: unknown; code?: unknown; created?: unknown; token?: unknown; username?: unknown; role?: unknown; supabase?: { access_token?: unknown; refresh_token?: unknown } } = {};
+  try {
+    body = raw ? JSON.parse(raw) : {};
+  } catch {
+    body = {};
+  }
   if (!response.ok) {
-    const failure = new Error(body.error || 'No se pudo entrar.') as Error & { code?: string };
-    failure.code = typeof body.code === 'string' ? body.code : '';
+    const serverError = typeof body.error === 'string' ? body.error : '';
+    const serverCode = typeof body.code === 'string' && body.code ? body.code : String(response.status);
+    const failure = new Error(serverError ? `${serverError} Código ${serverCode}.` : `No se pudo entrar. Código ${serverCode}.`) as Error & { code?: string };
+    failure.code = serverCode;
     throw failure;
   }
   return {

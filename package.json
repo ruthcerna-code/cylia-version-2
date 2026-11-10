@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "vercel-build": "vite build && node scripts/stage-vercel-public.mjs",
+    "vercel-build": "vite build && node scripts/stage-vercel-public.mjs && node scripts/bundle-api.mjs",
     "start": "node dist/server.cjs"
   },
   "dependencies": {
