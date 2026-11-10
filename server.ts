@@ -375,7 +375,8 @@ async function startServer() {
   if (!isProduction) {
     console.log("[Server] Starting in development mode with Vite middleware...");
     app.use(express.static(path.join(process.cwd(), "public")));
-    const { createServer: createViteServer } = await import("vite");
+    const vitePackage = "vite";
+    const { createServer: createViteServer } = await import(vitePackage);
     const vite = await createViteServer({
       server: { middlewareMode: true, allowedHosts: true },
       appType: "spa",
