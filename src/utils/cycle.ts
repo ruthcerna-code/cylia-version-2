@@ -1,5 +1,5 @@
-import { MenstrualPhase, PhaseInfo } from "../types";
-import { habitualCycleDays, habitualPeriodDays } from "./profileFields";
+import type { MenstrualPhase, PhaseInfo } from "../types";
+import { habitualCycleDays, habitualPeriodDays } from "./profileFields.js";
 
 export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   Menstrual: {

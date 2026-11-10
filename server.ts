@@ -4,9 +4,9 @@ import path from "path";
 import dotenv from "dotenv";
 import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
-import { ensureAdminAccount, registerAccountRoutes } from "./accounts";
-import { registerConsentRoutes } from "./consentRoutes";
-import { assertConsentFromRequest, ConsentError } from "./consentHttp";
+import { ensureAdminAccount, registerAccountRoutes } from "./accounts.js";
+import { registerConsentRoutes } from "./consentRoutes.js";
+import { assertConsentFromRequest, ConsentError } from "./consentHttp.js";
 
 dotenv.config();
 

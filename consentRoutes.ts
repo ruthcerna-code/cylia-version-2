@@ -1,6 +1,6 @@
 import type { Express } from 'express';
-import { REQUIRED_PURPOSES } from './src/consentCopy';
-import { projectNextCycles } from './src/utils/cycle';
+import { REQUIRED_PURPOSES } from './src/consentCopy.js';
+import { projectNextCycles } from './src/utils/cycle.js';
 import {
   ConsentError,
   decisionsFromBody,
@@ -8,7 +8,7 @@ import {
   requireSession,
   sourceFromBody,
   summarizeConsent,
-} from './consentHttp';
+} from './consentHttp.js';
 
 function sendConsentError(res: { status: (code: number) => { json: (body: unknown) => void } }, error: unknown) {
   if (error instanceof ConsentError) {

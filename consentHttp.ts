@@ -10,7 +10,7 @@ import {
   isConsentAction,
   isConsentPurpose,
   isConsentSource,
-} from './src/consentCopy';
+} from './src/consentCopy.js';
 
 export class ConsentError extends Error {
   status: number;

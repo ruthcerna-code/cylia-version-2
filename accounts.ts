@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import type { Express, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { gmailConfigured, sendConfirmationCode, sendProvisionalPassword } from './mail';
+import { gmailConfigured, sendConfirmationCode, sendProvisionalPassword } from './mail.js';
 
 const ADMIN_USERNAME = 'administrador';
 const ADMIN_PASSWORD = '1234';
