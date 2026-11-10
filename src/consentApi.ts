@@ -1,5 +1,5 @@
 import type { ConsentAction, ConsentPurpose, ConsentSource } from './consentCopy';
-import { supabase } from './supabase';
+import { currentIdToken } from './firebase';
 
 export type ConsentStatus = {
   version: string;
@@ -19,10 +19,7 @@ export type ConsentEvent = {
 };
 
 async function authHeaders(): Promise<HeadersInit> {
-  if (!supabase) throw new Error('Supabase no está configurado.');
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error('Inicia sesión para continuar.');
+  const token = await currentIdToken();
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 
@@ -60,10 +57,6 @@ export function submitDataRequest(kind: 'access' | 'correction' | 'deletion' | '
   });
 }
 
-export async function supabaseBearer(): Promise<string> {
-  if (!supabase) throw new Error('Supabase no está configurado.');
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error('Inicia sesión para continuar.');
-  return token;
+export async function authBearer(): Promise<string> {
+  return currentIdToken();
 }

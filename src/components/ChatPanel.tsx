@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile, DailyLog, ChatMessage, PeriodRecord } from '../types';
-import { supabaseBearer } from '../consentApi';
+import { authBearer } from '../consentApi';
 import { buildAnalysisContext } from '../utils/analysisContext';
 
 interface ChatPanelProps {
@@ -118,7 +118,7 @@ export default function ChatPanel({
 
     setIsLoading(true);
     try {
-      const token = await supabaseBearer();
+      const token = await authBearer();
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

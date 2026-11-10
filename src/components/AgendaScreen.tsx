@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import type { ActivityDraft } from '../supabase';
+import type { ActivityDraft } from '../firebase';
 import type { DailyLog, PeriodRecord, ScheduledActivity, UserProfile } from '../types';
 import { compareActivities, overlappingActivity, resolveSchedule } from '../utils/activities';
 import { formatFriendlyDate } from '../utils/cycle';

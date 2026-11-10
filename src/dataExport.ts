@@ -1,7 +1,7 @@
-import { supabaseBearer } from './consentApi';
+import { authBearer } from './consentApi';
 
 export async function downloadOwnData(): Promise<void> {
-  const token = await supabaseBearer();
+  const token = await authBearer();
   const response = await fetch('/api/account/export', {
     headers: { Authorization: `Bearer ${token}` },
   });

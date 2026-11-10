@@ -17,7 +17,7 @@ import PhaseKnowledge from './components/PhaseKnowledge';
 import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
 import { analyzeCycle } from './utils/cycleModel';
 import { accountSessionExpired, beginEntry, bindAccountSessionSync, clearAccountSession, fetchAccountMe, finishAccountSession, type AccountRole, type PendingEntry } from './accountApi';
-import { fetchConsentStatus, supabaseBearer, type ConsentStatus } from './consentApi';
+import { authBearer, fetchConsentStatus, type ConsentStatus } from './consentApi';
 import { privacyAcceptedAtLogin, rememberPrivacyAcceptance } from './consentCopy';
 import ConsentScreen from './components/ConsentScreen';
 import PrivacyDataScreen from './components/PrivacyDataScreen';
@@ -40,7 +40,7 @@ import {
   fetchMessages,
   fetchPeriodRecords,
   fetchProfile,
-  isSupabaseConfigured,
+  isFirebaseConfigured,
   saveLogs,
   saveMessage,
   saveProfile,
@@ -48,9 +48,9 @@ import {
   toSessionUser,
   signOut,
   subscribeUserData,
-  supabase,
+  watchAuth,
   type SessionUser,
-} from './supabase';
+} from './firebase';
 
 const SCALE_LABELS = {
   sleep: ["Excelente", "Buena", "Regular", "Mala", "Muy mala"],
@@ -198,13 +198,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!supabase) {
+    if (!isFirebaseConfigured) {
       setIsLoadingAuth(false);
       return;
     }
     let active = true;
     bindAccountSessionSync();
-    const rememberUser = (sessionUser: { id: string; email?: string | null; is_anonymous?: boolean } | null) => {
+    const rememberUser = (sessionUser: { id: string; email?: string | null; isAnonymous?: boolean } | null) => {
       if (!active) return;
       if (!sessionUser) {
         if (userIdRef.current === null) {
@@ -229,26 +229,19 @@ export default function App() {
     const stopWaiting = window.setTimeout(() => {
       if (active && userIdRef.current === null) setIsLoadingAuth(false);
     }, 2500);
-    supabase.auth.getSession().then(async ({ data }) => {
+    const stop = watchAuth((user) => {
       window.clearTimeout(stopWaiting);
       if (accountSessionExpired()) {
         clearAccountSession();
-        try { await signOut(); } catch { /* La sesión local ya se limpia. */ }
         rememberUser(null);
         return;
       }
-      rememberUser(data.session?.user ?? null);
-    }).catch(() => {
-      window.clearTimeout(stopWaiting);
-      rememberUser(null);
-    });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      rememberUser(session?.user ?? null);
+      rememberUser(user ? { id: user.uid, email: user.email, isAnonymous: user.isAnonymous } : null);
     });
     return () => {
       active = false;
       window.clearTimeout(stopWaiting);
-      data.subscription.unsubscribe();
+      stop();
     };
   }, []);
 
@@ -301,7 +294,7 @@ export default function App() {
           guestMigrationStarted.current = true;
           const result = await migrateLocalGuestProfile(uid);
           if (cancelled) return;
-          if (result === 'error') showNotice('No se pudieron migrar los datos locales a Supabase.');
+          if (result === 'error') showNotice('No se pudieron migrar los datos locales a Firebase.');
           if (result === 'ok') {
             await refresh();
             return;
@@ -312,7 +305,7 @@ export default function App() {
           chatMigrationStarted.current = true;
           const result = await migrateLocalChat(uid);
           if (cancelled) return;
-          if (result === 'error') showNotice('No se pudo migrar el chat a Supabase.');
+          if (result === 'error') showNotice('No se pudo migrar el chat a Firebase.');
           if (result === 'ok') {
             await refresh();
             return;
@@ -325,11 +318,11 @@ export default function App() {
         setChatHistory(messageRows);
         setIsLoadingAuth(false);
       } catch (error) {
-        console.error('No se pudieron leer los datos de Supabase:', error);
+        console.error('No se pudieron leer los datos de Firebase:', error);
         if (!cancelled) {
           setProfile(null);
           setIsLoadingAuth(false);
-          showNotice('No se pudieron leer los datos en Supabase.');
+          showNotice('No se pudieron leer los datos en Firebase.');
         }
       }
     };
@@ -401,7 +394,7 @@ export default function App() {
       await saveProfile(user.id, newProfile);
     } catch (error) {
       console.error('No se pudo guardar el perfil:', error);
-      showNotice('No se pudo guardar el perfil en Supabase.');
+      showNotice('No se pudo guardar el perfil en Firebase.');
       return false;
     }
 
@@ -423,7 +416,7 @@ export default function App() {
     return true;
   };
 
-  // Sync logs to Supabase
+  // Sync logs to Firebase
   const handleSaveLog = async (log: DailyLog, options?: { analyze?: boolean }) => {
     if (!user) return;
 
@@ -443,7 +436,7 @@ export default function App() {
         else delete next[log.date];
         return next;
       });
-      showNotice('No se pudo guardar el registro en Supabase.');
+      showNotice('No se pudo guardar el registro en Firebase.');
       return;
     }
     
@@ -470,7 +463,7 @@ export default function App() {
     }
     setIsAnalyzing(true);
     try {
-      const token = await supabaseBearer();
+      const token = await authBearer();
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -487,7 +480,7 @@ export default function App() {
           await saveLogs(user.id, [updatedLog]);
         } catch (error) {
           console.error('No se pudo guardar el análisis:', error);
-          showNotice('El análisis se generó, pero no se pudo guardar en Supabase.');
+          showNotice('El análisis se generó, pero no se pudo guardar en Firebase.');
         }
       }
     } catch (err) {
@@ -536,7 +529,7 @@ export default function App() {
         await saveLogs(user.id, [updatedLog]);
       } catch (error) {
         console.error('No se pudo guardar el análisis:', error);
-        throw new Error('No se pudo guardar el análisis en Supabase.');
+        throw new Error('No se pudo guardar el análisis en Firebase.');
       }
     } catch (err: any) {
       setAnalysisError(err.message || "Error al conectar con la IA de Cyclia.");
@@ -553,7 +546,7 @@ export default function App() {
       await saveMessage(user.id, stored);
     } catch (error) {
       console.error('No se pudo guardar el mensaje:', error);
-      showNotice('No se pudo guardar el mensaje en Supabase.');
+      showNotice('No se pudo guardar el mensaje en Firebase.');
     }
   };
 
@@ -566,7 +559,7 @@ export default function App() {
       setChatHistory([]);
     } catch (error) {
       console.error('No se pudo borrar el chat:', error);
-      showNotice('No se pudo borrar el chat en Supabase.');
+      showNotice('No se pudo borrar el chat en Firebase.');
     }
   };
 
@@ -582,7 +575,7 @@ export default function App() {
       setSelectedDateStr(formatDateStr(new Date()));
     } catch (error) {
       console.error('No se pudieron borrar los datos:', error);
-      showNotice('No se pudieron borrar los datos en Supabase.');
+      showNotice('No se pudieron borrar los datos en Firebase.');
     }
   };
 
@@ -676,7 +669,7 @@ export default function App() {
       await saveLogs(user.id, demoLogs);
     } catch (error) {
       console.error('No se pudieron guardar los registros de demostración:', error);
-      showNotice('No se pudieron guardar los registros de demostración en Supabase.');
+      showNotice('No se pudieron guardar los registros de demostración en Firebase.');
       return;
     }
 
@@ -727,7 +720,7 @@ export default function App() {
         await saveLogs(user.id, clearedLogs);
       } catch (error) {
         console.error('No se pudieron limpiar los análisis:', error);
-        showNotice('El ciclo se actualizó, pero no se pudieron limpiar los análisis en Supabase.');
+        showNotice('El ciclo se actualizó, pero no se pudieron limpiar los análisis en Firebase.');
         return;
       }
 
@@ -813,7 +806,7 @@ export default function App() {
 
     return (
       <EntryFlow
-        configured={isSupabaseConfigured}
+        configured={isFirebaseConfigured}
         processing={isAuthProcessing}
         error={authPanelError}
         username={loginUsername}

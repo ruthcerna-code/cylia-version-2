@@ -153,13 +153,17 @@ service cloud.firestore {
       match /consent_events/{id} {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid)
-          && oneOf(request.resource.data.purpose, ['terms', 'privacy_notice', 'health_cycle', 'gemini_assistant'])
+          && oneOf(request.resource.data.purpose, ['terms', 'privacy_notice', 'health_cycle', 'gemini_assistant', 'google_calendar'])
           && oneOf(request.resource.data.action, ['accept', 'reject', 'withdraw'])
           && oneOf(request.resource.data.source, ['new_user', 'existing_user', 'privacy_settings'])
           && request.resource.data.policyVersion is string
           && request.resource.data.statementText is string
           && request.resource.data.statementText.size() <= 4000;
         allow update, delete: if false;
+      }
+
+      match /focus/{id} {
+        allow read, write: if isOwner(uid);
       }
 
       match /data_requests/{id} {

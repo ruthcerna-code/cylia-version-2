@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { loadFocus, saveFocus } from '../focus/store';
-import type { ActivityDraft } from '../supabase';
+import type { ActivityDraft } from '../firebase';
 import type { ActivityImportance, DailyLog, EnergyFeel, ScheduledActivity } from '../types';
 import { buildDayPlan, moveInSequence, overrunMessage, suggestSteps, taskMinutes } from '../utils/dayPlan';
 import { loadDaySettings, saveDaySettings } from '../utils/dayPlanStore';

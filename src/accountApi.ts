@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { currentIdToken, openEmailAccount, prepareEmailAccount } from './firebase';
 
 export type AccountRole = 'admin' | 'user';
 
@@ -90,16 +90,7 @@ async function openAccountSession(path: string, payload: Record<string, string>,
     failure.code = typeof body.code === 'string' ? body.code : '';
     throw failure;
   }
-  if (!supabase) throw new Error('Faltan las claves de Supabase en el archivo .env.');
   persistAccountToken(body.token, remember);
-  const { error } = await supabase.auth.setSession({
-    access_token: body.supabase.access_token,
-    refresh_token: body.supabase.refresh_token,
-  });
-  if (error) {
-    clearAccountSession();
-    throw new Error(error.message);
-  }
   return { username: body.username, role: body.role };
 }
 
@@ -111,19 +102,23 @@ export type PendingEntry = {
   created: boolean;
   remember: boolean;
   token: string;
-  accessToken: string;
-  refreshToken: string;
+  email: string;
+  password: string;
 };
 
 export async function beginEntry(username: string, password: string, remember: boolean): Promise<PendingEntry> {
   const email = username.includes('@');
-  const response = await fetch(email ? '/api/auth/email' : '/api/auth/login', {
+  if (email) {
+    const created = await prepareEmailAccount(username.trim().toLowerCase(), password);
+    return { created, remember, token: '', email: username.trim().toLowerCase(), password };
+  }
+  const response = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(email ? { email: username, password } : { username, password }),
+    body: JSON.stringify({ username, password }),
   });
   const raw = await response.text();
-  let body: { error?: unknown; code?: unknown; created?: unknown; token?: unknown; username?: unknown; role?: unknown; supabase?: { access_token?: unknown; refresh_token?: unknown } } = {};
+  let body: { error?: unknown; code?: unknown; token?: unknown } = {};
   try {
     body = raw ? JSON.parse(raw) : {};
   } catch {
@@ -136,26 +131,21 @@ export async function beginEntry(username: string, password: string, remember: b
     failure.code = serverCode;
     throw failure;
   }
-  return {
-    created: Boolean(body.created),
-    remember,
-    token: String(body.token || ''),
-    accessToken: String(body.supabase?.access_token || ''),
-    refreshToken: String(body.supabase?.refresh_token || ''),
-  };
+  return { created: false, remember, token: String(body.token || ''), email: '', password: '' };
 }
 
 export async function finishAccountSession(pending: PendingEntry): Promise<void> {
-  if (!supabase) throw new Error('Faltan las claves de Supabase en el archivo .env.');
-  persistAccountToken(pending.token, pending.remember);
-  const { error } = await supabase.auth.setSession({
-    access_token: pending.accessToken,
-    refresh_token: pending.refreshToken,
-  });
-  if (error) {
-    clearAccountSession();
-    throw new Error(error.message);
+  if (pending.email) {
+    try {
+      await openEmailAccount(pending.email, pending.password, pending.remember);
+      persistAccountToken(await currentIdToken(), pending.remember);
+    } catch (error) {
+      clearAccountSession();
+      throw error;
+    }
+    return;
   }
+  persistAccountToken(pending.token, pending.remember);
 }
 
 export function confirmEmailCode(email: string, code: string, remember: boolean): Promise<{ username: string; role: AccountRole }> {
@@ -177,40 +167,19 @@ export async function requestProvisionalPassword(email: string): Promise<string>
   return String(body.message || 'Enviamos la clave provisoria a tu correo.');
 }
 
-export async function fetchAccountMe(supabaseUserId: string): Promise<{ username: string; role: AccountRole } | null | 'expired'> {
-  if (!readAccountToken()) return accountSessionExpired() ? 'expired' : null;
+export async function fetchAccountMe(userId: string): Promise<{ username: string; role: AccountRole } | null | 'expired'> {
+  if (!userId) return null;
+  if (!readAccountToken()) return accountSessionExpired() ? 'expired' : { username: '', role: 'user' };
   try {
-    const body = await accountRequest<{ username: string; role: AccountRole; supabaseUserId: string }>('/api/auth/me');
-    if (body.supabaseUserId !== supabaseUserId) {
-      clearAccountSession();
-      return 'expired';
-    }
+    const body = await accountRequest<{ username: string; role: AccountRole }>('/api/auth/me');
     return { username: body.username, role: body.role };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (/expiró|ya no existe|no corresponde/i.test(message)) {
-      clearAccountSession();
-      return 'expired';
-    }
-    return null;
+  } catch {
+    return { username: '', role: 'user' };
   }
 }
 
-let sessionSyncBound = false;
-
 export function bindAccountSessionSync() {
-  if (sessionSyncBound || !supabase) return;
-  sessionSyncBound = true;
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (event !== 'TOKEN_REFRESHED' && event !== 'SIGNED_IN') return;
-    const token = readAccountToken();
-    if (!token || !session?.access_token || !session.refresh_token) return;
-    void fetch('/api/auth/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ accessToken: session.access_token, refreshToken: session.refresh_token }),
-    });
-  });
+  // La sesión de datos vive en Firebase Auth.
 }
 
 export function listManagedAccounts(): Promise<{ users: ManagedAccount[] }> {

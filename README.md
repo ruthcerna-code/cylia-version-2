@@ -13,7 +13,7 @@ Rama de trabajo: `develop`.
 
 - **Interfaz:** React 19, Vite 6 y Tailwind 4.
 - **Servidor:** Node.js y Express (`server.ts`). En local escucha en `http://localhost:3001`.
-- **Datos y acceso:** Supabase (Postgres y Auth), en local en `127.0.0.1:54321`. No hay Firebase.
+- **Datos y acceso:** Firebase Auth y Cloud Firestore, en el proyecto `cyclia-mvp`. No hay Supabase.
 - **Cuentas de Cyclia:** usuario y contraseña en `data/accounts.json`, en el servidor. Ese archivo no se publica.
 - **Asistente:** Gemini, llamado desde el servidor con `GEMINI_API_KEY`, solo si la persona lo autorizó.
 

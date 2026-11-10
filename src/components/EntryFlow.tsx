@@ -57,7 +57,7 @@ export function EntryFlow({
         </header>
         <main className="flex-1 overflow-y-auto px-5 pt-6 pb-8">
           {error && <p className="text-xs text-red-700 bg-red-50 rounded-2xl p-3 mb-4">{error}</p>}
-          {!configured && <p className="text-xs rounded-2xl p-3 mb-4" style={{ background: 'var(--menthe)', color: 'var(--emeraude)' }}>Faltan las claves de Supabase en el archivo .env.</p>}
+          {!configured && <p className="text-xs rounded-2xl p-3 mb-4" style={{ background: 'var(--menthe)', color: 'var(--emeraude)' }}>Falta la configuración de Firebase.</p>}
           <form onSubmit={(event) => { if (!acceptPrivacyOrWarn()) { event.preventDefault(); return; } onEnter(event); }} className="flex flex-col gap-3">
             <input value={username} onChange={(event) => onUsernameChange(event.target.value)} type="text" required autoComplete="username" placeholder="Usuario (correo)" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
             <input value={password} onChange={(event) => onPasswordChange(event.target.value)} type="password" required minLength={4} autoComplete="current-password" placeholder="Contraseña" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />

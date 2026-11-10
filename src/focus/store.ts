@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { deleteFocusDoc, loadFocusDoc, saveFocusDoc } from '../firebase';
 import type { FocusCheckin, FocusFlags, FocusTask } from './logic';
 
 export interface FocusState {
@@ -46,28 +46,30 @@ function readLocal(userId: string): FocusState {
 
 export async function loadFocus(userId: string): Promise<FocusState> {
   const local = readLocal(userId);
-  if (!supabase) return local;
-  const { data, error } = await supabase.from('focus_entries').select('payload').eq('user_id', userId).maybeSingle();
-  if (error || !data?.payload) return local;
-  const remote = data.payload as FocusState;
-  return { ...EMPTY, ...remote, flags: { ...EMPTY.flags, ...remote.flags } };
+  try {
+    const payload = await loadFocusDoc(userId);
+    if (!payload || typeof payload !== 'object') return local;
+    const remote = payload as FocusState;
+    return { ...EMPTY, ...remote, flags: { ...EMPTY.flags, ...remote.flags } };
+  } catch {
+    return local;
+  }
 }
 
 export async function saveFocus(userId: string, state: FocusState): Promise<void> {
   localStorage.setItem(key(userId), JSON.stringify(state));
-  if (!supabase) return;
-  const { error } = await supabase.from('focus_entries').upsert({
-    user_id: userId,
-    payload: state,
-    updated_at: new Date().toISOString(),
-  });
-  if (error && !/schema cache|does not exist|could not find the table/i.test(error.message)) {
-    console.error('No se pudo guardar Mi Foco:', error.message);
+  try {
+    await saveFocusDoc(userId, state);
+  } catch (error) {
+    console.error('No se pudo guardar Mi Foco:', error);
   }
 }
 
 export async function deleteFocus(userId: string): Promise<void> {
   localStorage.removeItem(key(userId));
-  if (!supabase) return;
-  await supabase.from('focus_entries').delete().eq('user_id', userId);
+  try {
+    await deleteFocusDoc(userId);
+  } catch {
+    // El borrado local ya quedó hecho.
+  }
 }

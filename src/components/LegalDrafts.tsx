@@ -62,7 +62,7 @@ export function PrivacyDetails() {
       <section className="rounded-[20px] bg-white p-4">
         <h2 className="m-0 text-base font-extrabold">Servicios</h2>
         <ul className="mb-0 mt-2 list-disc space-y-1 pl-4">
-          <li>Supabase guarda el acceso y los datos. Cada sesión lee sus propias filas.</li>
+          <li>Firebase guarda el acceso y los datos. Cada sesión lee solo lo suyo.</li>
           <li>El servidor de Cyclia atiende al asistente. La clave de Gemini permanece en el servidor y solo se usa si autorizas esa opción.</li>
           <li>No hay una herramienta de analítica de audiencia en esta aplicación.</li>
         </ul>

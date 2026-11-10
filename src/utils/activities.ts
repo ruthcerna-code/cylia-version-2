@@ -138,12 +138,12 @@ export function statusLabel(status: ScheduledActivity['syncStatus']): string {
   }
 }
 
-export const LOCAL_ACTIVITY_STORE_NOTE = 'Tus actividades están guardadas en este dispositivo para tu cuenta. Para que también sigan disponibles al entrar desde otro equipo, ejecuta supabase/migrations/20261016180000_scheduled_activities.sql en el SQL Editor de Supabase.';
+export const LOCAL_ACTIVITY_STORE_NOTE = 'Tus actividades se guardan en Firebase, en la cuenta con la que entraste.';
 
 export function explainActivityError(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
   if (/schema cache|scheduled_activities|does not exist|could not find the table/i.test(message)) {
-    return 'Falta crear la tabla de actividades en Supabase. Ejecuta supabase/migrations/20261016180000_scheduled_activities.sql en el SQL Editor.';
+    return 'Firebase no permitió guardar la actividad. Revisa que hayas entrado con tu correo.';
   }
   return message || 'No se pudo completar la acción.';
 }
