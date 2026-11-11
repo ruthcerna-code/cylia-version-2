@@ -1487,11 +1487,7 @@ export default function App() {
         {appTab === 'chat' && !chatHistoryOpen && (
           <div className="min-h-[70vh]">
             <ChatPanel
-              profile={{
-                ...profile,
-                currentPhase: selectedPhase,
-                cycleDay: selectedCycleDay
-              }}
+              profile={profile}
               periods={periods}
               logs={Object.values(logs)}
               chatHistory={chatHistory}
@@ -1584,19 +1580,19 @@ export default function App() {
               <span className="text-sm text-[#DCE5FA]">Ciclo de {profile.cycleLength} días · Periodo de {profile.periodLength} días</span>
             </header>
             <nav className="flex flex-col gap-2.5 py-4">
-              {[
-                ['Ajustes del ciclo y privacidad', 'Referencia, avisos y exportación', () => setProfileSheet('ajustes')],
-                ['Datos del ciclo y salud', 'Fechas, duración, condiciones', () => setProfileSheet('ciclo')],
-                ['Privacidad y datos', 'Decisiones, documentos y solicitudes', () => { setPrivacyBack(null); setProfileSheet('datos'); }],
-                ['Privacidad y notificaciones', darkMode ? 'Modo oscuro activo' : 'Recordatorios y apariencia', () => setProfileSheet('privacidad')],
-                ['Objetivos', 'Elige tu foco', () => setProfileSheet('objetivos')],
-                ...(account?.role === 'admin' ? [['Administración de usuarios', 'Crear y eliminar cuentas', () => setProfileSheet('usuarios')] as const] : []),
-                ['Ayuda y soporte', 'Preguntas frecuentes, contacto', () => setAppTab('chat')],
-              ].map(([title, subtitle, action]) => (
-                <button key={String(title)} type="button" onClick={action as () => void} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-left">
+              {([
+                { title: 'Ajustes del ciclo y privacidad', subtitle: 'Referencia, avisos y exportación', action: () => setProfileSheet('ajustes') },
+                { title: 'Datos del ciclo y salud', subtitle: 'Fechas, duración, condiciones', action: () => setProfileSheet('ciclo') },
+                { title: 'Privacidad y datos', subtitle: 'Decisiones, documentos y solicitudes', action: () => { setPrivacyBack(null); setProfileSheet('datos'); } },
+                { title: 'Privacidad y notificaciones', subtitle: darkMode ? 'Modo oscuro activo' : 'Recordatorios y apariencia', action: () => setProfileSheet('privacidad') },
+                { title: 'Objetivos', subtitle: 'Elige tu foco', action: () => setProfileSheet('objetivos') },
+                ...(account?.role === 'admin' ? [{ title: 'Administración de usuarios', subtitle: 'Crear y eliminar cuentas', action: () => setProfileSheet('usuarios') }] : []),
+                { title: 'Ayuda y soporte', subtitle: 'Preguntas frecuentes, contacto', action: () => setAppTab('chat') },
+              ] satisfies { title: string; subtitle: string; action: () => void }[]).map((item) => (
+                <button key={item.title} type="button" onClick={item.action} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-left">
                   <span className="flex-1">
-                    <strong className="block text-[15px]">{title}</strong>
-                    <span className="text-[13px] text-[#4A4F7A]">{subtitle}</span>
+                    <strong className="block text-[15px]">{item.title}</strong>
+                    <span className="text-[13px] text-[#4A4F7A]">{item.subtitle}</span>
                   </span>
                   <span className="text-[#3A44C4]">›</span>
                 </button>

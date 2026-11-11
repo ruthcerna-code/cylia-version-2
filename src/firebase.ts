@@ -22,7 +22,7 @@ import {
   setDoc,
   type Firestore,
 } from 'firebase/firestore';
-import type { ActivityImportance, ActivityPlanStatus, ActivityStep, BodyLevel, CervicalFluid, ChatMessage, CycleSymptom, DailyLog, EnergyFeel, FeltState, HormonalMethod, PeriodRecord, PerimenopauseMode, ScheduledActivity, SleepState, SpecialSituation, UserProfile } from './types';
+import type { ActivityEffort, ActivityImportance, ActivityKind, ActivityPlanStatus, ActivityStep, BodyLevel, CervicalFluid, ChatMessage, CycleSymptom, DailyLog, EnergyFeel, FeltState, HormonalMethod, PeriodRecord, PerimenopauseMode, ScheduledActivity, SleepState, SpecialSituation, UserProfile } from './types';
 import { compareActivities } from './utils/activities';
 import { HORMONAL_LABELS, inferHormonalMethod, validateProfile } from './utils/profileFields';
 
@@ -75,6 +75,8 @@ const ENERGY_FEELS = ['baja', 'estable', 'radiante', 'inquieta'] as const;
 const BODY_LEVELS = ['ninguno', 'leve', 'medio'] as const;
 const SYMPTOMS = ['colicos', 'dolor_cabeza', 'hinchazon', 'sensibilidad_mamaria', 'antojos', 'irritabilidad', 'bochornos', 'sudores_nocturnos', 'sequedad_vaginal'] as const;
 const IMPORTANCE = ['alta', 'media', 'baja'] as const;
+const KINDS = ['trabajo', 'movimiento', 'cuidado', 'descanso', 'social', 'tramite'] as const;
+const EFFORTS = ['bajo', 'medio', 'alto'] as const;
 const PLAN_STATUS = ['pendiente', 'en_curso', 'hecha', 'pospuesta'] as const;
 
 function oneOf<T extends string>(values: readonly T[], value: unknown): T | undefined {
@@ -421,6 +423,8 @@ export type ActivityDraft = {
   deadline?: string | null;
   estimateMinutes?: number | null;
   importance?: ActivityImportance | null;
+  kind?: ActivityKind | null;
+  effort?: ActivityEffort | null;
   dependsOn?: string | null;
   planStatus?: ActivityPlanStatus;
   sortOrder?: number | null;
@@ -460,6 +464,8 @@ function docToActivity(id: string, data: Record<string, unknown>): ScheduledActi
     deadline: data.deadline ? String(data.deadline) : null,
     estimateMinutes: data.estimateMinutes == null ? null : asInt(data.estimateMinutes, 0),
     importance: oneOf<ActivityImportance>(IMPORTANCE, data.importance) || null,
+    kind: oneOf<ActivityKind>(KINDS, data.kind) || null,
+    effort: oneOf<ActivityEffort>(EFFORTS, data.effort) || null,
     dependsOn: data.dependsOn ? String(data.dependsOn) : null,
     planStatus: oneOf<ActivityPlanStatus>(PLAN_STATUS, data.planStatus) || 'pendiente',
     sortOrder: data.sortOrder == null ? null : asInt(data.sortOrder, 0),
@@ -494,6 +500,8 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
       deadline: draft.deadline !== undefined ? draft.deadline : existing?.deadline ?? null,
       estimateMinutes: draft.estimateMinutes !== undefined ? draft.estimateMinutes : existing?.estimateMinutes ?? null,
       importance: draft.importance !== undefined ? draft.importance : existing?.importance ?? null,
+      kind: draft.kind !== undefined ? draft.kind : (oneOf<ActivityKind>(KINDS, existing?.kind) || null),
+      effort: draft.effort !== undefined ? draft.effort : (oneOf<ActivityEffort>(EFFORTS, existing?.effort) || null),
       dependsOn: draft.dependsOn !== undefined ? draft.dependsOn : existing?.dependsOn ?? null,
       planStatus: draft.planStatus || existing?.planStatus || 'pendiente',
       sortOrder: draft.sortOrder !== undefined ? draft.sortOrder : existing?.sortOrder ?? null,
@@ -506,6 +514,8 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
       endTime: saved.endTime || null,
       planStatus: saved.planStatus,
       importance: saved.importance,
+      kind: saved.kind,
+      effort: saved.effort,
       notes: saved.notes,
       reminderMinutes: saved.reminderMinutes,
       timeZone: saved.timeZone,

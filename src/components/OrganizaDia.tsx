@@ -31,6 +31,8 @@ function draftFrom(activity: ScheduledActivity, patch: Partial<ActivityDraft> = 
     deadline: activity.deadline,
     estimateMinutes: activity.estimateMinutes,
     importance: activity.importance,
+    kind: activity.kind,
+    effort: activity.effort,
     dependsOn: activity.dependsOn,
     planStatus: activity.planStatus,
     sortOrder: activity.sortOrder,

@@ -100,6 +100,8 @@ export type MenstrualPhase = 'Menstrual' | 'Folicular' | 'Ovulacion' | 'Lutea';
 export type ActivitySyncStatus = 'pending' | 'synced' | 'changed' | 'error' | 'delete_pending';
 
 export type ActivityImportance = 'alta' | 'media' | 'baja';
+export type ActivityKind = 'trabajo' | 'movimiento' | 'cuidado' | 'descanso' | 'social' | 'tramite';
+export type ActivityEffort = 'bajo' | 'medio' | 'alto';
 export type ActivityPlanStatus = 'pendiente' | 'en_curso' | 'hecha' | 'pospuesta';
 
 export interface ActivityStep {
@@ -125,6 +127,8 @@ export interface ScheduledActivity {
   deadline: string | null;
   estimateMinutes: number | null;
   importance: ActivityImportance | null;
+  kind: ActivityKind | null;
+  effort: ActivityEffort | null;
   dependsOn: string | null;
   planStatus: ActivityPlanStatus;
   sortOrder: number | null;

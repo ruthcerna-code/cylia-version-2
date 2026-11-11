@@ -280,18 +280,18 @@ export default function DesignRegister({
         </button>
       </section>
       <section className="flex flex-col gap-3 rounded-[20px] bg-white p-4">
-        {[
-          ['¿Cómo dormiste?', sleepDetails, setSleepDetails, 'Ej.: 7 horas, me desperté una vez'],
-          ['Hábitos de hoy', behavior, setBehavior, 'Ej.: caminé 30 min, mucho café'],
-          ['Notas para Cyclia', notes, setNotes, 'Algo que quieras que Cyclia tenga en cuenta'],
-        ].map(([label, value, setter, placeholder]) => (
-          <label key={String(label)} className="flex flex-col gap-1.5 text-sm font-extrabold">
-            {label}
+        {([
+          { label: '¿Cómo dormiste?', value: sleepDetails, set: setSleepDetails, placeholder: 'Ej.: 7 horas, me desperté una vez' },
+          { label: 'Hábitos de hoy', value: behavior, set: setBehavior, placeholder: 'Ej.: caminé 30 min, mucho café' },
+          { label: 'Notas para Cyclia', value: notes, set: setNotes, placeholder: 'Algo que quieras que Cyclia tenga en cuenta' },
+        ] satisfies { label: string; value: string; set: (next: string) => void; placeholder: string }[]).map((field) => (
+          <label key={field.label} className="flex flex-col gap-1.5 text-sm font-extrabold">
+            {field.label}
             <textarea
               rows={2}
-              value={String(value)}
-              placeholder={String(placeholder)}
-              onChange={(event) => (setter as (next: string) => void)(event.target.value)}
+              value={field.value}
+              placeholder={field.placeholder}
+              onChange={(event) => field.set(event.target.value)}
               className="resize-none rounded-xl border-[1.5px] border-[#C9D3EF] bg-[#F8F9FE] p-2.5 text-sm font-normal text-[#1B1F5E] outline-none"
             />
           </label>
