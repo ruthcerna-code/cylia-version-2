@@ -87,28 +87,28 @@ La entrada con correo es Firebase Auth. No hay pantalla «Sin cuenta».
 
 - **Usuario y contraseña.** El usuario es un correo. Si no existe, Cyclia crea la cuenta y avisa en una ventana. Si existe y la contraseña coincide, avisa que mostrará el calendario y abre la sesión. La contraseña queda cifrada en `data/accounts.json`. Cerrar sesión solo limpia este navegador; la cuenta sigue guardada para el próximo ingreso.
 - **Clave que no coincide.** Si el correo ya tiene cuenta y la contraseña es otra, no entra y no crea una cuenta duplicada.
-- **Administración.** La cuenta inicial es `administrador`, con rol admin. Desde Perfil crea y elimina usuarios. Esa cuenta no se puede borrar.
+- **Administración.** La cuenta `administrador` vive en el servidor, con rol admin. Si todavía no existe, se crea solo cuando `ADMIN_PASSWORD` está definida. Si ya existe, conserva su clave. Desde Perfil crea y elimina usuarios. Esa cuenta no se puede borrar.
 - **24 horas.** Si se marca, la sesión se conserva 24 horas. Si no, termina al cerrar el navegador.
 
 La contraseña del correo la comprueba Firebase Auth. Con ese usuario se guardan el perfil y los registros. La cuenta `administrador` sigue en el servidor.
 
 ### Modelo de datos
 
-Las reglas de perfil, registros, chat, agenda, plan del día, foco, consentimiento y solicitudes están en `firestore.rules`.
+Las reglas están en `firestore.rules`. Cada documento cuelga de `users/{uid}` y solo lo lee o lo edita esa usuaria.
 
-| Tabla | Clave | Qué guarda |
-|-------|-------|------------|
-| `profiles` | `id` = `auth.users.id` | Nombre, edad calculada, nacimiento, ciclo, anticonceptivo, condiciones, origen de la duración y avisos |
-| `daily_logs` | `user_id` + `date` | Escalas del día, fluido cervical, estado anímico, energía en palabras, nivel de sensaciones, manchado, síntomas y el texto del análisis |
-| `period_records` | `user_id` + `start_date` | Una fila por regla: inicio, fin, volumen y dolor de 0 a 3 |
-| `messages` | `id` | Chat con Cyclia: rol, texto y momento |
-| `scheduled_activities` | `id` | Actividad, fecha, horario y notas |
-| `focus_entries` | `user_id` | JSON anterior de Mi Foco. Organiza tu día ya no guarda ahí las tareas |
-| `day_plans` | `user_id`, `plan_date` | Minutos disponibles y energía marcada si el registro del día no la tiene |
-| `consent_events` | `id` | Decisiones de privacidad, salud y asistente |
-| `data_requests` | `id` | Pedidos de acceso, corrección o eliminación |
+| Colección | Dónde | Qué guarda |
+|-----------|--------|------------|
+| Perfil | `users/{uid}` | Nombre, edad, nacimiento, ciclo, anticonceptivo, condiciones, origen de la duración y avisos |
+| `daily_logs` | `users/{uid}/daily_logs/{fecha}` | Escalas del día, fluido cervical, estado anímico, energía, sensaciones, manchado, síntomas y el texto del análisis |
+| `period_records` | `users/{uid}/period_records/{id}` | Una regla: inicio, fin, volumen y dolor de 0 a 3 |
+| `messages` | `users/{uid}/messages/{id}` | Chat con Cyclia: rol, texto y momento |
+| `activities` | `users/{uid}/activities/{id}` | Actividad, fecha, horario, duración, estado y notas |
+| `focus` | `users/{uid}/focus/{id}` | Estado anterior de Mi Foco |
+| `day_plans` | `users/{uid}/day_plans/{fecha}` | Minutos disponibles y energía marcada si el registro del día no la tiene |
+| `consent_events` | `users/{uid}/consent_events/{id}` | Decisiones de privacidad, salud y asistente |
+| `data_requests` | `users/{uid}/data_requests/{id}` | Pedidos de acceso, corrección o eliminación |
 
-Cada persona solo ve lo suyo. Row Level Security limita cada fila al `auth.uid()` de la sesión. Perfiles, registros y mensajes se publican en Realtime para refrescar la pantalla.
+El navegador recibe los cambios con los listeners de Firestore de la sesión que entró.
 
 ### Qué recibe y qué entrega el análisis
 
@@ -168,7 +168,8 @@ Variables de entorno (ver `.env.example`):
 
 - `GEMINI_API_KEY`: clave de Gemini en el servidor.
 - `APP_URL`: origen de la app. En local es `http://localhost:3001`.
-- `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID` y `VITE_FIREBASE_APP_ID`: configuración pública de la app web. Si faltan, el código usa el proyecto `cyclia-mvp`.
+- `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID` y `VITE_FIREBASE_APP_ID`: configuración pública de la app web. La clave va solo en el entorno; sin `VITE_FIREBASE_API_KEY` el ingreso con correo no arranca.
+- `ADMIN_PASSWORD`: clave de la cuenta `administrador` la primera vez que se crea. Si esa cuenta ya existe, no se cambia.
 - `GMAIL_USER` y `GMAIL_APP_PASSWORD`: cuenta de Gmail y contraseña de aplicación. La entrada principal no las usa: la cuenta se crea con el usuario y la contraseña escritos en la pantalla.
 
 Para ver la versión compilada: `npm run build` y luego `npm start`. Si `dist/index.html` existe, `npm run dev` sirve esa carpeta.
@@ -179,17 +180,15 @@ La app ocupa el ancho del teléfono (hasta 480 px, centrada en una pantalla más
 
 ### Barra inferior
 
-Siete pestañas fijas.
+Cinco pestañas fijas.
 
 | Pestaña | Qué muestra | Dato que usa o guarda |
 |---------|-------------|------------------------|
-| Inicio | Saludo, anillo del día y una sugerencia de comida y bienestar según la fase estimada. Si el registro marca cansancio, el ritmo baja | Lee `profiles`, `period_records` y el registro del día |
-| Ciclo | Calendario, proyección de 3 ciclos y, en «Ver más», el conocimiento por fase y la guía. El porcentaje de una fase sale solo de los registros de esa fase | Lee `profiles`, `period_records` y `daily_logs` |
+| Inicio | Saludo, anillo del día y una sugerencia de comida y bienestar según la fase estimada. Si el registro marca cansancio, el ritmo baja | Lee el perfil, `period_records` y el registro del día |
+| Ciclo | Calendario, proyección de 3 ciclos y, en «Ver más», el conocimiento por fase y la guía. El porcentaje de una fase sale solo de los registros de esa fase | Lee el perfil, `period_records` y `daily_logs` |
 | Registro | ¿Cómo estás hoy? en cinco pasos: ánimo, energía, cuerpo, números y notas. Al guardar, el análisis muestra la gráfica | Escribe fluido, estado, energía, sensaciones y escalas en `daily_logs` |
-| Agendar | Actividades con hora, por día. La hora va en una columna a la izquierda | Escribe la hora en `scheduled_activities`. No muestra las tareas sin hora |
-| Cyclia IA | Conversación con la asistente | Recibe el contexto del análisis: día, fase solo si el calendario la muestra, y las escalas del registro. Escribe `messages` si hay consentimiento |
-| Organiza tu día | Ahora, Después y Puede esperar | Usa las mismas actividades. Guarda duración, importancia, dependencia, orden y estado. El tiempo del día va en `day_plans` |
-| Perfil | Cuenta, ciclo, objetivos, privacidad y exportación | Lee y actualiza `profiles`; la administración también ve las cuentas |
+| Organiza tu día | Calendario de la semana y el botón para crear una actividad | Lee y escribe `users/{uid}/activities` |
+| Perfil | Cuenta, ciclo, objetivos, privacidad y exportación | Lee y actualiza el perfil; la administración también ve las cuentas |
 
 ### Organiza tu día
 

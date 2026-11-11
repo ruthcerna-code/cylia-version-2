@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, DailyLog, ChatMessage, MenstrualPhase, PeriodRecord, ScheduledActivity } from './types';
-import AgendaScreen, { type AgendaSeed } from './components/AgendaScreen';
+import OrganizaTuDia from './components/plan/OrganizaTuDia';
 import Onboarding from './components/Onboarding';
 import { EntryFlow, MoodGrid, ObjectivesScreen, RegionScreen } from './components/EntryFlow';
 import DesignHome from './components/DesignHome';
@@ -22,7 +22,6 @@ import { privacyAcceptedAtLogin, rememberPrivacyAcceptance } from './consentCopy
 import ConsentScreen from './components/ConsentScreen';
 import PrivacyDataScreen from './components/PrivacyDataScreen';
 import CyclePrivacySettings from './components/CyclePrivacySettings';
-import OrganizaDia from './components/OrganizaDia';
 import { downloadOwnData } from './dataExport';
 import { compareActivities, explainActivityError, formatActivityWhen, LOCAL_ACTIVITY_STORE_NOTE, suggestActivity } from './utils/activities';
 import { compareRecords, dayRecordNote, indicatorNote } from './utils/recordCompare';
@@ -131,12 +130,13 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
-  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'agenda' | 'chat' | 'humor' | 'perfil' | 'foco'>('inicio');
+  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil' | 'foco'>('inicio');
   const [activities, setActivities] = useState<ScheduledActivity[]>([]);
   const [activitiesReady, setActivitiesReady] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
   const [activityStorageNote, setActivityStorageNote] = useState('');
-  const [agendaSeed, setAgendaSeed] = useState<AgendaSeed | null>(null);
+  const [planOpenToken, setPlanOpenToken] = useState(0);
+  const [planRequest, setPlanRequest] = useState({ title: '', date: '' });
   const [homeSheet, setHomeSheet] = useState<null | 'fase' | 'actividad'>(null);
   const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion' | 'proyeccion'>(null);
   const [profileSheet, setProfileSheet] = useState<null | 'ajustes' | 'ciclo' | 'objetivos' | 'privacidad' | 'datos' | 'usuarios'>(null);
@@ -867,12 +867,13 @@ export default function App() {
     : null;
   const activityDates = activities.map((item) => item.date);
   const openAgenda = (title: string, date: string) => {
-    setAgendaSeed({ token: Date.now(), title, date });
+    setPlanRequest({ title, date });
+    setPlanOpenToken((current) => current + 1);
     setHomeSheet(null);
     setCycleSheet(null);
     setProfileSheet(null);
     setChatHistoryOpen(false);
-    setAppTab('agenda');
+    setAppTab('foco');
   };
 
   const selectedActivity = generateActivityForDay(
@@ -899,7 +900,7 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className={`flex-1 w-full flex flex-col gap-4 ${appTab === 'inicio' && !homeSheet ? '' : 'px-4 py-4'}`}>
+      <main className={`flex-1 w-full flex flex-col gap-4 ${(appTab === 'inicio' && !homeSheet) || appTab === 'foco' ? '' : 'px-4 py-4'}`}>
         <>
         {appTab === 'inicio' && homeSheet === 'fase' && (
           <PhaseScreen current={selectedPhase} onBack={() => setHomeSheet(null)} />
@@ -980,37 +981,47 @@ export default function App() {
           </div>
         )}
         {appTab === 'foco' && (
-          <OrganizaDia
-            userId={user.id}
-            date={formatDateStr(new Date())}
-            activities={activities}
-            activitiesReady={activitiesReady}
-            log={logs[formatDateStr(new Date())]}
-            onSave={async (draft) => {
-              const saved = await handleSaveActivity(draft);
-              if (!saved) throw new Error('Sin sesión');
-              return saved;
-            }}
-            onEnergy={(feel, score) => {
-              const today = formatDateStr(new Date());
-              const current = logs[today];
-              if (current) void handleSaveLog({ ...current, energy: score, energyFeel: feel });
-            }}
-          />
-        )}
-        {appTab === 'agenda' && (
-          <AgendaScreen
-            activities={activities}
-            loadError={activitiesError}
-            storageNote={activityStorageNote}
-            seed={agendaSeed}
+          <OrganizaTuDia
+            openToken={planOpenToken}
+            createTitle={planRequest.title}
+            createDate={planRequest.date || formatDateStr(new Date())}
             profile={profile}
             periods={periods}
             logs={logs}
-            onSeedApplied={() => setAgendaSeed(null)}
-            onSave={handleSaveActivity}
-            onDelete={handleDeleteActivity}
-            onRefresh={refreshActivities}
+            activities={activities}
+            assistantEnabled={consentStatus?.purposes.gemini_assistant === 'accept'}
+            onSaveActivity={handleSaveActivity}
+            onSaveEnergy={async (date, band) => {
+              const current = logs[date];
+              const energy = band === 'sin_energia' ? 2 : 4;
+              const feel = band === 'sin_energia' ? 'baja' as const : 'estable' as const;
+              await handleSaveLog({
+                date,
+                sleepQuality: current?.sleepQuality ?? 3,
+                fatigue: current?.fatigue ?? 3,
+                pain: current?.pain ?? 1,
+                stress: current?.stress ?? 3,
+                mood: current?.mood ?? 3,
+                sleepDetails: current?.sleepDetails ?? '',
+                additionalNotes: current?.additionalNotes ?? '',
+                behavior: current?.behavior ?? '',
+                concentration: current?.concentration,
+                sleepState: current?.sleepState,
+                spotting: current?.spotting,
+                symptoms: current?.symptoms,
+                cervicalFluid: current?.cervicalFluid,
+                feltState: current?.feltState,
+                headache: current?.headache,
+                bloating: current?.bloating,
+                breastSensitivity: current?.breastSensitivity,
+                pelvicCramps: current?.pelvicCramps,
+                energy: current?.energy ?? energy,
+                energyFeel: current?.energyFeel ?? feel,
+                energyBand: band,
+              }, { analyze: false });
+            }}
+            onOpenRegister={() => setAppTab('registro')}
+            onLanded={() => setAppTab('foco')}
           />
         )}
         {appTab === 'registro' && (
@@ -1617,24 +1628,28 @@ export default function App() {
 
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-7 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
+      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-5 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
         {([
           ['inicio', 'Inicio', '⌂'],
           ['calendario', 'Ciclo', '▦'],
           ['registro', 'Registro', '+'],
-          ['agenda', 'Agendar actividades', '◷'],
-          ['chat', 'Cyclia IA', '✦'],
           ['foco', 'Organiza tu día', '◎'],
           ['perfil', 'Perfil', '•'],
         ] as const).map(([id, label, icon]) => (
           <button
             key={id}
             type="button"
-            onClick={() => { setHomeSheet(null); setCycleSheet(null); setProfileSheet(null); setChatHistoryOpen(false); setAppTab(id); }}
+            onClick={() => {
+              setHomeSheet(null);
+              setCycleSheet(null);
+              setProfileSheet(null);
+              setChatHistoryOpen(false);
+              setAppTab(id);
+            }}
             className={`flex cursor-pointer flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-extrabold leading-tight ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
           >
             <span className="text-lg leading-none">{icon}</span>
-            {id === 'agenda' ? <span className="text-center">Agendar<br />actividades</span> : id === 'foco' ? <span className="text-center">Organiza<br />tu día</span> : label}
+            {id === 'foco' ? <span className="text-center">Organiza<br />tu día</span> : label}
           </button>
         ))}
       </nav>

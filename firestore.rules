@@ -94,6 +94,7 @@ service cloud.firestore {
           && optionalEnum('cervicalFluid', ['seco', 'pegajoso', 'cremoso', 'clara_de_huevo'])
           && optionalEnum('feltState', ['Serena', 'Enfocada', 'Radiante', 'Reflexiva', 'Sensible'])
           && optionalEnum('energyFeel', ['baja', 'estable', 'radiante', 'inquieta'])
+          && optionalEnum('energyBand', ['con_energia', 'sin_energia'])
           && optionalEnum('headache', ['ninguno', 'leve', 'medio'])
           && optionalEnum('bloating', ['ninguno', 'leve', 'medio'])
           && optionalEnum('breastSensitivity', ['ninguno', 'leve', 'medio'])

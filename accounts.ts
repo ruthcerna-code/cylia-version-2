@@ -5,7 +5,6 @@ import type { Express, Request, Response } from 'express';
 import { gmailConfigured, sendConfirmationCode, sendProvisionalPassword } from './mail.js';
 
 const ADMIN_USERNAME = 'administrador';
-const ADMIN_PASSWORD = '1234';
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 type Role = 'admin' | 'user';
@@ -15,14 +14,12 @@ type Account = {
   username: string;
   passwordHash: string;
   role: Role;
-  supabaseUserId: string;
-  refreshToken: string;
   createdAt: string;
 };
 
 type AccountFile = { users: Account[] };
 
-type TokenPayload = { sub: string; role: Role; exp: number; username?: string; supabaseUserId?: string };
+type TokenPayload = { sub: string; role: Role; exp: number; username?: string };
 
 function dataDir(): string {
   return path.join(process.cwd(), 'data');
@@ -39,8 +36,21 @@ function secretPath(): string {
 function readAccounts(): AccountFile {
   if (process.env.VERCEL) return { users: [] };
   try {
-    const parsed = JSON.parse(fs.readFileSync(accountsPath(), 'utf8')) as AccountFile;
-    return { users: Array.isArray(parsed.users) ? parsed.users : [] };
+    const parsed = JSON.parse(fs.readFileSync(accountsPath(), 'utf8')) as { users?: unknown };
+    const rows = Array.isArray(parsed.users) ? parsed.users : [];
+    const users = rows.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const row = item as Partial<Account>;
+      if (typeof row.id !== 'string' || typeof row.username !== 'string' || typeof row.passwordHash !== 'string') return [];
+      return [{
+        id: row.id,
+        username: row.username,
+        passwordHash: row.passwordHash,
+        role: row.role === 'admin' ? 'admin' as const : 'user' as const,
+        createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date().toISOString(),
+      }];
+    });
+    return { users };
   } catch {
     return { users: [] };
   }
@@ -167,7 +177,6 @@ function signToken(account: Account): string {
     role: account.role,
     exp: Date.now() + TOKEN_TTL_MS,
     username: account.username,
-    supabaseUserId: account.supabaseUserId,
   } satisfies TokenPayload)).toString('base64url');
   const signature = crypto.createHmac('sha256', sessionSecret()).update(body).digest('base64url');
   return `${body}.${signature}`;
@@ -198,17 +207,6 @@ function requireAccount(req: Request, res: Response): Account | null {
   }
   const account = readAccounts().users.find((item) => item.id === payload.sub);
   if (account) return account;
-  if (payload.role === 'user' && payload.username && payload.supabaseUserId) {
-    return {
-      id: payload.sub,
-      username: payload.username,
-      passwordHash: '',
-      role: 'user',
-      supabaseUserId: payload.supabaseUserId,
-      refreshToken: '',
-      createdAt: '',
-    };
-  }
   res.status(401).json({ error: 'Esta cuenta ya no existe.' });
   return null;
 }
@@ -223,22 +221,23 @@ function publicAccount(account: Account) {
 }
 
 export async function ensureAdminAccount() {
+  if (process.env.VERCEL) return;
   const file = readAccounts();
-  let admin = file.users.find((account) => account.username === ADMIN_USERNAME);
-  if (!admin) {
-    admin = {
-      id: crypto.randomUUID(),
-      username: ADMIN_USERNAME,
-      passwordHash: hashPassword(ADMIN_PASSWORD),
-      role: 'admin',
-      supabaseUserId: '',
-      refreshToken: '',
-      createdAt: new Date().toISOString(),
-    };
-    file.users.push(admin);
-    writeAccounts(file);
-    console.log('[Cuentas] Usuario administrador listo.');
+  if (file.users.some((account) => account.username === ADMIN_USERNAME)) return;
+  const password = process.env.ADMIN_PASSWORD?.trim() || '';
+  if (!password) {
+    console.log('[Cuentas] No hay cuenta administrador. Define ADMIN_PASSWORD para crearla.');
+    return;
   }
+  file.users.push({
+    id: crypto.randomUUID(),
+    username: ADMIN_USERNAME,
+    passwordHash: hashPassword(password),
+    role: 'admin',
+    createdAt: new Date().toISOString(),
+  });
+  writeAccounts(file);
+  console.log('[Cuentas] Usuario administrador listo.');
 }
 
 async function sendAccountSession(
@@ -319,8 +318,6 @@ export function registerAccountRoutes(app: Express) {
           username: email,
           passwordHash: hashPassword(password),
           role: 'user',
-          supabaseUserId: '',
-          refreshToken: '',
           createdAt: new Date().toISOString(),
         };
         createdId = created.id;
@@ -365,8 +362,6 @@ export function registerAccountRoutes(app: Express) {
         username: email,
         passwordHash: hashPassword(password),
         role: 'user',
-        supabaseUserId: '',
-        refreshToken: '',
         createdAt: new Date().toISOString(),
       };
       file.users.push(createdAccount);
@@ -409,8 +404,6 @@ export function registerAccountRoutes(app: Express) {
         username: email,
         passwordHash: signup.passwordHash,
         role: 'user',
-        supabaseUserId: '',
-        refreshToken: '',
         createdAt: new Date().toISOString(),
       };
       file.users.push(created);
@@ -469,8 +462,6 @@ export function registerAccountRoutes(app: Express) {
         username,
         passwordHash: hashPassword(password),
         role: 'user',
-        supabaseUserId: '',
-        refreshToken: '',
         createdAt: new Date().toISOString(),
       };
       file.users.push(created);

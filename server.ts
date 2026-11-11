@@ -7,6 +7,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ensureAdminAccount, registerAccountRoutes } from "./accounts.js";
 import { registerConsentRoutes } from "./consentRoutes.js";
 import { assertConsentFromRequest, ConsentError } from "./consentHttp.js";
+import { alignProposal, extractJson, PLAN_ACTIVITY_SYSTEM_PROMPT, planRequestSchema } from "./src/plan/proposal.js";
 
 dotenv.config();
 
@@ -346,6 +347,59 @@ Responde a la consulta con esos datos. Si pregunta por su ciclo y no hay fase, d
 
 registerAccountRoutes(app);
 registerConsentRoutes(app);
+
+app.post("/api/plan-activity", async (req, res) => {
+  try {
+    await assertConsentFromRequest(req, "gemini_assistant");
+    const parsed = planRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Faltan el día, la hora o la actividad." });
+      return;
+    }
+    const input = parsed.data;
+    const ai = getAI();
+    const ask = async (previous: string | null) => {
+      const response = await generateContentWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: previous
+          ? `La respuesta anterior no cumplió el formato. Responde solo con el JSON pedido.\nDatos:\n${JSON.stringify(input)}\nRespuesta anterior:\n${previous}`
+          : JSON.stringify(input),
+        config: {
+          systemInstruction: PLAN_ACTIVITY_SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+        },
+      });
+      return typeof response.text === "string" ? response.text : "";
+    };
+    let rawText = await ask(null);
+    let proposal = null;
+    try {
+      proposal = alignProposal(extractJson(rawText), input.hora_inicio, input.fase);
+    } catch {
+      proposal = null;
+    }
+    if (!proposal) {
+      rawText = await ask(rawText.slice(0, 800));
+      try {
+        proposal = alignProposal(extractJson(rawText), input.hora_inicio, input.fase);
+      } catch {
+        proposal = null;
+      }
+    }
+    if (!proposal) {
+      res.status(422).json({ error: "Cyclia no pudo armar una propuesta esta vez. Puedes intentarlo de nuevo." });
+      return;
+    }
+    res.json({ proposal });
+  } catch (error: any) {
+    if (error instanceof ConsentError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    console.error("Error en propuesta de actividad:", error);
+    res.status(500).json({ error: "Cyclia no pudo armar una propuesta esta vez. Puedes intentarlo de nuevo." });
+  }
+});
 
 function localNetworkAddresses(): string[] {
   const addresses: string[] = [];

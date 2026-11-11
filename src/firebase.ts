@@ -27,7 +27,7 @@ import { compareActivities } from './utils/activities';
 import { HORMONAL_LABELS, inferHormonalMethod, validateProfile } from './utils/profileFields';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyB7PrtjPHO6ubosoKF4iKabpm_W9aX3TZQ',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'cyclia-mvp.firebaseapp.com',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'cyclia-mvp',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'cyclia-mvp.firebasestorage.app',
@@ -72,6 +72,7 @@ const SLEEP_STATES = ['bien', 'regular', 'mal'] as const;
 const FLUIDS = ['seco', 'pegajoso', 'cremoso', 'clara_de_huevo'] as const;
 const FELT_STATES = ['Serena', 'Enfocada', 'Radiante', 'Reflexiva', 'Sensible'] as const;
 const ENERGY_FEELS = ['baja', 'estable', 'radiante', 'inquieta'] as const;
+const ENERGY_BANDS = ['con_energia', 'sin_energia'] as const;
 const BODY_LEVELS = ['ninguno', 'leve', 'medio'] as const;
 const SYMPTOMS = ['colicos', 'dolor_cabeza', 'hinchazon', 'sensibilidad_mamaria', 'antojos', 'irritabilidad', 'bochornos', 'sudores_nocturnos', 'sequedad_vaginal'] as const;
 const IMPORTANCE = ['alta', 'media', 'baja'] as const;
@@ -245,6 +246,7 @@ function logToDoc(log: DailyLog): Record<string, unknown> {
     cervicalFluid: oneOf(FLUIDS, log.cervicalFluid),
     feltState: oneOf(FELT_STATES, log.feltState),
     energyFeel: oneOf(ENERGY_FEELS, log.energyFeel),
+    energyBand: oneOf(ENERGY_BANDS, log.energyBand),
     headache: oneOf(BODY_LEVELS, log.headache),
     bloating: oneOf(BODY_LEVELS, log.bloating),
     breastSensitivity: oneOf(BODY_LEVELS, log.breastSensitivity),
@@ -276,6 +278,7 @@ function docToLog(data: Record<string, unknown>): DailyLog {
     cervicalFluid: oneOf<CervicalFluid>(FLUIDS, data.cervicalFluid),
     feltState: oneOf<FeltState>(FELT_STATES, data.feltState),
     energyFeel: oneOf<EnergyFeel>(ENERGY_FEELS, data.energyFeel),
+    energyBand: oneOf<'con_energia' | 'sin_energia'>(ENERGY_BANDS, data.energyBand),
     headache: oneOf<BodyLevel>(BODY_LEVELS, data.headache),
     bloating: oneOf<BodyLevel>(BODY_LEVELS, data.bloating),
     breastSensitivity: oneOf<BodyLevel>(BODY_LEVELS, data.breastSensitivity),
@@ -429,6 +432,8 @@ export type ActivityDraft = {
   planStatus?: ActivityPlanStatus;
   sortOrder?: number | null;
   steps?: ActivityStep[];
+  completedAt?: string | null;
+  durationSource?: 'cyclia' | 'manual' | null;
 };
 
 function readSteps(value: unknown): ActivityStep[] {
@@ -470,6 +475,8 @@ function docToActivity(id: string, data: Record<string, unknown>): ScheduledActi
     planStatus: oneOf<ActivityPlanStatus>(PLAN_STATUS, data.planStatus) || 'pendiente',
     sortOrder: data.sortOrder == null ? null : asInt(data.sortOrder, 0),
     steps: readSteps(data.steps),
+    completedAt: data.completedAt ? String(data.completedAt) : null,
+    durationSource: data.durationSource === 'cyclia' || data.durationSource === 'manual' ? data.durationSource : null,
   };
 }
 
@@ -506,6 +513,10 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
       planStatus: draft.planStatus || existing?.planStatus || 'pendiente',
       sortOrder: draft.sortOrder !== undefined ? draft.sortOrder : existing?.sortOrder ?? null,
       steps: draft.steps || readSteps(existing?.steps),
+      completedAt: draft.completedAt !== undefined ? draft.completedAt : (existing?.completedAt ? String(existing.completedAt) : null),
+      durationSource: draft.durationSource !== undefined
+        ? draft.durationSource
+        : (existing?.durationSource === 'cyclia' || existing?.durationSource === 'manual' ? existing.durationSource : null),
     });
     await setDoc(doc(db, 'users', userId, 'activities', id), clean({
       title: saved.title,
@@ -525,6 +536,8 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
       dependsOn: saved.dependsOn,
       sortOrder: saved.sortOrder,
       steps: saved.steps,
+      completedAt: saved.completedAt,
+      durationSource: saved.durationSource,
     }), { merge: true });
     return saved;
   });

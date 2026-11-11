@@ -1,4 +1,7 @@
+import dotenv from 'dotenv';
 import type { Request } from 'express';
+
+dotenv.config();
 import {
   CONSENT_STATEMENTS,
   CONSENT_VERSION,
@@ -12,7 +15,12 @@ import {
 } from './src/consentCopy.js';
 
 const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || 'cyclia-mvp';
-const API_KEY = process.env.VITE_FIREBASE_API_KEY || 'AIzaSyB7PrtjPHO6ubosoKF4iKabpm_W9aX3TZQ';
+
+function firebaseApiKey(): string {
+  const key = process.env.VITE_FIREBASE_API_KEY?.trim();
+  if (!key) throw new ConsentError(500, 'Falta VITE_FIREBASE_API_KEY en el servidor.');
+  return key;
+}
 
 export class ConsentError extends Error {
   status: number;
@@ -66,7 +74,7 @@ export async function requireSession(req: Request) {
   const header = req.headers.authorization || '';
   const jwt = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!jwt) throw new ConsentError(401, 'Inicia sesión para continuar.');
-  const lookup = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${API_KEY}`, {
+  const lookup = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ idToken: jwt }),

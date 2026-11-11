@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { BodyLevel, CervicalFluid, CycleSymptom, DailyLog, EnergyFeel, FeltState, SleepState } from '../types';
+import type { EnergyBand } from '../plan/proposal';
+import { energyBandFromLog } from '../plan/dayContext';
 import type { ActivitySuggestion } from '../utils/activities';
 
 const SCALES = [
@@ -100,6 +102,7 @@ export default function DesignRegister({
   const [fluid, setFluid] = useState<CervicalFluid | ''>(existing?.cervicalFluid || '');
   const [felt, setFelt] = useState<FeltState | ''>(existing?.feltState || '');
   const [energyFeel, setEnergyFeel] = useState<EnergyFeel | ''>(existing?.energyFeel || '');
+  const [energyBand, setEnergyBand] = useState<EnergyBand | ''>(energyBandFromLog(existing) || '');
   const levelFrom = (key: (typeof BODY)[number]['key'], code: CycleSymptom): BodyLevel => existing?.[key] || (existing?.symptoms?.includes(code) ? 'leve' : 'ninguno');
   const [body, setBody] = useState<Record<(typeof BODY)[number]['key'], BodyLevel>>({
     headache: levelFrom('headache', 'dolor_cabeza'),
@@ -136,6 +139,7 @@ export default function DesignRegister({
       cervicalFluid: fluid || undefined,
       feltState: felt || undefined,
       energyFeel: energyFeel || undefined,
+      energyBand: energyBand || undefined,
       headache: body.headache,
       bloating: body.bloating,
       breastSensitivity: body.breastSensitivity,
@@ -183,6 +187,31 @@ export default function DesignRegister({
       {step === 1 && <section className="flex flex-col gap-4 rounded-[20px] bg-white p-4">
         <h2 className="m-0 text-base font-extrabold">Nivel de energía</h2>
         <div className="grid grid-cols-2 gap-2">
+          {([
+            ['con_energia', 'Con energía'],
+            ['sin_energia', 'Sin energía'],
+          ] as const).map(([value, label]) => (
+            <Choice
+              key={value}
+              selected={energyBand === value}
+              onClick={() => {
+                const next = energyBand === value ? '' : value;
+                setEnergyBand(next);
+                if (next === 'sin_energia') {
+                  setEnergyFeel('baja');
+                  setValues((current) => ({ ...current, energy: 2 }));
+                }
+                if (next === 'con_energia') {
+                  setEnergyFeel((current) => current && current !== 'baja' ? current : 'estable');
+                  setValues((current) => ({ ...current, energy: current.energy >= 3 ? current.energy : 4 }));
+                }
+              }}
+            >
+              {label}
+            </Choice>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           {ENERGIES.map((item) => (
             <Choice
               key={item.value}
@@ -190,7 +219,10 @@ export default function DesignRegister({
               onClick={() => {
                 const next = energyFeel === item.value ? '' : item.value;
                 setEnergyFeel(next);
-                if (next) setValues((current) => ({ ...current, energy: item.score }));
+                if (next) {
+                  setValues((current) => ({ ...current, energy: item.score }));
+                  setEnergyBand(next === 'baja' ? 'sin_energia' : next === 'inquieta' ? energyBand : 'con_energia');
+                }
               }}
             >
               {item.label}
@@ -238,6 +270,7 @@ export default function DesignRegister({
                     onClick={() => {
                       setValues((current) => ({ ...current, [scale.key]: value }));
                       if (scale.key === 'energy') {
+                        setEnergyBand(value <= 2 ? 'sin_energia' : 'con_energia');
                         setEnergyFeel((current) => {
                           const match = ENERGIES.find((item) => item.value === current);
                           return match && match.score === value ? current : '';

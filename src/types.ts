@@ -68,6 +68,8 @@ export interface DailyLog {
   feltState?: FeltState;
   /** Word for energy. The 1–5 number stays in `energy`. Inquieta is not a high or low score. */
   energyFeel?: EnergyFeel;
+  /** Binary energy used by the activity planner. The 1–5 scale stays. */
+  energyBand?: 'con_energia' | 'sin_energia';
   headache?: BodyLevel;
   bloating?: BodyLevel;
   breastSensitivity?: BodyLevel;
@@ -133,6 +135,9 @@ export interface ScheduledActivity {
   planStatus: ActivityPlanStatus;
   sortOrder: number | null;
   steps: ActivityStep[];
+  completedAt: string | null;
+  /** cyclia: accepted a proposal. manual: she chose the minutes. */
+  durationSource: 'cyclia' | 'manual' | null;
 }
 
 export interface PhaseInfo {
