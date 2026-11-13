@@ -51,9 +51,9 @@ export function EntryFlow({
     <div className="h-dvh flex justify-center" style={{ background: 'var(--perle)' }}>
       <div className="channel-frame !min-h-0 h-full flex flex-col">
         <header className="shrink-0 px-5 pt-10">
-          <p className="font-serif text-[15px] tracking-[0.18em]" style={{ color: 'var(--fucsia)' }}>CYCLIA</p>
-          <h1 className="font-serif text-4xl" style={{ color: 'var(--emeraude)' }}>Entra a Cyclia</h1>
-          <p className="text-sm mt-2" style={{ color: 'var(--emeraude-deep)' }}>El usuario es tu correo. Si no existe, se crea la cuenta. Si ya existe, verás tu calendario.</p>
+          <p className="login-kicker font-serif text-[15px] font-semibold tracking-[0.18em]">CYCLIA</p>
+          <h1 className="login-title font-serif text-4xl">Entra a Cyclia</h1>
+          <p className="login-copy mt-2 text-sm font-semibold">El usuario es tu correo. Si no existe, se crea la cuenta. Si ya existe, verás tu calendario.</p>
         </header>
         <main className="flex-1 overflow-y-auto px-5 pt-6 pb-8">
           {error && <p className="text-xs text-red-700 bg-red-50 rounded-2xl p-3 mb-4">{error}</p>}
@@ -62,20 +62,20 @@ export function EntryFlow({
             <input value={username} onChange={(event) => onUsernameChange(event.target.value)} type="text" required autoComplete="username" placeholder="Usuario (correo)" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
             <input value={password} onChange={(event) => onPasswordChange(event.target.value)} type="password" required minLength={4} autoComplete="current-password" placeholder="Contraseña" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
             <PrivacyAcceptance checked={privacyAccepted} error={privacyError} onChange={(value) => { setPrivacyAccepted(value); if (value) setPrivacyError(''); }} />
-            <button type="submit" disabled={processing || !configured || !privacyAccepted} className="btn-fucsia min-h-12 rounded-full py-3 text-sm font-semibold cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={processing || !configured || !privacyAccepted} className="btn-fucsia min-h-12 rounded-full py-3 text-base font-extrabold cursor-pointer">
               {processing ? 'Entrando…' : 'Entrar'}
             </button>
           </form>
         </main>
       </div>
       {entryNotice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(27,31,94,0.45)' }}>
-          <div className="w-full max-w-sm rounded-[28px] bg-white p-6">
-            <h2 className="font-serif text-3xl" style={{ color: 'var(--emeraude)' }}>{entryNotice === 'created' ? 'Se creó una cuenta nueva' : 'Mostraremos tu calendario'}</h2>
-            <p className="mt-3 text-sm" style={{ color: 'var(--emeraude-deep)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(18, 22, 58, 0.72)' }}>
+          <div className="entry-dialog w-full max-w-sm rounded-[28px] bg-white p-6">
+            <h2 className="font-serif text-3xl font-semibold text-[#1B1F5E]">{entryNotice === 'created' ? 'Se creó una cuenta nueva' : 'Mostraremos tu calendario'}</h2>
+            <p className="mt-3 text-sm font-semibold leading-relaxed text-[#1B1F5E]">
               {entryNotice === 'created' ? 'Tu usuario y tu contraseña ya quedaron guardados. Continúa para completar el registro.' : 'Esta cuenta ya existe. Al continuar verás tu calendario.'}
             </p>
-            <button type="button" onClick={onContinue} disabled={processing} className="btn-fucsia mt-6 min-h-12 w-full rounded-full py-3 text-sm font-semibold cursor-pointer disabled:opacity-50">Continuar</button>
+            <button type="button" onClick={onContinue} disabled={processing} className="btn-fucsia mt-6 min-h-12 w-full rounded-full py-3 text-base font-extrabold cursor-pointer">Continuar</button>
           </div>
         </div>
       )}

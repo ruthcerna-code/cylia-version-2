@@ -10,12 +10,14 @@ export default function DayActivityList({
   justDoneId,
   onAsk,
   onReschedule,
+  onOpen,
 }: {
   activities: ScheduledActivity[];
   energyOf: (date: string) => EnergyBand | null;
   justDoneId: string | null;
   onAsk: (activity: ScheduledActivity) => void;
   onReschedule: (activity: ScheduledActivity) => void;
+  onOpen: (activity: ScheduledActivity) => void;
 }) {
   const ordered = [...activities].sort((a, b) => (clockMinutes(a.startTime) ?? 0) - (clockMinutes(b.startTime) ?? 0));
   if (ordered.length === 0) {
@@ -35,6 +37,7 @@ export default function DayActivityList({
             justDone={justDoneId === activity.id}
             onAsk={() => onAsk(activity)}
             onReschedule={() => onReschedule(activity)}
+            onOpen={() => onOpen(activity)}
           />
         </div>
       ))}

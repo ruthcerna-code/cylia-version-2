@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, DailyLog, ChatMessage, MenstrualPhase, PeriodRecord, ScheduledActivity } from './types';
 import OrganizaTuDia from './components/plan/OrganizaTuDia';
 import Onboarding from './components/Onboarding';
+import WelcomeScreen from './components/WelcomeScreen';
 import { EntryFlow, MoodGrid, ObjectivesScreen, RegionScreen } from './components/EntryFlow';
 import DesignHome from './components/DesignHome';
 import DesignRegister from './components/DesignRegister';
@@ -17,7 +18,7 @@ import PhaseKnowledge from './components/PhaseKnowledge';
 import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
 import { analyzeCycle } from './utils/cycleModel';
 import { accountSessionExpired, beginEntry, bindAccountSessionSync, clearAccountSession, fetchAccountMe, finishAccountSession, type AccountRole, type PendingEntry } from './accountApi';
-import { authBearer, fetchConsentStatus, type ConsentStatus } from './consentApi';
+import { authBearer, fetchConsentStatus, saveConsentDecisions, type ConsentStatus } from './consentApi';
 import { privacyAcceptedAtLogin, rememberPrivacyAcceptance } from './consentCopy';
 import ConsentScreen from './components/ConsentScreen';
 import PrivacyDataScreen from './components/PrivacyDataScreen';
@@ -175,6 +176,7 @@ export default function App() {
   };
 
   // Authentication Panel States
+  const [welcomeDone, setWelcomeDone] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [entryNotice, setEntryNotice] = useState<'' | 'created' | 'calendar'>('');
@@ -804,6 +806,17 @@ export default function App() {
       }
     };
 
+    if (!welcomeDone) {
+      return (
+        <WelcomeScreen
+          subtitle="Conoce tu cuerpo. Enfrenta el día a tu ritmo."
+          body="Cyclia te ayuda a reconocer tu ciclo, tu energía y cómo te sientes, para que los retos de cada día se ajusten a lo que tu cuerpo necesita hoy."
+          primaryLabel="Comencemos"
+          onPrimary={() => setWelcomeDone(true)}
+        />
+      );
+    }
+
     return (
       <EntryFlow
         configured={isFirebaseConfigured}
@@ -990,6 +1003,12 @@ export default function App() {
             logs={logs}
             activities={activities}
             assistantEnabled={consentStatus?.purposes.gemini_assistant === 'accept'}
+            availabilityKnown={activitiesReady && !activitiesError}
+            onAuthorizeAssistant={async () => {
+              const status = await saveConsentDecisions('privacy_settings', [{ purpose: 'gemini_assistant', action: 'accept' }]);
+              setConsentStatus(status);
+              return status.purposes.gemini_assistant === 'accept';
+            }}
             onSaveActivity={handleSaveActivity}
             onSaveEnergy={async (date, band) => {
               const current = logs[date];

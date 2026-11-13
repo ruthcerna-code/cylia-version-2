@@ -87,7 +87,11 @@ img, video, canvas {
 }
 .btn-fucsia:hover { background: #E57F86; }
 .btn-fucsia:active { background: #d96d76; }
-.btn-fucsia:disabled { opacity: 0.5; }
+.btn-fucsia:disabled {
+  background: #F7C8CA;
+  color: #1B1F5E;
+  cursor: not-allowed;
+}
 
 .btn-emeraude {
   background: #F6E27F;
@@ -95,3 +99,22 @@ img, video, canvas {
 }
 .btn-emeraude:hover { background: #E8D46A; }
 .btn-emeraude:active { background: #dcc85a; }
+.btn-emeraude:disabled {
+  background: #F8EBB0;
+  color: #1B1F5E;
+  cursor: not-allowed;
+}
+
+.login-kicker { color: #3A44C4; }
+.login-title,
+.login-copy { color: #1B1F5E; }
+
+html[data-theme="dark"] .login-kicker { color: #F6E27F; }
+html[data-theme="dark"] .login-title,
+html[data-theme="dark"] .login-copy { color: #FFFFFF; }
+
+.entry-dialog,
+.entry-dialog h2,
+.entry-dialog p {
+  color: #1B1F5E;
+}

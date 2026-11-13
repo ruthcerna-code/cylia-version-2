@@ -104,7 +104,7 @@ export function PrivacyAcceptance({
   const [open, setOpen] = useState(false);
   return (
     <section className="flex flex-col gap-3" aria-labelledby="privacy-login-title">
-      <label className="flex items-start gap-3 rounded-[20px] p-4 text-sm leading-relaxed" style={{ background: 'var(--menthe)', color: 'var(--emeraude)' }}>
+      <label className="flex items-start gap-3 rounded-[20px] p-4 text-sm font-semibold leading-relaxed" style={{ background: 'var(--menthe)', color: 'var(--ink)' }}>
         <input
           type="checkbox"
           className="mt-1 h-5 w-5 shrink-0"
@@ -121,7 +121,7 @@ export function PrivacyAcceptance({
           <button
             type="button"
             className="cursor-pointer font-bold underline"
-            style={{ color: 'var(--emeraude)' }}
+            style={{ color: 'var(--ink)' }}
             aria-expanded={open}
             onClick={(event) => {
               event.preventDefault();

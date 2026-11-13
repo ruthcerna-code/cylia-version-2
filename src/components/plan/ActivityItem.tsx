@@ -20,12 +20,14 @@ export default function ActivityItem({
   justDone,
   onAsk,
   onReschedule,
+  onOpen,
 }: {
   activity: ScheduledActivity;
   energy: EnergyBand | null;
   justDone: boolean;
   onAsk: () => void;
   onReschedule: () => void;
+  onOpen?: () => void;
 }) {
   const done = activity.planStatus === 'hecha';
   const skipped = activity.planStatus === 'pospuesta';
@@ -44,6 +46,9 @@ export default function ActivityItem({
           {icon ? ` · ${icon}` : ''}
         </p>
         <h3 className={`m-0 text-[15px] font-extrabold text-[#1B1F5E] ${done ? 'line-through' : ''}`}>{activity.title}</h3>
+        {onOpen && (
+          <button type="button" onClick={onOpen} className="mt-1 cursor-pointer text-sm font-extrabold text-[#3A44C4]">Ver o editar</button>
+        )}
         {skipped && <p className="m-0 text-[12px] font-bold text-[#8B90B8]">No realizada</p>}
         {skipped && (
           <button type="button" onClick={onReschedule} className="mt-1 flex h-11 cursor-pointer items-center rounded-full bg-[#F8F9FE] px-4 text-sm font-extrabold text-[#3A44C4]">

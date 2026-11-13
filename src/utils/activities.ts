@@ -191,9 +191,96 @@ export function parseTime(value: string): number | null {
 }
 
 export function formatMinutes(total: number): string {
-  const hours = Math.floor(total / 60);
-  const minutes = total % 60;
+  const hours = Math.floor(((total % 1440) + 1440) % 1440 / 60);
+  const minutes = ((total % 1440) + 1440) % 1440 % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function roundUpFive(minutes: number): number {
+  return Math.ceil(minutes / 5) * 5;
+}
+
+const DAY_OPEN = 8 * 60;
+const DAY_CLOSE = 21 * 60;
+
+function busyOnDate(items: ScheduledActivity[], date: string): MinuteRange[] {
+  return mergeRanges(items.flatMap((item) => {
+    const window = activityWindow(item);
+    const clipped = window ? clipToDate(window, date) : null;
+    return clipped ? [clipped] : [];
+  }));
+}
+
+export function suggestOpenSlot(
+  items: ScheduledActivity[],
+  durationMinutes: number,
+  options: { now?: Date; availabilityKnown: boolean; date?: string },
+): { date: string; startTime: string; needsReview: boolean } {
+  const now = options.now ?? new Date();
+  const duration = Math.max(5, Math.round(durationMinutes));
+  const today = localToday(now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const search = (date: string): string | null => {
+    const earliest = date === today ? Math.max(DAY_OPEN, roundUpFive(nowMinutes)) : DAY_OPEN;
+    if (earliest + duration > DAY_CLOSE) return null;
+    if (!options.availabilityKnown) return formatMinutes(earliest);
+    let cursor = earliest;
+    for (const block of busyOnDate(items, date)) {
+      if (block.end <= cursor) continue;
+      if (cursor + duration <= block.start) return formatMinutes(cursor);
+      cursor = Math.max(cursor, block.end);
+      if (cursor + duration > DAY_CLOSE) return null;
+    }
+    return cursor + duration <= DAY_CLOSE ? formatMinutes(cursor) : null;
+  };
+
+  const reviewTime = (date: string) => {
+    const minutes = date === today ? Math.min(Math.max(roundUpFive(nowMinutes), 0), 23 * 60 + 55) : DAY_OPEN;
+    return formatMinutes(minutes);
+  };
+
+  if (options.date) {
+    const startTime = search(options.date);
+    if (startTime) return { date: options.date, startTime, needsReview: !options.availabilityKnown };
+    return { date: options.date, startTime: reviewTime(options.date), needsReview: true };
+  }
+
+  const horizon = options.availabilityKnown ? 7 : 1;
+  for (let offset = 0; offset < horizon; offset += 1) {
+    const date = addDays(today, offset);
+    const startTime = search(date);
+    if (startTime) return { date, startTime, needsReview: !options.availabilityKnown };
+  }
+
+  return { date: addDays(today, 1), startTime: '09:00', needsReview: true };
+}
+
+function localToday(now: Date): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function validateAssistSchedule(input: {
+  title: string;
+  date: string;
+  startTime: string;
+  durationMinutes: number;
+  now?: Date;
+}): string | null {
+  if (!input.title.trim()) return 'Escribe el nombre de la actividad.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return 'Elige la fecha de la actividad.';
+  const today = localToday(input.now ?? new Date());
+  if (input.date < today) return 'Elige hoy o un día que todavía no pasó.';
+  if (parseTime(input.startTime) == null) return 'Indica la hora de inicio.';
+  if (!Number.isFinite(input.durationMinutes) || input.durationMinutes <= 0) return 'La duración debe ser mayor que cero.';
+  if (input.durationMinutes > 18 * 60) return 'Elige una duración de hasta 18 horas.';
+  const now = input.now ?? new Date();
+  const start = parseTime(input.startTime) ?? 0;
+  if (input.date === today && start < now.getHours() * 60 + now.getMinutes()) return 'Elige una hora que todavía no pasó.';
+  return null;
 }
 
 export function resolveSchedule(input: {

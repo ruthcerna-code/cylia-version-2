@@ -61,22 +61,22 @@ export default function WelcomeScreen({
 }) {
   return (
     <div className="flex min-h-screen justify-center bg-[#2E37B0]">
-      <div className="relative h-dvh w-full max-w-[390px] overflow-hidden text-white" style={{ background: '#2E37B0' }}>
+      <div className="relative flex h-dvh w-full max-w-[390px] flex-col overflow-hidden text-white" style={{ background: '#2E37B0' }}>
         <Botanica />
-        <div className="absolute inset-x-0 top-[28%] flex h-[200px] flex-col items-center justify-center gap-3 bg-[#3A44C4] px-6 shadow-[0_10px_30px_rgba(20,24,90,0.35)]">
-          <h1 className="m-0 font-serif text-[52px] font-light tracking-[0.16em] text-[#F9C4C6]">CYCLIA</h1>
+        <div className="relative z-10 mt-[18%] flex flex-col items-center justify-center gap-3 bg-[#3A44C4] px-6 py-8 shadow-[0_10px_30px_rgba(20,24,90,0.35)]">
+          <h1 className="m-0 font-serif text-[52px] font-light tracking-[0.16em] text-white">CYCLIA</h1>
           <div className="h-[3px] w-12 rounded-full bg-[#F6E27F]" />
-          <p className="m-0 text-base font-semibold">{subtitle}</p>
+          <p className="m-0 text-center text-base font-extrabold leading-snug text-white">{subtitle}</p>
         </div>
-        <div className="absolute inset-x-5 bottom-7 flex flex-col gap-3 rounded-[26px] bg-[#3A44C4] p-6 shadow-[0_12px_32px_rgba(20,24,90,0.4)]">
-          {error && <p className="rounded-2xl bg-white/15 px-3 py-2 text-xs">{error}</p>}
-          <p className="m-0 text-[15px] leading-relaxed">{body}</p>
+        <div className="relative z-10 mx-5 mb-7 mt-auto flex flex-col gap-3 rounded-[26px] bg-[#1B1F5E] p-6 shadow-[0_12px_32px_rgba(20,24,90,0.4)]">
+          {error && <p className="rounded-2xl bg-white/15 px-3 py-2 text-xs text-white">{error}</p>}
+          <p className="m-0 text-[15px] font-semibold leading-relaxed text-white">{body}</p>
           <button type="button" onClick={onPrimary} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-base font-extrabold text-[#1B1F5E]">{primaryLabel}</button>
           {secondaryLabel && onSecondary && (
-            <button type="button" onClick={onSecondary} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-bold text-[#1B1F5E]">{secondaryLabel}</button>
+            <button type="button" onClick={onSecondary} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">{secondaryLabel}</button>
           )}
           {extra}
-          <p className="m-0 text-center text-xs text-[#D2DDF8]">Cyclia es educativa y de bienestar: no reemplaza a un profesional de salud.</p>
+          <p className="m-0 text-center text-xs font-semibold text-white">Cyclia es educativa y de bienestar: no reemplaza a un profesional de salud.</p>
         </div>
       </div>
     </div>

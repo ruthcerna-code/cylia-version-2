@@ -7,6 +7,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ensureAdminAccount, registerAccountRoutes } from "./accounts.js";
 import { registerConsentRoutes } from "./consentRoutes.js";
 import { assertConsentFromRequest, ConsentError } from "./consentHttp.js";
+import { alignAssist, ASSIST_ACTIVITY_SYSTEM_PROMPT, assistRequestSchema } from "./src/plan/assist.js";
 import { alignProposal, extractJson, PLAN_ACTIVITY_SYSTEM_PROMPT, planRequestSchema } from "./src/plan/proposal.js";
 
 dotenv.config();
@@ -398,6 +399,58 @@ app.post("/api/plan-activity", async (req, res) => {
     }
     console.error("Error en propuesta de actividad:", error);
     res.status(500).json({ error: "Cyclia no pudo armar una propuesta esta vez. Puedes intentarlo de nuevo." });
+  }
+});
+
+app.post("/api/assist-activity", async (req, res) => {
+  try {
+    await assertConsentFromRequest(req, "gemini_assistant");
+    const parsed = assistRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Escribe la actividad antes de analizar." });
+      return;
+    }
+    const ai = getAI();
+    const ask = async (previous: string | null) => {
+      const response = await generateContentWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: previous
+          ? `La respuesta anterior no cumplió el formato. Responde solo con el JSON pedido.\nActividad:\n${parsed.data.texto}\nRespuesta anterior:\n${previous}`
+          : parsed.data.texto,
+        config: {
+          systemInstruction: ASSIST_ACTIVITY_SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+        },
+      });
+      return typeof response.text === "string" ? response.text : "";
+    };
+    let rawText = await ask(null);
+    let analysis = null;
+    try {
+      analysis = alignAssist(extractJson(rawText));
+    } catch {
+      analysis = null;
+    }
+    if (!analysis) {
+      rawText = await ask(rawText.slice(0, 800));
+      try {
+        analysis = alignAssist(extractJson(rawText));
+      } catch {
+        analysis = null;
+      }
+    }
+    if (!analysis) {
+      res.status(422).json({ error: "Cyclia no pudo analizar la actividad esta vez. Puedes intentarlo de nuevo." });
+      return;
+    }
+    res.json({ analysis });
+  } catch (error: any) {
+    if (error instanceof ConsentError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    console.error("Error en Cyclia te asiste:", error);
+    res.status(500).json({ error: "Cyclia no pudo analizar la actividad esta vez. Puedes intentarlo de nuevo." });
   }
 });
 

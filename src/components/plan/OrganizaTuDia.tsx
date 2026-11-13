@@ -8,6 +8,7 @@ import { localDate, mondayOf, shiftDate } from '../../plan/proposal';
 import WeekStrip from './WeekStrip';
 import DayActivityList from './DayActivityList';
 import CreateActivitySheet from './CreateActivitySheet';
+import CycliaTeAsiste, { ActivityReviewSheet } from './CycliaTeAsiste';
 
 function toDraft(activity: ScheduledActivity, patch: Partial<ActivityDraft> = {}): ActivityDraft {
   return {
@@ -43,6 +44,8 @@ export default function OrganizaTuDia({
   logs,
   activities,
   assistantEnabled,
+  availabilityKnown,
+  onAuthorizeAssistant,
   onSaveActivity,
   onSaveEnergy,
   onOpenRegister,
@@ -56,6 +59,8 @@ export default function OrganizaTuDia({
   logs: Record<string, DailyLog>;
   activities: ScheduledActivity[];
   assistantEnabled: boolean;
+  availabilityKnown: boolean;
+  onAuthorizeAssistant: () => Promise<boolean>;
   onSaveActivity: (draft: ActivityDraft) => Promise<ScheduledActivity | undefined>;
   onSaveEnergy: (date: string, band: EnergyBand) => Promise<void>;
   onOpenRegister: () => void;
@@ -65,6 +70,8 @@ export default function OrganizaTuDia({
   const [selected, setSelected] = useState(today);
   const [monday, setMonday] = useState(mondayOf(today));
   const [sheet, setSheet] = useState<{ token: number; title: string; date: string } | null>(null);
+  const [assistOpen, setAssistOpen] = useState(false);
+  const [review, setReview] = useState<ScheduledActivity | null>(null);
   const [asking, setAsking] = useState<ScheduledActivity | null>(null);
   const [justDoneId, setJustDoneId] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ activity: ScheduledActivity; until: number } | null>(null);
@@ -140,13 +147,22 @@ export default function OrganizaTuDia({
           </button>
         </div>
       </header>
-      <button
-        type="button"
-        onClick={() => setSheet({ token: Date.now(), title: '', date: selected < today ? today : selected })}
-        className="mx-4 flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]"
-      >
-        + Crear actividad
-      </button>
+      <div className="mx-4 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => setAssistOpen(true)}
+          className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-[15px] font-extrabold text-[#1B1F5E]"
+        >
+          Cyclia te asiste
+        </button>
+        <button
+          type="button"
+          onClick={() => setSheet({ token: Date.now(), title: '', date: selected < today ? today : selected })}
+          className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]"
+        >
+          + Crear actividad
+        </button>
+      </div>
       <WeekStrip
         monday={monday}
         selected={selected}
@@ -170,6 +186,7 @@ export default function OrganizaTuDia({
         justDoneId={justDoneId}
         onAsk={setAsking}
         onReschedule={(activity) => setSheet({ token: Date.now(), title: activity.title, date: today })}
+        onOpen={setReview}
       />
       {asking && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B1F5E]/40" onClick={() => setAsking(null)}>
@@ -188,6 +205,37 @@ export default function OrganizaTuDia({
           <span>Listo. Puedes deshacer.</span>
           <button type="button" onClick={() => { void restore(); }} className="flex h-11 cursor-pointer items-center font-extrabold text-[#F6E27F]">Deshacer</button>
         </div>
+      )}
+      <CycliaTeAsiste
+        open={assistOpen}
+        activities={activities}
+        availabilityKnown={availabilityKnown}
+        assistantEnabled={assistantEnabled}
+        onAuthorizeAssistant={onAuthorizeAssistant}
+        onClose={() => setAssistOpen(false)}
+        onSave={onSaveActivity}
+        onShow={(activity, mode) => {
+          setSelected(activity.date);
+          setMonday(mondayOf(activity.date));
+          setAssistOpen(false);
+          setReview(mode === 'edit' ? activity : null);
+        }}
+      />
+      {review && (
+        <ActivityReviewSheet
+          activity={review}
+          activities={activities}
+          onClose={() => setReview(null)}
+          onSave={async (draft) => {
+            const saved = await onSaveActivity(draft);
+            if (saved) {
+              setReview(saved);
+              setSelected(saved.date);
+              setMonday(mondayOf(saved.date));
+            }
+            return saved;
+          }}
+        />
       )}
       <CreateActivitySheet
         open={Boolean(sheet)}
