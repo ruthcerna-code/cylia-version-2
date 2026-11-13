@@ -7,7 +7,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ensureAdminAccount, registerAccountRoutes } from "./accounts.js";
 import { registerConsentRoutes } from "./consentRoutes.js";
 import { assertConsentFromRequest, ConsentError } from "./consentHttp.js";
-import { alignAssist, ASSIST_ACTIVITY_SYSTEM_PROMPT, assistRequestSchema } from "./src/plan/assist.js";
+import { alignAssist, ASSIST_ACTIVITY_SYSTEM_PROMPT, assistRequestSchema, draftAssist, geminiKeyLooksUsable } from "./src/plan/assist.js";
 import { alignProposal, extractJson, PLAN_ACTIVITY_SYSTEM_PROMPT, planRequestSchema } from "./src/plan/proposal.js";
 
 dotenv.config();
@@ -45,6 +45,11 @@ function getAI(): GoogleGenAI {
   return aiClient;
 }
 
+function isInvalidGeminiKey(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /API_KEY_INVALID|API key not valid/i.test(message);
+}
+
 // Resilient helper to handle transient Gemini API errors (like 503 unavailable) via retry & fallback
 async function generateContentWithRetry(
   ai: GoogleGenAI,
@@ -68,9 +73,11 @@ async function generateContentWithRetry(
     } catch (err: any) {
       lastError = err;
       console.warn(`[Gemini] Attempt ${attempt} with ${params.model} failed:`, err.message || err);
-      // Continue to next retry if we can
+      if (isInvalidGeminiKey(err)) break;
     }
   }
+
+  if (isInvalidGeminiKey(lastError)) throw lastError;
 
   // If retries fail, fallback to gemini-3.1-flash-lite (highly available, fast fallback model)
   const fallbackModel = "gemini-3.1-flash-lite";
@@ -410,6 +417,10 @@ app.post("/api/assist-activity", async (req, res) => {
       res.status(400).json({ error: "Escribe la actividad antes de analizar." });
       return;
     }
+    if (!geminiKeyLooksUsable(process.env.GEMINI_API_KEY)) {
+      res.json({ analysis: draftAssist(parsed.data.texto), fuente: "local" });
+      return;
+    }
     const ai = getAI();
     const ask = async (previous: string | null) => {
       const response = await generateContentWithRetry(ai, {
@@ -443,16 +454,25 @@ app.post("/api/assist-activity", async (req, res) => {
       res.status(422).json({ error: "Cyclia no pudo analizar la actividad esta vez. Puedes intentarlo de nuevo." });
       return;
     }
-    res.json({ analysis });
+    res.json({ analysis, fuente: "gemini" });
   } catch (error: any) {
     if (error instanceof ConsentError) {
       res.status(error.status).json({ error: error.message });
+      return;
+    }
+    if (isInvalidGeminiKey(error) && parsedTexto(req)) {
+      res.json({ analysis: draftAssist(parsedTexto(req) as string), fuente: "local" });
       return;
     }
     console.error("Error en Cyclia te asiste:", error);
     res.status(500).json({ error: "Cyclia no pudo analizar la actividad esta vez. Puedes intentarlo de nuevo." });
   }
 });
+
+function parsedTexto(req: express.Request): string | null {
+  const parsed = assistRequestSchema.safeParse(req.body);
+  return parsed.success ? parsed.data.texto : null;
+}
 
 function localNetworkAddresses(): string[] {
   const addresses: string[] = [];

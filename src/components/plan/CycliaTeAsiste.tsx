@@ -217,6 +217,7 @@ export default function CycliaTeAsiste({
   const [timeTouched, setTimeTouched] = useState(false);
   const [scheduleReady, setScheduleReady] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [localEstimate, setLocalEstimate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState<ScheduledActivity | null>(null);
@@ -296,6 +297,7 @@ export default function CycliaTeAsiste({
         throw new Error(typeof data.error === 'string' ? data.error : 'Cyclia no pudo analizar la actividad esta vez. Puedes intentarlo de nuevo.');
       }
       const analysis = data.analysis as AssistAnalysis;
+      setLocalEstimate(data.fuente === 'local');
       if (analysis.necesita_datos) {
         setQuestion(analysis.pregunta || 'Cuéntame un poco más sobre la actividad para poder estimar el trabajo.');
         setStep('describe');
@@ -385,6 +387,7 @@ export default function CycliaTeAsiste({
       {step === 'review' && (
         <div className="flex flex-col gap-3">
           <p className="m-0 text-sm font-semibold text-[#1B1F5E]">Puedes corregir el resultado. La estimación es orientativa.</p>
+          {localEstimate && <p className="m-0 rounded-2xl bg-white px-3 py-3 text-sm font-semibold leading-relaxed text-[#1B1F5E]" role="status">La clave de Gemini del servidor no es válida, así que Cyclia ordenó esta actividad con tu texto. Puedes corregirla y guardarla.</p>}
           <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
             Descripción
             <textarea value={description} rows={4} onChange={(event) => setDescription(event.target.value)} className={`${FIELD} resize-none`} />
