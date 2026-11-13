@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UserProfile, DailyLog, ChatMessage } from '../types';
+import { UserProfile, DailyLog, ChatMessage, PeriodRecord } from '../types';
+import { authBearer } from '../consentApi';
+import { buildAnalysisContext } from '../utils/analysisContext';
 
 interface ChatPanelProps {
   profile: UserProfile;
+  periods: PeriodRecord[];
   logs: DailyLog[];
   chatHistory: ChatMessage[];
   onAddMessage: (msg: ChatMessage) => void;
@@ -11,6 +14,7 @@ interface ChatPanelProps {
   previousInteractionId: string | null;
   environmentId: string | null;
   onUpdateAgentState: (interId?: string, envId?: string, steps?: any[]) => void;
+  assistantEnabled?: boolean;
 }
 
 function AgentTrace({ steps }: { steps: any[] }) {
@@ -65,14 +69,15 @@ function AgentTrace({ steps }: { steps: any[] }) {
 }
 
 const QUICK_PROMPTS = [
-  { label: "🌸 ¿Cómo influye mi fase actual?", text: "Explícame qué está pasando en mi cuerpo hoy y cómo influye en mis emociones y energía." },
-  { label: "💼 Ideas de productividad hoy", text: "Tengo que organizar mis tareas de hoy, ¿qué tipo de actividades me recomiendas hacer según mi fase actual?" },
-  { label: "🧘‍♀️ Ejercicios y autocuidado", text: "Recomiéndame una rutina de autocuidado y ejercicio ideal para mi fase actual del ciclo." },
-  { label: "🥑 ¿Qué comer esta semana?", text: "Sugerencias de alimentación saludable y nutrientes clave para asimilar mejor esta fase." }
+  { label: "🌸 ¿Cómo va mi ciclo hoy?", text: "Con el día y la fase que sí llegaron, y con mis registros, dime qué muestra hoy. No inventes hormonas." },
+  { label: "💼 Ideas para hoy", text: "Con mi energía y mi cansancio registrados, ¿qué opciones hay para organizar el día?" },
+  { label: "🧘‍♀️ Movimiento suave", text: "Sugiere un movimiento acorde a la energía y el cansancio de mi registro. No es una orden." },
+  { label: "🥑 Ideas de comida", text: "Ideas de comida acordes a lo que registré. No cambies un tratamiento." }
 ];
 
 export default function ChatPanel({
   profile,
+  periods,
   logs,
   chatHistory,
   onAddMessage,
@@ -80,9 +85,11 @@ export default function ChatPanel({
   previousInteractionId,
   environmentId,
   onUpdateAgentState,
+  assistantEnabled = false,
 }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [blockedNotice, setBlockedNotice] = useState('');
   const [activeSteps, setActiveSteps] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -94,8 +101,13 @@ export default function ChatPanel({
   const handleSend = async (textToSend: string) => {
     const text = textToSend.trim();
     if (!text) return;
+    if (!assistantEnabled) {
+      setBlockedNotice('Cyclia IA permanece desactivada hasta que autorices ese tratamiento en Privacidad y datos. El seguimiento del ciclo no depende de esta opción.');
+      return;
+    }
 
     setInput('');
+    setBlockedNotice('');
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -106,14 +118,14 @@ export default function ChatPanel({
 
     setIsLoading(true);
     try {
+      const token = await authBearer();
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          profile,
-          logs: logs.slice(-5), // Send last 5 logs for context
+          context: buildAnalysisContext(profile, periods, logs),
           message: text,
-          chatHistory: chatHistory.slice(-10), // Send last 10 messages for context
+          chatHistory: chatHistory.slice(-10),
           previousInteractionId,
           environmentId,
         })
@@ -303,6 +315,10 @@ export default function ChatPanel({
 
       {/* Message History */}
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4 min-h-[260px] max-h-[460px]">
+        {blockedNotice && <p className="rounded-[16px] bg-[#FFF6CF] p-3 text-sm text-[#1B1F5E]" role="status">{blockedNotice}</p>}
+        {!assistantEnabled && !blockedNotice && (
+          <p className="rounded-[16px] bg-[#FFF6CF] p-3 text-sm text-[#1B1F5E]">Cyclia IA permanece desactivada hasta que autorices ese tratamiento en Privacidad y datos. El seguimiento del ciclo no depende de esta opción.</p>
+        )}
         {chatHistory.length === 0 ? (
           <div className="text-center py-8 px-4 space-y-4">
             <p className="text-[#7A7A70] text-sm max-w-xs mx-auto leading-relaxed">

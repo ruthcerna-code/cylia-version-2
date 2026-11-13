@@ -1,9 +1,9 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, type UserConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig((): UserConfig => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -12,6 +12,8 @@ export default defineConfig(() => {
       },
     },
     server: {
+      // Acepta el host de una URL reenviada (Cursor, túnel o celular en la red).
+      allowedHosts: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

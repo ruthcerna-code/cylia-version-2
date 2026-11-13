@@ -1,11 +1,11 @@
 # Acceso de Cyclia
 
-Cyclia guarda el perfil, los registros diarios y el chat en Supabase. No hay cotizaciones ni Firebase.
+Cyclia guarda el perfil, los registros diarios y el chat en Cloud Firestore, proyecto `cyclia-mvp`.
 
-La sesión entra con Gmail (`signInWithOAuth`, proveedor `google`), con modo anónimo o con correo. Cada persona autenticada solo puede leer y escribir sus filas:
+La sesión de correo entra con Firebase Auth. Cada persona autenticada solo puede leer y escribir sus documentos bajo `users/{uid}`:
 
-- `profiles.id = auth.uid()`
-- `daily_logs.user_id = auth.uid()`
-- `messages.user_id = auth.uid()`
+- el perfil es el documento `users/{uid}`
+- el registro del día es `users/{uid}/daily_logs/{fecha}`
+- el chat es `users/{uid}/messages/{id}`
 
-Las políticas están en `supabase/schema.sql` (`profiles_own`, `logs_own`, `messages_own`). El rol anónimo de Supabase también queda como `authenticated` y queda sujeto a las mismas reglas.
+Las reglas están en `firestore.rules`. El identificador de la sesión tiene que ser el `uid` de Firebase.

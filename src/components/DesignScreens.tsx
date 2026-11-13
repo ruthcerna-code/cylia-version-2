@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { MenstrualPhase, UserProfile } from '../types';
 import { PHASE_DETAILS } from '../utils/cycle';
+import { validateCycleLength, validatePeriodLength } from '../utils/profileFields';
 
 const ORDER: MenstrualPhase[] = ['Menstrual', 'Folicular', 'Ovulacion', 'Lutea'];
 const PHASE_BG: Record<MenstrualPhase, { bg: string; fg: string; label: string }> = {
@@ -16,7 +17,7 @@ export function PhaseScreen({ current, onBack }: { current: MenstrualPhase; onBa
   const info = PHASE_DETAILS[selected];
   const tone = PHASE_BG[selected];
   const blocks = [
-    ['Qué pasa en tu cuerpo', info.hormones],
+    ['Referencia, no es una medición', info.hormones],
     ['Energía y ánimo', info.description],
     ['Productividad', info.productivity.join('. ')],
     ['Bienestar', info.tips[0]],
@@ -132,6 +133,7 @@ export function CycleDataScreen({
     { key: 'hasObesity', label: 'Obesidad' },
     { key: 'hasDepression', label: 'Depresión o ansiedad' },
   ];
+  const [lengthError, setLengthError] = useState('');
   const field = 'h-[46px] rounded-xl border-[1.5px] border-[#C9D3EF] bg-[#F8F9FE] px-3 text-[15px] font-semibold text-[#1B1F5E] outline-none';
   return (
     <div className="flex flex-col gap-3 pt-2">
@@ -142,8 +144,10 @@ export function CycleDataScreen({
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Nombre<input className={field} value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Inicio del último periodo<input className={field} type="date" value={lastPeriodDate} onChange={(event) => setLastPeriodDate(event.target.value)} /></label>
         <div className="grid grid-cols-2 gap-2.5">
-          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Duración del ciclo<input className={field} type="number" min={21} max={40} value={cycleLength} onChange={(event) => setCycleLength(event.target.value)} /></label>
-          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Duración del periodo<input className={field} type="number" min={2} max={10} value={periodLength} onChange={(event) => setPeriodLength(event.target.value)} /></label>
+          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Duración del ciclo<input className={field} type="number" min={21} max={45} value={cycleLength} onChange={(event) => setCycleLength(event.target.value)} /></label>
+          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Duración del periodo<input className={field} type="number" min={1} max={10} value={periodLength} onChange={(event) => setPeriodLength(event.target.value)} /></label>
+          <p className="m-0 text-[12px] font-semibold text-[#4A4F7A]">El ciclo va de 21 a 45 días. Si no se sabe, la primera predicción usa 28. La regla va de 1 a 10 días; si no se sabe, usa 5.</p>
+          {lengthError && <p className="m-0 text-sm font-bold text-[#9C3B45]" role="alert">{lengthError}</p>}
         </div>
       </section>
       <section className="rounded-[20px] bg-white p-4">
@@ -162,7 +166,17 @@ export function CycleDataScreen({
       </button>
       <button
         type="button"
-        onClick={() => onSave({ ...profile, name: name.trim() || profile.name, lastPeriodDate, cycleLength: Number(cycleLength) || profile.cycleLength, periodLength: Number(periodLength) || profile.periodLength, ...flags })}
+        onClick={() => {
+          const cycleDays = Number(cycleLength);
+          const periodDays = Number(periodLength);
+          const error = validateCycleLength(cycleDays) || validatePeriodLength(periodDays);
+          if (error) {
+            setLengthError(error);
+            return;
+          }
+          setLengthError('');
+          onSave({ ...profile, name: name.trim() || profile.name, lastPeriodDate, cycleLength: cycleDays, periodLength: periodDays, cycleLengthKnown: true, periodLengthKnown: true, ...flags });
+        }}
         className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-base font-extrabold text-[#1B1F5E]"
       >
         Guardar cambios
@@ -206,31 +220,13 @@ export function PrivacyClauses() {
     <section className="rounded-[20px] bg-[#A9C4F0] p-4 text-sm leading-relaxed text-[#1B1F5E]">
       <h2 className="m-0 text-base font-extrabold">Cláusulas de privacidad</h2>
       <ul className="mb-0 mt-2 list-disc space-y-1.5 pl-4">
-        <li>Tus registros de ciclo, síntomas y conversaciones son privados.</li>
-        <li>Para ver tus datos registrados debes conectar tu cuenta de Gmail.</li>
-        <li>Esos datos se usan solo para personalizar tus recomendaciones de bienestar.</li>
+        <li>El borrador de privacidad describe los datos, las finalidades y lo que todavía está pendiente de revisión.</li>
+        <li>Las filas de tu cuenta se leen con tu sesión. Eso no significa que ningún proveedor pueda acceder a la infraestructura.</li>
+        <li>El asistente depende de una autorización aparte. Las actividades se guardan en Cyclia.</li>
         <li>Cyclia es educativa y no reemplaza a un profesional de salud.</li>
-        <li>Puedes exportar o eliminar tus datos desde Privacidad.</li>
+        <li>Desde Privacidad y datos puedes consultar decisiones, retirar autorizaciones y enviar solicitudes. Enviar una solicitud no borra la cuenta.</li>
       </ul>
     </section>
-  );
-}
-
-export function DataPrivacyGate({ onConnect }: { onConnect: () => void }) {
-  return (
-    <div className="flex flex-col gap-4 px-4 py-4">
-      <header className="rounded-[24px] bg-[#3A44C4] px-5 py-8 text-white">
-        <span className="font-serif text-[15px] tracking-[0.18em] text-[#F9C4C6]">CYCLIA</span>
-        <h1 className="m-0 mt-2 text-[26px] font-extrabold">Tus datos</h1>
-        <p className="m-0 mt-1 text-sm text-[#DCE5FA]">Conecta Gmail para ver lo que ya registraste.</p>
-      </header>
-      <section className="rounded-[20px] bg-white p-4">
-        <h2 className="m-0 text-base font-extrabold">Cuenta de Gmail</h2>
-        <p className="mt-1 text-sm leading-relaxed text-[#3B4070]">Sin Gmail no se muestran tu ciclo, tus registros ni tu historial. Al conectar, ves solo la información de tu cuenta.</p>
-        <button type="button" onClick={onConnect} className="mt-3 flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Conectar Gmail</button>
-      </section>
-      <PrivacyClauses />
-    </div>
   );
 }
 

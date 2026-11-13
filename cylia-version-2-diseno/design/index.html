@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CYCLIA · Diseño de la app</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400&amp;family=Nunito+Sans:wght@400;700;800&amp;display=swap">
+<style>
+body{margin:0;background:#E3F1FB url(flores-fondo.svg) top center/390px 844px;font-family:'Nunito Sans',sans-serif;color:#1B1F5E}
+.wrap{max-width:1100px;margin:0 auto;padding:40px 16px 64px}
+h1{margin:0;font-family:'Josefin Sans',sans-serif;font-weight:300;font-size:48px;letter-spacing:.14em;color:#3A44C4}
+p.lead{margin:8px 0 28px;font-size:17px;color:#3B4070}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+section{background:#fff;border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:8px}
+h2{margin:0 0 4px;font-size:18px}
+a{display:flex;align-items:center;justify-content:space-between;min-height:44px;padding:0 14px;border-radius:14px;text-decoration:none;font-weight:700;color:#1B1F5E;background:#FFF6CF}
+a.n1{background:#F49A9E;font-weight:800}
+a:hover{filter:brightness(.96)}
+.top{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px}
+.top a{background:#F6E27F;font-weight:800}
+small{color:#4A4F7A}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>CYCLIA</h1>
+<p class="lead">Diseño de la aplicación: pantallas de primer nivel (barra inferior) y segundo nivel (pantallas internas).</p>
+<div class="top">
+<a href="Main.html">Bienvenida (pantalla inicial)</a>
+<a href="Mapa.html">Mapa de navegación</a>
+</div>
+<div class="grid">
+<section><h2>Inicio</h2>
+<a class="n1" href="Inicio.html">Inicio (Hoy) <small>N1</small></a>
+<a href="Inicio-Fase.html">Tu fase en detalle <small>N2</small></a>
+<a href="Humor.html">¿Cómo te sientes? <small>N2</small></a>
+<a href="Inicio-Actividad.html">Actividad recomendada <small>N2</small></a>
+</section>
+<section><h2>Ciclo</h2>
+<a class="n1" href="Ciclo.html">Calendario <small>N1</small></a>
+<a href="Ciclo-Dia.html">Detalle del día <small>N2</small></a>
+<a href="Ciclo-Evolucion.html">Evolución de bienestar <small>N2</small></a>
+</section>
+<section><h2>Registro</h2>
+<a class="n1" href="Registro.html">Registro diario <small>N1</small></a>
+<a href="Registro-Analisis.html">Análisis de Cyclia <small>N2</small></a>
+</section>
+<section><h2>Cyclia IA</h2>
+<a class="n1" href="Chat.html">Chat <small>N1</small></a>
+<a href="Chat-Historial.html">Historial <small>N2</small></a>
+</section>
+<section><h2>Perfil</h2>
+<a class="n1" href="Perfil.html">Perfil <small>N1</small></a>
+<a href="Perfil-Ciclo.html">Datos del ciclo y salud <small>N2</small></a>
+<a href="Perfil-Objetivos.html">Objetivos <small>N2</small></a>
+<a href="Perfil-Privacidad.html">Privacidad, notificaciones y modo oscuro <small>N2</small></a>
+</section>
+</div>
+</div>
+</body>
+</html>

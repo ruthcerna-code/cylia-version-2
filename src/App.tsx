@@ -1,39 +1,56 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, DailyLog, ChatMessage, MenstrualPhase } from './types';
+import { UserProfile, DailyLog, ChatMessage, MenstrualPhase, PeriodRecord, ScheduledActivity } from './types';
+import OrganizaTuDia from './components/plan/OrganizaTuDia';
 import Onboarding from './components/Onboarding';
+import WelcomeScreen from './components/WelcomeScreen';
 import { EntryFlow, MoodGrid, ObjectivesScreen, RegionScreen } from './components/EntryFlow';
 import DesignHome from './components/DesignHome';
 import DesignRegister from './components/DesignRegister';
-import { ActivityScreen, CycleDataScreen, DataPrivacyGate, GoalsScreen, PhaseScreen, PrivacyScreen } from './components/DesignScreens';
+import { ActivityScreen, CycleDataScreen, GoalsScreen, PhaseScreen, PrivacyScreen } from './components/DesignScreens';
+import UserAdminScreen from './components/UserAdminScreen';
 import CalendarView from './components/CalendarView';
 import DailyCheckin from './components/DailyCheckin';
 import ChatPanel from './components/ChatPanel';
 import HealthProfileModal from './components/HealthProfileModal';
 import SymptomChart from './components/SymptomChart';
+import CycleProjectionScreen from './components/CycleProjectionScreen';
+import PhaseKnowledge from './components/PhaseKnowledge';
 import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
+import { analyzeCycle } from './utils/cycleModel';
+import { accountSessionExpired, beginEntry, bindAccountSessionSync, clearAccountSession, fetchAccountMe, finishAccountSession, type AccountRole, type PendingEntry } from './accountApi';
+import { authBearer, fetchConsentStatus, saveConsentDecisions, type ConsentStatus } from './consentApi';
+import { privacyAcceptedAtLogin, rememberPrivacyAcceptance } from './consentCopy';
+import ConsentScreen from './components/ConsentScreen';
+import PrivacyDataScreen from './components/PrivacyDataScreen';
+import CyclePrivacySettings from './components/CyclePrivacySettings';
+import { downloadOwnData } from './dataExport';
+import { compareActivities, explainActivityError, formatActivityWhen, LOCAL_ACTIVITY_STORE_NOTE, suggestActivity } from './utils/activities';
+import { compareRecords, dayRecordNote, indicatorNote } from './utils/recordCompare';
+import { suggestCare } from './utils/care';
+import DayMatch from './components/DayMatch';
+import { buildAnalysisContext } from './utils/analysisContext';
 import { generateActivityForDay } from './utils/activity';
 import {
   deleteAccountData,
   deleteMessages,
+  activitiesStoredOnThisDevice,
+  deleteScheduledActivity,
+  fetchActivities,
   fetchLogs,
   fetchMessages,
+  fetchPeriodRecords,
   fetchProfile,
-  isSupabaseConfigured,
+  isFirebaseConfigured,
   saveLogs,
   saveMessage,
   saveProfile,
-  signInAnonymously,
-  canSeeRegisteredData,
-  signInWithEmail,
-  connectGoogle,
-  signInWithGoogle,
+  saveScheduledActivity,
   toSessionUser,
   signOut,
-  signUpWithEmail,
   subscribeUserData,
-  supabase,
+  watchAuth,
   type SessionUser,
-} from './supabase';
+} from './firebase';
 
 const SCALE_LABELS = {
   sleep: ["Excelente", "Buena", "Regular", "Mala", "Muy mala"],
@@ -105,6 +122,7 @@ export default function App() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [logs, setLogs] = useState<Record<string, DailyLog>>({});
+  const [periods, setPeriods] = useState<PeriodRecord[]>([]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(formatDateStr(new Date()));
   const [isCheckinOpen, setIsCheckinOpen] = useState(false);
@@ -113,10 +131,21 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
-  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil'>('inicio');
+  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil' | 'foco'>('inicio');
+  const [activities, setActivities] = useState<ScheduledActivity[]>([]);
+  const [activitiesReady, setActivitiesReady] = useState(false);
+  const [activitiesError, setActivitiesError] = useState('');
+  const [activityStorageNote, setActivityStorageNote] = useState('');
+  const [planOpenToken, setPlanOpenToken] = useState(0);
+  const [planRequest, setPlanRequest] = useState({ title: '', date: '' });
   const [homeSheet, setHomeSheet] = useState<null | 'fase' | 'actividad'>(null);
-  const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion'>(null);
-  const [profileSheet, setProfileSheet] = useState<null | 'ciclo' | 'objetivos' | 'privacidad'>(null);
+  const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion' | 'proyeccion'>(null);
+  const [profileSheet, setProfileSheet] = useState<null | 'ajustes' | 'ciclo' | 'objetivos' | 'privacidad' | 'datos' | 'usuarios'>(null);
+  const [privacyBack, setPrivacyBack] = useState<null | 'ajustes'>(null);
+  const [consentStatus, setConsentStatus] = useState<ConsentStatus | null>(null);
+  const geminiEnabledRef = useRef(false);
+  geminiEnabledRef.current = consentStatus?.purposes.gemini_assistant === 'accept';
+  const [account, setAccount] = useState<{ username: string; role: AccountRole } | null>(null);
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
   const [region, setRegion] = useState<string | null>(() => localStorage.getItem('cyclia_region'));
   const [objectivesDone, setObjectivesDone] = useState(() => localStorage.getItem('cyclia_objectives_done') === '1');
@@ -147,29 +176,22 @@ export default function App() {
   };
 
   // Authentication Panel States
-  const [gmailError, setGmailError] = useState('');
-  const [loginEmail, setLoginEmail] = useState('');
+  const [welcomeDone, setWelcomeDone] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [entryNotice, setEntryNotice] = useState<'' | 'created' | 'calendar'>('');
+  const [pendingEntry, setPendingEntry] = useState<PendingEntry | null>(null);
   const [authPanelError, setAuthPanelError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
 
   const guestMigrationStarted = useRef(false);
   const chatMigrationStarted = useRef(false);
+  const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
     localStorage.setItem('cyclia_theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
-
-  const handleConnectGoogle = async () => {
-    setGmailError('');
-    try {
-      await connectGoogle(Boolean(user?.isAnonymous));
-    } catch (err: any) {
-      setGmailError(err?.message || 'No se pudo abrir Gmail.');
-    }
-  };
 
   const showNotice = (message: string) => {
     setNotificationMsg(message);
@@ -178,42 +200,72 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!supabase) {
+    if (!isFirebaseConfigured) {
       setIsLoadingAuth(false);
       return;
     }
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    bindAccountSessionSync();
+    const rememberUser = (sessionUser: { id: string; email?: string | null; isAnonymous?: boolean } | null) => {
       if (!active) return;
-      const sessionUser = data.session?.user;
-      setUser(sessionUser ? toSessionUser(sessionUser) : null);
-      if (!sessionUser) setIsLoadingAuth(false);
-      const oauthError = new URLSearchParams(window.location.search).get('error_description')
-        || new URLSearchParams(window.location.search).get('error');
-      if (oauthError) {
-        const text = decodeURIComponent(oauthError.replace(/\+/g, ' '));
-        setAuthPanelError(text);
-        setGmailError(text);
-      }
-    });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      if (session?.user) {
-        setUser(toSessionUser(session.user));
-        setIsLoadingAuth(true);
-      } else {
+      if (!sessionUser) {
+        if (userIdRef.current === null) {
+          setIsLoadingAuth(false);
+          return;
+        }
+        userIdRef.current = null;
         setUser(null);
+        setAccount(null);
         setProfile(null);
         setLogs({});
         setChatHistory([]);
+        setConsentStatus(null);
         setIsLoadingAuth(false);
+        return;
       }
+      if (userIdRef.current === sessionUser.id) return;
+      userIdRef.current = sessionUser.id;
+      setUser(toSessionUser(sessionUser));
+      setIsLoadingAuth(true);
+    };
+    const stopWaiting = window.setTimeout(() => {
+      if (active && userIdRef.current === null) setIsLoadingAuth(false);
+    }, 2500);
+    const stop = watchAuth((user) => {
+      window.clearTimeout(stopWaiting);
+      if (accountSessionExpired()) {
+        clearAccountSession();
+        rememberUser(null);
+        return;
+      }
+      rememberUser(user ? { id: user.uid, email: user.email, isAnonymous: user.isAnonymous } : null);
     });
     return () => {
       active = false;
-      data.subscription.unsubscribe();
+      window.clearTimeout(stopWaiting);
+      stop();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setAccount(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchAccountMe(user.id).then(async (next) => {
+      if (cancelled) return;
+      if (next === 'expired') {
+        clearAccountSession();
+        try { await signOut(); } catch { /* La sesión local ya se limpia. */ }
+        return;
+      }
+      setAccount(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -224,29 +276,38 @@ export default function App() {
 
     const refresh = async () => {
       try {
-        const [profileRow, logRows, messageRows] = await Promise.all([
+        const [profileRow, logRows, messageRows, periodRows] = await Promise.all([
           fetchProfile(uid),
           fetchLogs(uid),
           fetchMessages(uid),
+          fetchPeriodRecords(uid),
         ]);
         if (cancelled) return;
 
-        if (!profileRow && !guestMigrationStarted.current) {
+        let consent: ConsentStatus | null = null;
+        try {
+          consent = await fetchConsentStatus();
+        } catch (error) {
+          console.error('No se pudieron leer las decisiones de privacidad:', error);
+        }
+        if (!cancelled) setConsentStatus(consent);
+
+        if (!profileRow && consent?.purposes.health_cycle === 'accept' && !guestMigrationStarted.current) {
           guestMigrationStarted.current = true;
           const result = await migrateLocalGuestProfile(uid);
           if (cancelled) return;
-          if (result === 'error') showNotice('No se pudieron migrar los datos locales a Supabase.');
+          if (result === 'error') showNotice('No se pudieron migrar los datos locales a Firebase.');
           if (result === 'ok') {
             await refresh();
             return;
           }
         }
 
-        if (messageRows.length === 0 && !chatMigrationStarted.current) {
+        if (messageRows.length === 0 && consent?.purposes.gemini_assistant === 'accept' && !chatMigrationStarted.current) {
           chatMigrationStarted.current = true;
           const result = await migrateLocalChat(uid);
           if (cancelled) return;
-          if (result === 'error') showNotice('No se pudo migrar el chat a Supabase.');
+          if (result === 'error') showNotice('No se pudo migrar el chat a Firebase.');
           if (result === 'ok') {
             await refresh();
             return;
@@ -255,14 +316,15 @@ export default function App() {
 
         setProfile(profileRow);
         setLogs(logRows);
+        setPeriods(periodRows);
         setChatHistory(messageRows);
         setIsLoadingAuth(false);
       } catch (error) {
-        console.error('No se pudieron leer los datos de Supabase:', error);
+        console.error('No se pudieron leer los datos de Firebase:', error);
         if (!cancelled) {
           setProfile(null);
           setIsLoadingAuth(false);
-          showNotice('No se pudieron leer los datos en Supabase.');
+          showNotice('No se pudieron leer los datos en Firebase.');
         }
       }
     };
@@ -275,7 +337,55 @@ export default function App() {
       cancelled = true;
       unsubscribe();
     };
-  }, [user]);
+  }, [user?.id]);
+
+  const refreshActivities = async () => {
+    if (!user) {
+      setActivities([]);
+      setActivitiesError('');
+      setActivityStorageNote('');
+      return;
+    }
+    try {
+      setActivities(await fetchActivities(user.id));
+      setActivitiesError('');
+      setActivityStorageNote(activitiesStoredOnThisDevice() ? LOCAL_ACTIVITY_STORE_NOTE : '');
+    } catch (error) {
+      setActivitiesError(explainActivityError(error));
+    } finally {
+      setActivitiesReady(true);
+    }
+  };
+
+  useEffect(() => {
+    void refreshActivities();
+  }, [user?.id]);
+
+  const handleSaveActivity = async (draft: Parameters<typeof saveScheduledActivity>[1]) => {
+    if (!user) return;
+    try {
+      const saved = await saveScheduledActivity(user.id, draft);
+      setActivities((current) => [...current.filter((item) => item.id !== saved.id), saved].sort(compareActivities));
+      setActivitiesError('');
+      setActivityStorageNote(activitiesStoredOnThisDevice() ? LOCAL_ACTIVITY_STORE_NOTE : '');
+      return saved;
+    } catch (error) {
+      throw new Error(explainActivityError(error));
+    }
+  };
+
+  const handleDeleteActivity = async (activity: ScheduledActivity) => {
+    if (!user) return;
+    try {
+      const updated = await deleteScheduledActivity(user.id, activity);
+      setActivities((current) => updated
+        ? current.map((item) => item.id === activity.id ? updated : item)
+        : current.filter((item) => item.id !== activity.id));
+      setActivityStorageNote(activitiesStoredOnThisDevice() ? LOCAL_ACTIVITY_STORE_NOTE : '');
+    } catch (error) {
+      throw new Error(explainActivityError(error));
+    }
+  };
 
   const handleSaveProfile = async (newProfile: UserProfile) => {
     if (!user) return false;
@@ -286,7 +396,7 @@ export default function App() {
       await saveProfile(user.id, newProfile);
     } catch (error) {
       console.error('No se pudo guardar el perfil:', error);
-      showNotice('No se pudo guardar el perfil en Supabase.');
+      showNotice('No se pudo guardar el perfil en Firebase.');
       return false;
     }
 
@@ -308,7 +418,7 @@ export default function App() {
     return true;
   };
 
-  // Sync logs to Supabase
+  // Sync logs to Firebase
   const handleSaveLog = async (log: DailyLog, options?: { analyze?: boolean }) => {
     if (!user) return;
 
@@ -328,7 +438,7 @@ export default function App() {
         else delete next[log.date];
         return next;
       });
-      showNotice('No se pudo guardar el registro en Supabase.');
+      showNotice('No se pudo guardar el registro en Firebase.');
       return;
     }
     
@@ -349,17 +459,18 @@ export default function App() {
   // Automatically trigger AI Analysis after check-in for deep insights
   const triggerAiAnalysis = async (currentLog: DailyLog, allLogs: Record<string, DailyLog>) => {
     if (!user) return;
+    if (!geminiEnabledRef.current) {
+      showNotice('El registro se guardó. El análisis con inteligencia artificial no se envió porque esa autorización no está vigente.');
+      return;
+    }
     setIsAnalyzing(true);
     try {
+      const token = await authBearer();
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          profile,
-          log: currentLog,
-          history: listLogs(allLogs)
-            .filter(l => l.date !== currentLog.date)
-            .slice(-4) // Send recent 4 logs
+          context: buildAnalysisContext(profile, periods, allLogs, currentLog.date),
         })
       });
 
@@ -371,7 +482,7 @@ export default function App() {
           await saveLogs(user.id, [updatedLog]);
         } catch (error) {
           console.error('No se pudo guardar el análisis:', error);
-          showNotice('El análisis se generó, pero no se pudo guardar en Supabase.');
+          showNotice('El análisis se generó, pero no se pudo guardar en Firebase.');
         }
       }
     } catch (err) {
@@ -396,11 +507,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profile,
-          log: activeLog,
-          history: listLogs(logs)
-            .filter(l => l.date !== selectedDateStr)
-            .slice(-4),
+          context: buildAnalysisContext(profile, periods, logs, selectedDateStr),
           previousInteractionId,
           environmentId,
         })
@@ -424,7 +531,7 @@ export default function App() {
         await saveLogs(user.id, [updatedLog]);
       } catch (error) {
         console.error('No se pudo guardar el análisis:', error);
-        throw new Error('No se pudo guardar el análisis en Supabase.');
+        throw new Error('No se pudo guardar el análisis en Firebase.');
       }
     } catch (err: any) {
       setAnalysisError(err.message || "Error al conectar con la IA de Cyclia.");
@@ -441,7 +548,7 @@ export default function App() {
       await saveMessage(user.id, stored);
     } catch (error) {
       console.error('No se pudo guardar el mensaje:', error);
-      showNotice('No se pudo guardar el mensaje en Supabase.');
+      showNotice('No se pudo guardar el mensaje en Firebase.');
     }
   };
 
@@ -454,7 +561,7 @@ export default function App() {
       setChatHistory([]);
     } catch (error) {
       console.error('No se pudo borrar el chat:', error);
-      showNotice('No se pudo borrar el chat en Supabase.');
+      showNotice('No se pudo borrar el chat en Firebase.');
     }
   };
 
@@ -470,7 +577,7 @@ export default function App() {
       setSelectedDateStr(formatDateStr(new Date()));
     } catch (error) {
       console.error('No se pudieron borrar los datos:', error);
-      showNotice('No se pudieron borrar los datos en Supabase.');
+      showNotice('No se pudieron borrar los datos en Firebase.');
     }
   };
 
@@ -552,8 +659,7 @@ export default function App() {
         sleepDetails: sleepQuality <= 2 ? "Dormí de corrido toda la noche" : "Me costó conciliar el sueño al principio",
         additionalNotes: "Registro automático de demostración histórica.",
         behavior,
-        aiAnalysis: `### Análisis de Tendencia - Fase ${phase}
-Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu cuerpo está respondiendo de manera típica. Los niveles de dolor y fatiga se correlacionan directamente con tus fluctuaciones hormonales.`
+        aiAnalysis: `Texto de demostración del día ${cycleDay}. No sale de un análisis de tus registros ni mide hormonas.`
       };
 
       updatedLogs[dateStr] = logDoc;
@@ -565,7 +671,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       await saveLogs(user.id, demoLogs);
     } catch (error) {
       console.error('No se pudieron guardar los registros de demostración:', error);
-      showNotice('No se pudieron guardar los registros de demostración en Supabase.');
+      showNotice('No se pudieron guardar los registros de demostración en Firebase.');
       return;
     }
 
@@ -616,7 +722,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         await saveLogs(user.id, clearedLogs);
       } catch (error) {
         console.error('No se pudieron limpiar los análisis:', error);
-        showNotice('El ciclo se actualizó, pero no se pudieron limpiar los análisis en Supabase.');
+        showNotice('El ciclo se actualizó, pero no se pudieron limpiar los análisis en Firebase.');
         return;
       }
 
@@ -626,89 +732,124 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
     }
   };
 
-  if (isLoadingAuth && !user) {
+  const leaveForAccountLogin = async () => {
+    setEntryNotice('');
+    setPendingEntry(null);
+    userIdRef.current = null;
+    clearAccountSession();
+    setUser(null);
+    setAccount(null);
+    setProfile(null);
+    setLogs({});
+    setChatHistory([]);
+    setConsentStatus(null);
+    setIsLoadingAuth(false);
+    rememberPrivacyAcceptance(false);
+    try {
+      await signOut();
+    } catch {
+      // La sesión local ya se limpió.
+    }
+  };
+
+  if (isLoadingAuth) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#2E37B0] p-6 text-center text-white">
         <h2 className="font-serif text-4xl font-light tracking-[0.16em] text-[#F9C4C6]">CYCLIA</h2>
         <p className="mt-3 text-sm text-[#D2DDF8]">Preparando tu espacio</p>
+        <button type="button" onClick={() => { void leaveForAccountLogin(); }} className="mt-6 cursor-pointer text-xs font-bold text-[#D2DDF8]">Entrar con otra cuenta</button>
       </div>
     );
   }
 
+  if (user && !isLoadingAuth && consentStatus?.requiredComplete !== true && !privacyAcceptedAtLogin()) {
+    return (
+      <ConsentScreen
+        variant={profile ? 'existing' : 'new'}
+        onSaved={(status) => setConsentStatus(status)}
+        onExit={() => { void leaveForAccountLogin(); }}
+      />
+    );
+  }
+
   if (!user) {
-    const handleEmailAuth = async (e: React.FormEvent) => {
+    const handleEnter = async (e: React.FormEvent) => {
       e.preventDefault();
       setAuthPanelError('');
+      setEntryNotice('');
       setIsAuthProcessing(true);
       try {
-        if (isSignUpMode) {
-          await signUpWithEmail(loginEmail, loginPassword);
-        } else {
-          await signInWithEmail(loginEmail, loginPassword);
-        }
+        const pending = await beginEntry(loginUsername, loginPassword, false);
+        setPendingEntry(pending);
+        setEntryNotice(pending.created ? 'created' : 'calendar');
       } catch (err: any) {
-        console.error("Error de autenticación:", err);
-        setAuthPanelError(err?.message || "Ocurrió un error. Verifica tus credenciales.");
+        console.error('Error de autenticación:', err);
+        setAuthPanelError(err?.message || 'No se pudo entrar.');
       } finally {
         setIsAuthProcessing(false);
       }
     };
 
-    const handleGoogleAuth = async () => {
+    const handleContinue = async () => {
+      if (!pendingEntry) return;
       setAuthPanelError('');
       setIsAuthProcessing(true);
       try {
-        await signInWithGoogle();
+        await finishAccountSession(pendingEntry);
+        setEntryNotice('');
+        setPendingEntry(null);
       } catch (err: any) {
-        console.error('Error en acceso con Gmail:', err);
-        setAuthPanelError(err?.message || 'No se pudo iniciar sesión con Gmail.');
-        setIsAuthProcessing(false);
-      }
-    };
-
-    const handleGuestAuth = async () => {
-      setAuthPanelError('');
-      setIsAuthProcessing(true);
-      try {
-        await signInAnonymously();
-      } catch (err: any) {
-        console.error("Error en acceso anónimo:", err);
-        setAuthPanelError(err?.message || 'No se pudo iniciar la sesión anónima en Supabase.');
+        setAuthPanelError(err?.message || 'No se pudo abrir la sesión.');
+        setEntryNotice('');
       } finally {
         setIsAuthProcessing(false);
       }
     };
+
+    if (!welcomeDone) {
+      return (
+        <WelcomeScreen
+          subtitle="Conoce tu cuerpo. Enfrenta el día a tu ritmo."
+          body="Cyclia te ayuda a reconocer tu ciclo, tu energía y cómo te sientes, para que los retos de cada día se ajusten a lo que tu cuerpo necesita hoy."
+          primaryLabel="Comencemos"
+          onPrimary={() => setWelcomeDone(true)}
+        />
+      );
+    }
 
     return (
       <EntryFlow
-        configured={isSupabaseConfigured}
+        configured={isFirebaseConfigured}
         processing={isAuthProcessing}
         error={authPanelError}
-        email={loginEmail}
+        username={loginUsername}
         password={loginPassword}
-        signUp={isSignUpMode}
-        onEmailChange={setLoginEmail}
+        entryNotice={entryNotice}
+        onUsernameChange={setLoginUsername}
         onPasswordChange={setLoginPassword}
-        onToggleSignUp={() => { setIsSignUpMode(!isSignUpMode); setAuthPanelError(''); }}
-        onGoogle={handleGoogleAuth}
-        onAnonymous={handleGuestAuth}
-        onEmailSubmit={handleEmailAuth}
+        onEnter={handleEnter}
+        onContinue={() => { void handleContinue(); }}
       />
     );
   }
 
   if (!region) {
     return (
-      <RegionScreen onSelect={(nextRegion) => {
-        localStorage.setItem('cyclia_region', nextRegion);
-        setRegion(nextRegion);
-      }} />
+      <RegionScreen
+        onLeave={() => { void leaveForAccountLogin(); }}
+        onSelect={(nextRegion) => {
+          localStorage.setItem('cyclia_region', nextRegion);
+          setRegion(nextRegion);
+        }}
+      />
     );
   }
 
   if (!objectivesDone) {
     return (
-      <ObjectivesScreen onSave={(goals) => {
+      <ObjectivesScreen
+        onLeave={() => { void leaveForAccountLogin(); }}
+        onSave={(goals) => {
         localStorage.setItem('cyclia_objectives', JSON.stringify(goals));
         localStorage.setItem('cyclia_objectives_done', '1');
         setSavedGoals(goals);
@@ -722,22 +863,35 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
       <Onboarding
         onComplete={handleSaveProfile}
         accountEmail={user.email}
-        gmailConnected={user.hasGoogle}
-        gmailError={gmailError}
-        onConnectGoogle={handleConnectGoogle}
+        onLeave={() => { void leaveForAccountLogin(); }}
       />
     );
   }
 
   // Calculate current state metrics based on active selection date
-  const selectedCycleDay = getCycleDay(selectedDateStr, profile.lastPeriodDate, profile.cycleLength);
-  const selectedPhase = getPhaseForDay(selectedCycleDay, profile.periodLength, profile.cycleLength);
+  const cycleView = analyzeCycle(profile, periods, selectedDateStr, logs);
+  const selectedCycleDay = cycleView.cycleDay;
+  const selectedPhase: MenstrualPhase = cycleView.phase ?? 'Folicular';
   const phaseDetails = PHASE_DETAILS[selectedPhase];
   const activeLog = logs[selectedDateStr];
+  const dayActivities = activities.filter((item) => item.date === selectedDateStr);
+  const activitySuggestion = activeLog || cycleView.lowerLoad
+    ? suggestActivity(cycleView.tasksUsePhases ? selectedPhase : null, activeLog, { lowerLoad: cycleView.lowerLoad })
+    : null;
+  const activityDates = activities.map((item) => item.date);
+  const openAgenda = (title: string, date: string) => {
+    setPlanRequest({ title, date });
+    setPlanOpenToken((current) => current + 1);
+    setHomeSheet(null);
+    setCycleSheet(null);
+    setProfileSheet(null);
+    setChatHistoryOpen(false);
+    setAppTab('foco');
+  };
 
   const selectedActivity = generateActivityForDay(
     profile.name,
-    selectedPhase,
+    cycleView.showPhases ? selectedPhase : null,
     selectedCycleDay,
     {
       isCeliac: profile.isCeliac,
@@ -749,7 +903,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
   return (
     <div className="min-h-dvh text-[#1B1F5E] font-sans flex justify-center bg-transparent">
-    <div className="w-full max-w-[480px] min-h-dvh relative flex flex-col pb-24 bg-transparent">
+    <div className="w-full max-w-[480px] min-h-dvh relative flex flex-col pb-28 bg-transparent">
       
       {/* Toast Notification */}
       {showNotification && (
@@ -758,13 +912,9 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         </div>
       )}
 
-      {gmailError && <p className="bg-[#F49A9E] px-5 py-2 text-xs text-[#1B1F5E]">{gmailError}</p>}
-
       {/* Main Content Area */}
-      <main className={`flex-1 w-full flex flex-col gap-4 ${!canSeeRegisteredData(user) || (appTab === 'inicio' && !homeSheet) ? '' : 'px-4 py-4'}`}>
-        {!canSeeRegisteredData(user) ? (
-          <DataPrivacyGate onConnect={() => { void handleConnectGoogle(); }} />
-        ) : (<>
+      <main className={`flex-1 w-full flex flex-col gap-4 ${(appTab === 'inicio' && !homeSheet) || appTab === 'foco' ? '' : 'px-4 py-4'}`}>
+        <>
         {appTab === 'inicio' && homeSheet === 'fase' && (
           <PhaseScreen current={selectedPhase} onBack={() => setHomeSheet(null)} />
         )}
@@ -785,11 +935,15 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             dateLabel={formatFriendlyDate(selectedDateStr)}
             todayStr={selectedDateStr}
             cycleDay={selectedCycleDay}
-            cycleLength={profile.cycleLength}
-            periodLength={profile.periodLength}
+            cycleLength={cycleView.averageLength}
+            periodLength={cycleView.periodLength}
             lastPeriodDate={profile.lastPeriodDate}
             phase={selectedPhase}
+            showPhases={cycleView.showPhases}
+            approximate={cycleView.approximate}
+            statusNote={cycleView.note}
             activityTitle={selectedActivity.title}
+            care={suggestCare(profile, periods, logs, selectedDateStr)}
             onOpenPhase={() => setHomeSheet('fase')}
             onRegister={() => setAppTab('registro')}
             onChat={() => { setHomeSheet(null); setAppTab('chat'); }}
@@ -839,13 +993,66 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </button>
           </div>
         )}
+        {appTab === 'foco' && (
+          <OrganizaTuDia
+            openToken={planOpenToken}
+            createTitle={planRequest.title}
+            createDate={planRequest.date || formatDateStr(new Date())}
+            profile={profile}
+            periods={periods}
+            logs={logs}
+            activities={activities}
+            assistantEnabled={consentStatus?.purposes.gemini_assistant === 'accept'}
+            availabilityKnown={activitiesReady && !activitiesError}
+            onAuthorizeAssistant={async () => {
+              const status = await saveConsentDecisions('privacy_settings', [{ purpose: 'gemini_assistant', action: 'accept' }]);
+              setConsentStatus(status);
+              return status.purposes.gemini_assistant === 'accept';
+            }}
+            onSaveActivity={handleSaveActivity}
+            onSaveEnergy={async (date, band) => {
+              const current = logs[date];
+              const energy = band === 'sin_energia' ? 2 : 4;
+              const feel = band === 'sin_energia' ? 'baja' as const : 'estable' as const;
+              await handleSaveLog({
+                date,
+                sleepQuality: current?.sleepQuality ?? 3,
+                fatigue: current?.fatigue ?? 3,
+                pain: current?.pain ?? 1,
+                stress: current?.stress ?? 3,
+                mood: current?.mood ?? 3,
+                sleepDetails: current?.sleepDetails ?? '',
+                additionalNotes: current?.additionalNotes ?? '',
+                behavior: current?.behavior ?? '',
+                concentration: current?.concentration,
+                sleepState: current?.sleepState,
+                spotting: current?.spotting,
+                symptoms: current?.symptoms,
+                cervicalFluid: current?.cervicalFluid,
+                feltState: current?.feltState,
+                headache: current?.headache,
+                bloating: current?.bloating,
+                breastSensitivity: current?.breastSensitivity,
+                pelvicCramps: current?.pelvicCramps,
+                energy: current?.energy ?? energy,
+                energyFeel: current?.energyFeel ?? feel,
+                energyBand: band,
+              }, { analyze: false });
+            }}
+            onOpenRegister={() => setAppTab('registro')}
+            onLanded={() => setAppTab('foco')}
+          />
+        )}
         {appTab === 'registro' && (
           <DesignRegister
             dateStr={selectedDateStr}
             dateLabel={formatFriendlyDate(selectedDateStr)}
-            phaseLabel={phaseDetails.name}
+            phaseLabel={cycleView.showPhases ? `${phaseDetails.name}${cycleView.approximate ? ' aproximada' : ''}` : 'Según tu registro'}
             cycleDay={selectedCycleDay}
+            showVasomotor={profile.age >= 40 || cycleView.mode === 'perimenopause' || cycleView.mode === 'menopause'}
             existing={activeLog}
+            suggestion={activitySuggestion}
+            onSchedule={(title) => openAgenda(title, selectedDateStr)}
             onSave={(log) => { void handleSaveLog(log, { analyze: false }); }}
             onSaveAndAnalyze={(log) => { void handleSaveLog(log); }}
           />
@@ -926,7 +1133,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
 
             {/* Cognitive & Physical Stats Progress Bars */}
             <div className="space-y-5">
-              <h4 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest">Indicadores de Fase</h4>
+              <h4 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest">Referencia, no es tu registro</h4>
               <div>
                 <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-[#9A9A90] mb-1.5">
                   <span>Concentración</span>
@@ -1012,19 +1219,48 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               profile={profile}
               selectedDateStr={selectedDateStr}
               onSelectDate={setSelectedDateStr}
+              activityDates={activityDates}
+              showPhases={cycleView.showPhases}
+              cycleLength={cycleView.averageLength}
+              periodLength={cycleView.periodLength}
             />
             <section className="flex flex-col gap-1.5 rounded-[20px] bg-white p-4">
               <span className="text-xs font-extrabold tracking-wide text-[#4A4F7A]">DÍA SELECCIONADO</span>
               <h2 className="m-0 text-[17px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h2>
-              <p className="m-0 text-sm text-[#3B4070]">Día {selectedCycleDay} del ciclo · {phaseDetails.name} · {activeLog ? 'Con registro' : 'Sin registro'}</p>
+              <p className="m-0 text-sm text-[#3B4070]">{cycleView.showPhases ? `Día ${selectedCycleDay} del ciclo · ${phaseDetails.name}${cycleView.approximate ? ' aproximada' : ''}` : cycleView.note} · {activeLog ? 'Con registro' : 'Sin registro'}</p>
+              {dayRecordNote(activeLog) && <p className="m-0 text-sm text-[#3B4070]">{dayRecordNote(activeLog)}</p>}
               <button type="button" onClick={() => setCycleSheet('dia')} className="w-fit cursor-pointer py-2 text-[15px] font-extrabold text-[#3A44C4]">Ver detalle del día</button>
+              {dayActivities.length > 0 && (
+                <ul className="m-0 list-none p-0 text-sm text-[#3B4070]">
+                  {dayActivities.map((activity) => (
+                    <li key={activity.id}><strong className="text-[#1B1F5E]">{activity.title}</strong> · {activity.startTime}–{activity.endTime}</li>
+                  ))}
+                </ul>
+              )}
+              {activitySuggestion && (
+                <>
+                  <p className="m-0 text-sm text-[#3B4070]">Sugerencia opcional: <strong className="text-[#1B1F5E]">{activitySuggestion.title}</strong>. {activitySuggestion.note}</p>
+                  <button type="button" onClick={() => openAgenda(activitySuggestion.title, selectedDateStr)} className="mt-1 h-11 cursor-pointer rounded-full bg-[#F49A9E] px-4 text-sm font-extrabold text-[#1B1F5E]">Agendar una actividad para mí</button>
+                </>
+              )}
               <div className="my-1 h-px bg-[#E1E5F5]" />
-              <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {formatFriendlyDate(formatDateStr(new Date(new Date().setHours(12, 0, 0, 0) + (profile.cycleLength - getCycleDay(formatDateStr(new Date()), profile.lastPeriodDate, profile.cycleLength) + 1) * 86400000)))}</p>
+              <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {cycleView.nextPeriod ? formatFriendlyDate(cycleView.nextPeriod) : 'En pausa con los datos actuales.'}</p>
+              {cycleView.alerts[0] && <p className="m-0 text-sm text-[#3B4070]">{cycleView.alerts[0].message}</p>}
+              {cycleView.offerPerimenopause && <p className="m-0 text-sm text-[#3B4070]">Desde los 40 años, tus ciclos muestran variación. Puedes activar el modo perimenopausia en la ficha si quieres que las sugerencias sigan tu registro diario.</p>}
+              <div className="my-1 h-px bg-[#E1E5F5]" />
+              <h3 className="m-0 text-sm font-extrabold">Tus registros y la proyección</h3>
+              {compareRecords(profile, periods, logs).map((line) => <p key={line} className="m-0 text-sm text-[#3B4070]">{line}</p>)}
+              <p className="m-0 text-xs text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
             </section>
             <button type="button" onClick={() => setCycleSheet('evolucion')} className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">↗</span>
               <span><strong className="block text-base">Evolución de bienestar</strong><span className="text-[13px] text-[#3B4070]">Ánimo, estrés, dolor, sueño y cansancio</span></span>
             </button>
+            <button type="button" onClick={() => setCycleSheet('proyeccion')} className="flex items-center gap-3 rounded-[20px] bg-[#A9C4F0] p-4 text-left text-[#1B1F5E]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">3</span>
+              <span><strong className="block text-base">Proyección de tu ciclo</strong><span className="text-[13px] text-[#3B4070]">Tres ciclos, fases y ovulación estimada</span></span>
+            </button>
+            <PhaseKnowledge profile={profile} periods={periods} logs={logs} userId={user.id} />
             <button type="button" onClick={() => handleUpdatePeriodStart(formatDateStr(new Date()))} className="h-[50px] cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Registrar inicio de periodo hoy</button>
           </div>
           {appTab === 'calendario' && cycleSheet === 'dia' && (
@@ -1039,6 +1275,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                 <>
                   <section className="rounded-[20px] bg-white p-4">
                     <h2 className="m-0 text-base font-extrabold">Cómo te sentiste</h2>
+                    {indicatorNote(activeLog) && <p className="m-0 mt-2 text-sm leading-relaxed text-[#3B4070]">{indicatorNote(activeLog)}</p>}
                     <div className="mt-3 grid grid-cols-2 gap-2.5">
                       {[
                         ['Cansancio', activeLog.fatigue],
@@ -1065,6 +1302,23 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               ) : (
                 <p className="rounded-[20px] bg-white p-4 text-sm">Este día todavía no tiene registro.</p>
               )}
+              {dayActivities.length > 0 && (
+                <section className="rounded-[20px] bg-white p-4">
+                  <h2 className="m-0 text-base font-extrabold">Actividades de este día</h2>
+                  <ul className="m-0 mt-2 list-none p-0 text-sm text-[#3B4070]">
+                    {dayActivities.map((activity) => (
+                      <li key={activity.id} className="mt-1"><strong className="text-[#1B1F5E]">{activity.title}</strong> · {formatActivityWhen(activity)}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {activitySuggestion && (
+                <section className="rounded-[20px] bg-white p-4">
+                  <h2 className="m-0 text-base font-extrabold">Agendar una actividad para mí</h2>
+                  <p className="m-0 mt-2 text-sm text-[#3B4070]">Sugerencia opcional: <strong className="text-[#1B1F5E]">{activitySuggestion.title}</strong>. {activitySuggestion.note}</p>
+                  <button type="button" onClick={() => openAgenda(activitySuggestion.title, selectedDateStr)} className="mt-3 h-11 cursor-pointer rounded-full bg-[#A9C4F0] px-4 text-[15px] font-extrabold text-[#1B1F5E]">Agendar una actividad para mí</button>
+                </section>
+              )}
               <div className="flex gap-2.5">
                 <button type="button" onClick={() => activeLog ? setIsAnalysisOpen(true) : setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Ver análisis</button>
                 <button type="button" onClick={() => setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#F6E27F] text-[15px] font-extrabold text-[#1B1F5E]">Editar registro</button>
@@ -1076,6 +1330,16 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <button type="button" onClick={() => setCycleSheet(null)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Calendario</button>
               <h1 className="m-0 text-[26px] font-extrabold">Evolución de bienestar</h1>
             </div>
+          )}
+          {appTab === 'calendario' && cycleSheet === 'proyeccion' && (
+            <CycleProjectionScreen
+              profile={profile}
+              periods={periods}
+              logs={logs}
+              userId={user.id}
+              onBack={() => setCycleSheet(null)}
+              onOpenCalendar={(date) => { setSelectedDateStr(date); setCycleSheet(null); }}
+            />
           )}
 
           {/* Detailed Recommended Activity for Selected Day */}
@@ -1253,11 +1517,8 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
         {appTab === 'chat' && !chatHistoryOpen && (
           <div className="min-h-[70vh]">
             <ChatPanel
-              profile={{
-                ...profile,
-                currentPhase: selectedPhase,
-                cycleDay: selectedCycleDay
-              }}
+              profile={profile}
+              periods={periods}
               logs={Object.values(logs)}
               chatHistory={chatHistory}
               onAddMessage={handleAddMessage}
@@ -1266,6 +1527,7 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               previousInteractionId={previousInteractionId}
               environmentId={environmentId}
               onUpdateAgentState={updateAgentState}
+              assistantEnabled={consentStatus?.purposes.gemini_assistant === 'accept'}
             />
           </div>
         )}
@@ -1301,19 +1563,41 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             }}
           />
         )}
+        {appTab === 'perfil' && profileSheet === 'usuarios' && account?.role === 'admin' && (
+          <UserAdminScreen onBack={() => setProfileSheet(null)} />
+        )}
+        {appTab === 'perfil' && profileSheet === 'ajustes' && (
+          <CyclePrivacySettings
+            profile={profile}
+            onBack={() => setProfileSheet(null)}
+            onManagePrivacy={() => {
+              setPrivacyBack('ajustes');
+              setProfileSheet('datos');
+            }}
+            onSave={handleSaveProfile}
+          />
+        )}
+        {appTab === 'perfil' && profileSheet === 'datos' && consentStatus && (
+          <PrivacyDataScreen
+            status={consentStatus}
+            onBack={() => {
+              setProfileSheet(privacyBack);
+              setPrivacyBack(null);
+            }}
+            backLabel={privacyBack === 'ajustes' ? 'Ajustes' : 'Perfil'}
+            onChanged={(status) => setConsentStatus(status)}
+          />
+        )}
         {appTab === 'perfil' && profileSheet === 'privacidad' && (
           <PrivacyScreen
             darkMode={darkMode}
             onBack={() => setProfileSheet(null)}
             onToggleDark={() => setDarkMode((value) => !value)}
             onExport={() => {
-              const blob = new Blob([JSON.stringify({ profile, logs }, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = 'cyclia-datos.json';
-              link.click();
-              URL.revokeObjectURL(url);
+              if (!window.confirm('Este archivo contiene información personal y de salud. Guárdalo en un lugar de confianza.')) return;
+              void downloadOwnData().catch((error: unknown) => {
+                showNotice(error instanceof Error ? error.message : 'No pudimos preparar tu archivo.');
+              });
             }}
             onDelete={() => { if (confirm('¿Eliminar los datos de esta cuenta en este dispositivo?')) handleResetAppData(); }}
           />
@@ -1326,16 +1610,19 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <span className="text-sm text-[#DCE5FA]">Ciclo de {profile.cycleLength} días · Periodo de {profile.periodLength} días</span>
             </header>
             <nav className="flex flex-col gap-2.5 py-4">
-              {[
-                ['Datos del ciclo y salud', 'Fechas, duración, condiciones', () => setProfileSheet('ciclo')],
-                ['Privacidad y notificaciones', darkMode ? 'Modo oscuro activo' : 'Recordatorios, tus datos', () => setProfileSheet('privacidad')],
-                ['Objetivos', 'Elige tu foco', () => setProfileSheet('objetivos')],
-                ['Ayuda y soporte', 'Preguntas frecuentes, contacto', () => setAppTab('chat')],
-              ].map(([title, subtitle, action]) => (
-                <button key={String(title)} type="button" onClick={action as () => void} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-left">
+              {([
+                { title: 'Ajustes del ciclo y privacidad', subtitle: 'Referencia, avisos y exportación', action: () => setProfileSheet('ajustes') },
+                { title: 'Datos del ciclo y salud', subtitle: 'Fechas, duración, condiciones', action: () => setProfileSheet('ciclo') },
+                { title: 'Privacidad y datos', subtitle: 'Decisiones, documentos y solicitudes', action: () => { setPrivacyBack(null); setProfileSheet('datos'); } },
+                { title: 'Privacidad y notificaciones', subtitle: darkMode ? 'Modo oscuro activo' : 'Recordatorios y apariencia', action: () => setProfileSheet('privacidad') },
+                { title: 'Objetivos', subtitle: 'Elige tu foco', action: () => setProfileSheet('objetivos') },
+                ...(account?.role === 'admin' ? [{ title: 'Administración de usuarios', subtitle: 'Crear y eliminar cuentas', action: () => setProfileSheet('usuarios') }] : []),
+                { title: 'Ayuda y soporte', subtitle: 'Preguntas frecuentes, contacto', action: () => setAppTab('chat') },
+              ] satisfies { title: string; subtitle: string; action: () => void }[]).map((item) => (
+                <button key={item.title} type="button" onClick={item.action} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-left">
                   <span className="flex-1">
-                    <strong className="block text-[15px]">{title}</strong>
-                    <span className="text-[13px] text-[#4A4F7A]">{subtitle}</span>
+                    <strong className="block text-[15px]">{item.title}</strong>
+                    <span className="text-[13px] text-[#4A4F7A]">{item.subtitle}</span>
                   </span>
                   <span className="text-[#3A44C4]">›</span>
                 </button>
@@ -1344,7 +1631,10 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               <button
                 type="button"
                 onClick={async () => {
-                  if (confirm('¿Estás segura de que deseas cerrar sesión?')) await signOut();
+                  if (confirm('¿Estás segura de que deseas cerrar sesión?')) {
+                    clearAccountSession();
+                    await signOut();
+                  }
                 }}
                 className="mx-auto mt-2 flex h-12 cursor-pointer items-center rounded-full bg-[#F49A9E] px-7 text-[15px] font-extrabold text-[#1B1F5E]"
               >
@@ -1353,26 +1643,32 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
             </nav>
           </div>
         )}
-        </>)}
+        </>
 
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[82px] w-full max-w-[480px] -translate-x-1/2 grid-cols-5 border-t border-[#E7ECFB] bg-white">
+      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-5 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
         {([
           ['inicio', 'Inicio', '⌂'],
           ['calendario', 'Ciclo', '▦'],
           ['registro', 'Registro', '+'],
-          ['chat', 'Cyclia IA', '✦'],
+          ['foco', 'Organiza tu día', '◎'],
           ['perfil', 'Perfil', '•'],
         ] as const).map(([id, label, icon]) => (
           <button
             key={id}
             type="button"
-            onClick={() => { setHomeSheet(null); setCycleSheet(null); setProfileSheet(null); setChatHistoryOpen(false); setAppTab(id); }}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-1 text-[11px] font-extrabold ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
+            onClick={() => {
+              setHomeSheet(null);
+              setCycleSheet(null);
+              setProfileSheet(null);
+              setChatHistoryOpen(false);
+              setAppTab(id);
+            }}
+            className={`flex cursor-pointer flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-extrabold leading-tight ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
           >
             <span className="text-lg leading-none">{icon}</span>
-            {label}
+            {id === 'foco' ? <span className="text-center">Organiza<br />tu día</span> : label}
           </button>
         ))}
       </nav>
@@ -1399,11 +1695,12 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 mb-6">
+            <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+              <DayMatch care={suggestCare(profile, periods, logs, selectedDateStr)} />
               {isAnalyzing ? (
-                <div className="text-center py-12 space-y-4">
-                  <div className="w-10 h-10 border-4 border-t-[#1E5631] border-[#d7e6d4] rounded-full animate-spin mx-auto"></div>
-                  <p className="text-sm font-semibold text-[#1E5631] animate-pulse">Cyclia está analizando tu registro hormonal e historial diario...</p>
+                <div className="rounded-[20px] bg-white py-8 text-center">
+                  <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#E7EAF8] border-t-[#3A44C4]"></div>
+                  <p className="mt-3 text-sm font-extrabold text-[#1B1F5E]">Cyclia está leyendo tu registro.</p>
                 </div>
               ) : analysisError ? (
                 <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -1416,22 +1713,12 @@ Basado en tus registros de la fase **${phase}** (Día ${cycleDay} del ciclo), tu
                   </button>
                 </div>
               ) : activeLog?.aiAnalysis ? (
-                <div className="space-y-4 text-sm text-[#3A3A35] leading-relaxed">
-                  <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl mb-4">
-                    <p className="text-xs font-bold uppercase text-emerald-800 mb-1">💡 Conclusión Biológica</p>
-                    <p className="text-xs text-emerald-950 font-medium leading-normal">
-                      Este análisis ha sido personalizado según tu fase menstrual ({selectedPhase}) y el registro de tu estado de ánimo, dolores y calidad de sueño.
-                    </p>
-                  </div>
-                  
-                  {/* Parsing sections from response */}
-                  <div className="whitespace-pre-wrap leading-relaxed bg-[#F5F6F8] p-5 rounded-2xl border border-[#d7e6d4] max-h-[400px] overflow-y-auto">
-                    {activeLog.aiAnalysis}
-                  </div>
+                <div className="whitespace-pre-wrap rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#3B4070]">
+                  {activeLog.aiAnalysis}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <p className="text-sm text-[#7A7A70]">No hay análisis disponible aún. Haz clic en el botón de abajo para generarlo por IA.</p>
+                <div className="rounded-[20px] bg-white p-4 text-center">
+                  <p className="text-sm text-[#3B4070]">La gráfica de arriba ya compara tu registro con la propuesta. El texto de la asistente es aparte.</p>
                   <button
                     onClick={handleRequestAnalysisManually}
                     className="mt-4 bg-[#1E5631] hover:bg-[#1B4D3E] text-white font-semibold py-2.5 px-6 rounded-full text-xs uppercase tracking-wide cursor-pointer"

@@ -1,4 +1,5 @@
-import { MenstrualPhase, PhaseInfo } from "../types";
+import type { MenstrualPhase, PhaseInfo } from "../types";
+import { habitualCycleDays, habitualPeriodDays } from "./profileFields.js";
 
 export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   Menstrual: {
@@ -7,18 +8,18 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
     colorClass: "bg-[#F49A9E] text-[#1B1F5E]",
     bgHex: "#F49A9E",
     textHex: "#1B1F5E",
-    description: "Tu ciclo comienza hoy. El estrógeno y la progesterona están en sus niveles más bajos, invitándote al descanso y a la renovación física y mental.",
-    hormones: "Estrógeno y progesterona en niveles mínimos.",
+    description: "El día 1 es el inicio de la regla. Muchas mujeres reportan más ganas de ir más lento. Tu energía es la que marques en el registro.",
+    hormones: "Cyclia no mide hormonas. Algunas descripciones de estos días hablan de estrógeno y progesterona más bajos.",
     stats: {
       concentration: 50,
       creativity: 60,
       physicalEnergy: 30
     },
     tips: [
-      "Prioriza el descanso y duerme 8-9 horas.",
-      "Realiza ejercicios muy suaves como yoga restaurativo o estiramientos.",
-      "Mantente bien hidratada y consume infusiones calientes de manzanilla o jengibre.",
-      "Reduce compromisos sociales o reuniones intensas si te sientes fatigada."
+      "Si el registro marca cansancio, un ritmo más lento es una opción.",
+      "Muchas mujeres eligen un movimiento suave, como estirar o caminar poco.",
+      "Una bebida caliente es una opción. No es una indicación.",
+      "Si hay fatiga, puedes dejar las reuniones más exigentes para otro día."
     ],
     productivity: [
       "Reflexionar sobre el mes anterior",
@@ -33,18 +34,18 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
     colorClass: "bg-[#A9C4F0] text-[#1B1F5E]",
     bgHex: "#A9C4F0",
     textHex: "#1B1F5E",
-    description: "La hormona FSH estimula tus ovarios. Tus niveles de estrógeno comienzan a subir, aumentando tu energía, optimismo, claridad mental y apertura social.",
-    hormones: "Incremento progresivo de estrógeno.",
+    description: "Muchas mujeres reportan más foco y más ganas de empezar cosas. Si tu registro dice otra cosa, manda el registro.",
+    hormones: "Cyclia no mide hormonas. Algunas descripciones de estos días hablan de un ascenso del estrógeno.",
     stats: {
       concentration: 80,
       creativity: 95,
       physicalEnergy: 85
     },
     tips: [
-      "Es el momento ideal para iniciar nuevos proyectos y aprender cosas nuevas.",
-      "Aprovecha para realizar ejercicio de fuerza o cardio de intensidad moderada-alta.",
-      "Tu mente está abierta a nuevas ideas; haz sesiones de lluvia de ideas (brainstorming).",
-      "Disfruta de tu alta motivación y socializa."
+      "Empezar algo nuevo es una opción que muchas mujeres prueban en estos días.",
+      "Un movimiento más activo es una opción si tu energía registrada lo acompaña.",
+      "Anotar ideas es una opción. No es una tarea.",
+      "Ver a otras personas es una opción, no una obligación."
     ],
     productivity: [
       "Comenzar nuevos proyectos",
@@ -59,18 +60,18 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
     colorClass: "bg-[#F6E27F] text-[#1B1F5E]",
     bgHex: "#F6E27F",
     textHex: "#1B1F5E",
-    description: "El pico de LH provoca la liberación del óvulo. Tu estrógeno y testosterona están al máximo. Te sientes sumamente magnética, comunicativa, con gran poder de convicción y vitalidad.",
-    hormones: "Pico de estrógeno y hormona luteinizante (LH).",
+    description: "Muchas mujeres reportan un ánimo más abierto. Esta fase no calcula fertilidad ni mide hormonas.",
+    hormones: "Cyclia no mide hormonas. Algunas descripciones de estos días hablan de un pico de estrógeno. No es un cálculo de fertilidad.",
     stats: {
       concentration: 75,
       creativity: 85,
       physicalEnergy: 95
     },
     tips: [
-      "Fase de máxima fertilidad (ventana de 5 días).",
-      "Momento perfecto para networking, presentaciones en público y negociaciones difíciles.",
-      "Práctica entrenamientos de alta intensidad (HIIT, running duro) si te sientes con fuerza.",
-      "Colabora con otros y fomenta el trabajo en equipo."
+      "No es una ventana de fertilidad. Cyclia no la calcula.",
+      "Conversar o presentar es una opción si te sientes con ganas.",
+      "Un movimiento más intenso es una opción solo si tu registro marca energía alta.",
+      "Estar con otras personas es una opción, no un requisito."
     ],
     productivity: [
       "Hacer presentaciones y discursos públicos",
@@ -85,18 +86,18 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
     colorClass: "bg-[#3A44C4] text-white",
     bgHex: "#3A44C4",
     textHex: "#ffffff",
-    description: "El folículo se convierte en cuerpo lúteo y produce progesterona. Esta hormona te invita a replegarte, enfocarte en detalles técnicos, organizar tu espacio, documentar y cerrar pendientes.",
-    hormones: "Progesterona en su nivel máximo.",
+    description: "Muchas mujeres reportan un ritmo más reflexivo y, a ratos, más sensibilidad. Tu ánimo es el que marques en el registro.",
+    hormones: "Cyclia no mide hormonas. Algunas descripciones de estos días hablan de la progesterona.",
     stats: {
       concentration: 85,
       creativity: 40,
       physicalEnergy: 60
     },
     tips: [
-      "Tu energía física empieza a descender; prioriza comidas ricas en magnesio y fibra.",
-      "Excelente momento para análisis críticos, revisión de detalles y tareas individuales.",
-      "Organiza tu entorno físico y digital; te dará paz mental.",
-      "Sé amable contigo si sientes fluctuaciones de humor o retención de líquidos."
+      "Si el registro marca menos energía, cerrar pendientes es una opción.",
+      "Revisar detalles es una opción que muchas mujeres eligen en estos días.",
+      "Ordenar el espacio es una opción, no una tarea.",
+      "Si el ánimo cambia, el registro lo guarda. No es un diagnóstico."
     ],
     productivity: [
       "Revisión minuciosa y auditoría de datos",
@@ -123,45 +124,96 @@ export function getDaysDifference(date1: Date | string, date2: Date | string): n
 }
 
 /**
- * Calculates the cycle day (1 to cycleLength) for a given date based on the last period date.
+ * Days since the last period start, plus one. Day 1 is that start.
+ * Dates after the start keep growing so a delay can be measured.
+ * Dates before the anchor stay inside one estimated cycle.
  */
 export function getCycleDay(targetDateStr: string, lastPeriodDateStr: string, cycleLength: number): number {
+  const length = habitualCycleDays(cycleLength);
   const diffDays = getDaysDifference(targetDateStr, lastPeriodDateStr);
-  
   if (diffDays < 0) {
-    // Return relative cycle day in the past
-    const mod = diffDays % cycleLength;
-    return mod === 0 ? cycleLength : cycleLength + mod;
+    const mod = diffDays % length;
+    return mod === 0 ? length : length + mod;
   }
-  
-  return (diffDays % cycleLength) + 1;
+  return diffDays + 1;
+}
+
+/** Position of a cycle day inside the period that repeats every cycle length. Day 1 is the bleeding start. */
+export function dayWithinCycle(day: number, cycleLength: number): number {
+  const length = habitualCycleDays(cycleLength);
+  const whole = Number.isFinite(day) ? Math.trunc(day) : 1;
+  return ((whole - 1) % length + length) % length + 1;
+}
+
+/** Estimated ovulation is 14 days before the next period: cycle length minus 14. */
+export function ovulationDay(cycleLength: number): number {
+  return Math.max(1, habitualCycleDays(cycleLength) - 14);
 }
 
 /**
- * Decides the menstrual phase based on the cycle day.
+ * Phase from the period. The pattern restarts every cycle length:
+ * bleeding, follicular until two days before ovulation, ovulation plus or minus one, then luteal.
  */
 export function getPhaseForDay(day: number, periodLength: number, cycleLength: number): MenstrualPhase {
-  // Menstrual Phase: Days 1 to periodLength
-  if (day >= 1 && day <= periodLength) {
-    return 'Menstrual';
-  }
-
-  // Ovulation fertile window is centered on cycleLength - 14.
-  // Fertile window spans 5 days: [ovulation - 2, ovulation + 2], which is [cycleLength - 16, cycleLength - 12].
-  const ovulStart = Math.max(periodLength + 1, cycleLength - 16);
-  const ovulEnd = cycleLength - 12;
-
-  if (day >= ovulStart && day <= ovulEnd) {
-    return 'Ovulacion';
-  }
-
-  // Folicular Phase: after menstruation ends, up to the fertile window
-  if (day > periodLength && day < ovulStart) {
-    return 'Folicular';
-  }
-
-  // Lútea Phase: after fertile window ends, until the last day of the cycle
+  const length = habitualCycleDays(cycleLength);
+  const bleed = Math.min(habitualPeriodDays(periodLength), length);
+  const dayInCycle = dayWithinCycle(day, length);
+  if (dayInCycle <= bleed) return 'Menstrual';
+  const ovulation = ovulationDay(length);
+  if (dayInCycle <= ovulation - 2) return 'Folicular';
+  if (dayInCycle >= ovulation - 1 && dayInCycle <= ovulation + 1) return 'Ovulacion';
   return 'Lutea';
+}
+
+export interface CycleProjection {
+  index: number;
+  periodStart: string;
+  periodEnd: string;
+  estimated: true;
+}
+
+/**
+ * Adds calendar days to a YYYY-MM-DD date, at local noon so the day does not shift.
+ */
+export function addCalendarDays(dateStr: string, days: number): string {
+  const date = new Date(`${dateStr}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return formatDateStr(date);
+}
+
+/**
+ * First future period start after `fromDate`.
+ * Uses the same day count as the calendar: cycleLength - cycle day + 1.
+ * Today is not included when it is already day 1 of the current cycle.
+ */
+export function nextPeriodStart(lastPeriodDate: string, cycleLength: number, fromDate = formatDateStr(new Date())): string {
+  const cycleDay = getCycleDay(fromDate, lastPeriodDate, cycleLength);
+  const daysUntil = cycleLength - cycleDay + 1;
+  return addCalendarDays(fromDate, daysUntil);
+}
+
+/**
+ * Estimates the next menstrual cycles from the registered anchor.
+ * Results are not records: callers must not persist them as period history.
+ */
+export function projectNextCycles(
+  lastPeriodDate: string,
+  cycleLength: number,
+  periodLength: number,
+  count = 3,
+  fromDate = formatDateStr(new Date()),
+): CycleProjection[] {
+  const firstStart = nextPeriodStart(lastPeriodDate, cycleLength, fromDate);
+  return Array.from({ length: count }, (_, index) => {
+    const periodStart = addCalendarDays(firstStart, index * cycleLength);
+    const periodEnd = addCalendarDays(periodStart, Math.max(periodLength, 1) - 1);
+    return {
+      index: index + 1,
+      periodStart,
+      periodEnd,
+      estimated: true,
+    };
+  });
 }
 
 /**

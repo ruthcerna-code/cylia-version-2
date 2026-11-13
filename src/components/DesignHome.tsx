@@ -12,20 +12,20 @@ const PHASE_COLOR: Record<MenstrualPhase, string> = {
 
 const ENERGY: Record<MenstrualPhase, { title: string; text: string }> = {
   Menstrual: {
-    title: 'Tu cuerpo pide descanso',
-    text: 'Prioriza el sueño, el calor y un ritmo más lento.',
+    title: 'Muchas mujeres reportan más descanso',
+    text: 'Tu energía de hoy es la que marques en el registro.',
   },
   Folicular: {
-    title: 'Tu energía va en aumento',
-    text: 'Buen momento para planificar, aprender algo nuevo y empezar proyectos.',
+    title: 'Muchas mujeres reportan más foco',
+    text: 'Si tu registro marca otra energía, manda el registro.',
   },
   Ovulacion: {
-    title: 'Tu energía está en lo más alto',
-    text: 'Buen momento para conversar, presentar y moverte con más intensidad.',
+    title: 'Muchas mujeres reportan un ánimo más abierto',
+    text: 'No es una medición de energía ni de fertilidad.',
   },
   Lutea: {
-    title: 'Tu energía empieza a bajar',
-    text: 'Buen momento para cerrar pendientes y cuidar los detalles.',
+    title: 'Muchas mujeres reportan un ritmo más lento',
+    text: 'Tu cansancio de hoy es el que marques en el registro.',
   },
 };
 
@@ -53,7 +53,11 @@ export default function DesignHome({
   periodLength,
   lastPeriodDate,
   phase,
+  showPhases = true,
+  approximate = false,
+  statusNote = '',
   activityTitle,
+  care,
   onOpenPhase,
   onRegister,
   onChat,
@@ -69,7 +73,11 @@ export default function DesignHome({
   periodLength: number;
   lastPeriodDate: string;
   phase: MenstrualPhase;
+  showPhases?: boolean;
+  approximate?: boolean;
+  statusNote?: string;
   activityTitle: string;
+  care?: { foods: string[]; exercises: string[] };
   onOpenPhase: () => void;
   onRegister: () => void;
   onChat: () => void;
@@ -77,9 +85,9 @@ export default function DesignHome({
   onActivity: () => void;
   onCalendar: () => void;
 }) {
-  const energy = ENERGY[phase];
+  const energy = showPhases ? ENERGY[phase] : { title: 'Hoy manda cómo te sientes', text: statusNote };
   const arcs = phaseArcs(periodLength, cycleLength);
-  const markerAngle = ((cycleDay / Math.max(cycleLength, 1)) * Math.PI * 2) - Math.PI / 2;
+  const markerAngle = ((Math.min(cycleDay, cycleLength) / Math.max(cycleLength, 1)) * Math.PI * 2) - Math.PI / 2;
   const markerX = 100 + 70 * Math.cos(markerAngle);
   const markerY = 100 + 70 * Math.sin(markerAngle);
   const names = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
@@ -90,17 +98,17 @@ export default function DesignHome({
     const dateStr = formatDateStr(date);
     const dayOfCycle = getCycleDay(dateStr, lastPeriodDate, cycleLength);
     const dayPhase = getPhaseForDay(dayOfCycle, periodLength, cycleLength);
-    return { label: names[date.getDay()], day: date.getDate(), today: index === 0, color: PHASE_COLOR[dayPhase] };
+    return { label: names[date.getDay()], day: date.getDate(), today: index === 0, color: showPhases ? PHASE_COLOR[dayPhase] : '#E7EAF8' };
   });
   let ovulationNote = '';
-  for (let index = 0; index < cycleLength; index += 1) {
+  if (showPhases) for (let index = 0; index < cycleLength; index += 1) {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
     const dateStr = formatDateStr(date);
     const dayOfCycle = getCycleDay(dateStr, lastPeriodDate, cycleLength);
     if (getPhaseForDay(dayOfCycle, periodLength, cycleLength) === 'Ovulacion') {
       const when = date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric' });
-      ovulationNote = `Ventana ovulatoria estimada desde el ${when}.`;
+      ovulationNote = approximate ? `La ovulación estimada es aproximada, alrededor del ${when}.` : `Ovulación estimada alrededor del ${when}.`;
       break;
     }
   }
@@ -128,14 +136,30 @@ export default function DesignHome({
             <span className="text-[13px] font-bold text-[#4A4F7A]">de {cycleLength}</span>
           </div>
         </div>
-        <span className="rounded-full px-4 py-1.5 text-sm font-extrabold text-[#1B1F5E]" style={{ background: PHASE_COLOR[phase] }}>
-          {phase === 'Folicular' ? 'Fase folicular' : phase === 'Ovulacion' ? 'Ovulación' : phase === 'Lutea' ? 'Fase lútea' : 'Menstruación'}
+        <span className="rounded-full px-4 py-1.5 text-sm font-extrabold text-[#1B1F5E]" style={{ background: showPhases ? PHASE_COLOR[phase] : '#E7EAF8' }}>
+          {showPhases
+            ? `${phase === 'Folicular' ? 'Fase folicular' : phase === 'Ovulacion' ? 'Ovulación' : phase === 'Lutea' ? 'Fase lútea' : 'Menstruación'}${approximate ? ' aproximada' : ''}`
+            : 'Según tu registro'}
         </span>
         <h2 className="m-0 text-center text-lg font-extrabold">{energy.title}</h2>
         <p className="m-0 text-center text-sm leading-relaxed text-[#4A4F7A]">{energy.text}</p>
-        <button type="button" onClick={onOpenPhase} className="cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">Ver tu fase en detalle</button>
+        {showPhases && <button type="button" onClick={onOpenPhase} className="cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">Ver tu fase en detalle</button>}
       </section>
       <section className="flex flex-col gap-3 px-[18px] py-5">
+        {care && (
+          <section className="rounded-[20px] bg-white p-4">
+            <h2 className="m-0 text-base font-extrabold">Alimentación y bienestar</h2>
+            <p className="m-0 mt-2 text-[13px] font-extrabold text-[#1B1F5E]">3 nutrientes</p>
+            <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#3B4070]">
+              {care.foods.map((item) => <li key={item}>{item}</li>)}
+            </ol>
+            <p className="m-0 mt-3 text-[13px] font-extrabold text-[#1B1F5E]">3 ejercicios</p>
+            <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#3B4070]">
+              {care.exercises.map((item) => <li key={item}>{item}</li>)}
+            </ol>
+            <p className="m-0 mt-2 text-[12px] leading-relaxed text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
+          </section>
+        )}
         <button type="button" onClick={onRegister} className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
           <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-[#1B1F5E] text-2xl text-[#F6E27F]">+</span>
           <span><strong className="block text-base">Registro de hoy</strong><span className="text-[13px]">Toma menos de un minuto</span></span>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>CYCLIA · Evolución de bienestar</title>
+<script src="cyclia-runtime.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&amp;family=Nunito+Sans:wght@400;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#3A44C4}a:hover{color:#262C8F}
+.cy-bg{background-image:url(flores-fondo.svg);background-size:390px 844px;background-repeat:no-repeat}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:44px;text-decoration:none;color:#5B6190;font:700 11px 'Nunito Sans',sans-serif}
+.tab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:#3A44C4}
+</style>
+</helmet>
+<div class="cy-bg" style="width: 390px; height: 844px; position: relative; overflow: hidden; background-color: #E3F1FB; font-family: 'Nunito Sans', sans-serif; color: #1B1F5E">
+<main style="position: absolute; left: 0; right: 0; top: 0; bottom: 82px; overflow-y: auto">
+<header style="padding: 44px 18px 8px; display: flex; flex-direction: column; gap: 6px">
+<a href="Ciclo.html" style="align-self: flex-start; display: flex; align-items: center; gap: 4px; min-height: 44px; text-decoration: none; font-weight: 800; font-size: 15px"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"></path></svg>Calendario</a>
+<h1 style="margin: 0; font-size: 26px; font-weight: 800">Evolución de bienestar</h1>
+<p style="margin: 0; font-size: 14px; color: #4A4F7A">Cómo cambian tus registros a lo largo del ciclo.</p>
+</header>
+<div style="padding: 8px 14px 24px; display: flex; flex-direction: column; gap: 12px">
+<div role="tablist" aria-label="Indicador" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px">
+<sc-for list="{{metrics}}" as="m" hint-placeholder-count="5">
+<button type="button" role="tab" aria-selected="{{m.on}}" onClick="{{m.pick}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1.5px solid {{m.border}}; background: {{m.bg}}; color: {{m.fg}}; font: 800 13px 'Nunito Sans', sans-serif; cursor: pointer">{{m.name}}</button>
+</sc-for>
+</div>
+<section style="background: #FFFFFF; border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #4A4F7A"><span>Arriba: mejor (1)</span><span>Abajo: peor (5)</span></div>
+<svg role="img" aria-label="{{aria}}" viewBox="0 0 330 190" width="330" height="190">
+<rect x="0" y="6" width="165" height="158" fill="#E7ECFB"></rect>
+<rect x="165" y="6" width="64" height="158" fill="#FDE3E4"></rect>
+<rect x="229" y="6" width="101" height="158" fill="#EAF1FC"></rect>
+<path d="M0 20H330M0 85H330M0 150H330" stroke="#D5DCF2" stroke-width="1" fill="none"></path>
+<path d="{{line}}" fill="none" stroke="#3A44C4" stroke-width="2.5" stroke-linejoin="round"></path>
+<path d="{{dots}}" fill="#3A44C4" stroke="#FFFFFF" stroke-width="2"></path>
+<text x="8" y="182" font-size="11" font-weight="700" fill="#4A4F7A" font-family="Nunito Sans, sans-serif">28 sep</text>
+<text x="150" y="182" font-size="11" font-weight="700" fill="#4A4F7A" font-family="Nunito Sans, sans-serif">7 oct</text>
+<text x="290" y="182" font-size="11" font-weight="700" fill="#4A4F7A" font-family="Nunito Sans, sans-serif">15 oct</text>
+</svg>
+<div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; font-weight: 700">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #E7ECFB; border: 1px solid #A9B4E6"></span>Lútea</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #FDE3E4; border: 1px solid #F49A9E"></span>Menstrual</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #EAF1FC; border: 1px solid #A9C4F0"></span>Folicular</span>
+</div>
+</section>
+<section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<div style="background: #FFFFFF; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; font-weight: 700; color: #4A4F7A">Días</span><span style="font-size: 22px; font-weight: 800">10</span></div>
+<div style="background: #FFFFFF; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; font-weight: 700; color: #4A4F7A">Promedio</span><span style="font-size: 22px; font-weight: 800">{{avg}}</span></div>
+<div style="background: #FFFFFF; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; font-weight: 700; color: #4A4F7A">Mejor día</span><span style="font-size: 16px; font-weight: 800; padding-top: 4px">{{best}}</span></div>
+</section>
+<section style="background: #F6E27F; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-size: 15px">Correlación de hábitos</h2>
+<p style="margin: 0; font-size: 14px; line-height: 1.5">Registra tus hábitos al menos 7 días y Cyclia te mostrará qué rutinas se relacionan con cómo te sientes.</p>
+</section>
+</div>
+</main>
+<nav aria-label="Navegación principal" style="position: absolute; left: 0; right: 0; bottom: 0; height: 82px; box-sizing: border-box; padding: 10px 6px 0; background: #FFFFFF; border-top: 1px solid #E1E5F5; display: flex">
+<a class="tab" href="Inicio.html"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</a>
+<a class="tab on" href="Ciclo.html" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Ciclo</a>
+<a class="tab" href="Registro.html"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8M8 12h8"></path></svg>Registro</a>
+<a class="tab" href="Chat.html"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"></path></svg>Cyclia IA</a>
+<a class="tab" href="Perfil.html"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>Perfil</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(p){ super(p); this.state = { sel: 0 }; }
+renderVals() {
+const M = [['Ánimo',[3,3,4,4,3,3,2,2,2,1]],['Estrés',[3,4,4,4,3,3,2,2,2,2]],['Dolor / cólicos',[1,1,2,2,3,4,3,1,1,1]],['Sueño',[2,3,3,4,3,3,2,2,2,2]],['Cansancio',[3,3,4,4,4,4,3,2,2,1]]];
+const D = ['28 sep','30 sep','2 oct','4 oct','6 oct','8 oct','10 oct','12 oct','14 oct','15 oct'];
+const s = this.state.sel, v = M[s][1];
+const pts = v.map((y,i)=>[20 + i*32.2, 20 + (y-1)*32.5]);
+const line = pts.map((p,i)=>(i?'L':'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
+const dots = pts.map(p=>'M' + (p[0]-4.5).toFixed(1) + ' ' + p[1].toFixed(1) + 'a4.5 4.5 0 1 0 9 0a4.5 4.5 0 1 0 -9 0').join('');
+const avg = (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1).replace('.', ',');
+const bi = v.lastIndexOf(Math.min(...v));
+return {
+  line, dots, avg, best: D[bi],
+  aria: M[s][0] + ' del 28 de septiembre al 15 de octubre, promedio ' + avg + ' de 5',
+  metrics: M.map((m,i)=>{ const on = i===s; return { name:m[0], on: on?'true':'false', bg: on?'#F49A9E':'#FFF6CF', fg: '#1B1F5E', border: on?'#E57F86':'#F6E27F', pick:()=>this.setState({ sel:i }) }; })
+};
+}
+}
+</script>
+</body>
+</html>

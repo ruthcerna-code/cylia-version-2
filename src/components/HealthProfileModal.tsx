@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { UserProfile } from '../types';
+import { HormonalMethod, PerimenopauseMode, SpecialSituation, UserProfile } from '../types';
+import { ageFromBirthDate, HORMONAL_LABELS, HORMONAL_METHODS, inferHormonalMethod, SITUATION_LABELS, SPECIAL_SITUATIONS, validateProfile } from '../utils/profileFields';
 
 interface HealthProfileModalProps {
   profile: UserProfile;
@@ -10,8 +11,8 @@ interface HealthProfileModalProps {
 export default function HealthProfileModal({ profile, onSave, onClose }: HealthProfileModalProps) {
   // Personal info state
   const [name, setName] = useState(profile.name || '');
-  const [age, setAge] = useState(profile.age || 25);
   const [birthDate, setBirthDate] = useState(profile.birthDate || '');
+  const age = ageFromBirthDate(birthDate);
   const [weight, setWeight] = useState(profile.weight || 60);
   const [height, setHeight] = useState(profile.height || 165);
   const [email, setEmail] = useState(profile.email || '');
@@ -20,7 +21,11 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
   const [lastPeriodDate, setLastPeriodDate] = useState(profile.lastPeriodDate || '');
   const [periodLength, setPeriodLength] = useState(profile.periodLength || 5);
   const [cycleLength, setCycleLength] = useState(profile.cycleLength || 28);
-  const [contraceptive, setContraceptive] = useState(profile.contraceptive || 'Ninguno');
+  const [periodLengthKnown, setPeriodLengthKnown] = useState(profile.periodLengthKnown !== false);
+  const [cycleLengthKnown, setCycleLengthKnown] = useState(profile.cycleLengthKnown !== false);
+  const [hormonalMethod, setHormonalMethod] = useState<HormonalMethod>(profile.hormonalMethod || inferHormonalMethod(profile.contraceptive || ''));
+  const [specialSituation, setSpecialSituation] = useState<SpecialSituation>(profile.specialSituation || 'ninguna');
+  const [perimenopauseMode, setPerimenopauseMode] = useState<PerimenopauseMode>(profile.perimenopauseMode || 'off');
 
   // Health conditions state
   const [isCeliac, setIsCeliac] = useState(profile.isCeliac || false);
@@ -35,41 +40,35 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
     e.preventDefault();
     setError('');
 
-    if (!name.trim()) {
-      setError('El nombre es requerido.');
-      setActiveTab('personal');
-      return;
-    }
-
-    if (!birthDate) {
-      setError('La fecha de nacimiento es requerida.');
-      setActiveTab('personal');
-      return;
-    }
-
-    if (!lastPeriodDate) {
-      setError('La fecha del último período es requerida.');
-      setActiveTab('cycle');
-      return;
-    }
-
     const updatedProfile: UserProfile = {
       ...profile,
       name: name.trim(),
-      age: Number(age),
+      age: age ?? 0,
       birthDate,
       weight: Number(weight),
       height: Number(height),
       email: email.trim(),
       lastPeriodDate,
-      periodLength: Number(periodLength),
-      cycleLength: Number(cycleLength),
-      contraceptive: contraceptive.trim(),
+      periodLength: periodLengthKnown ? Number(periodLength) : 5,
+      cycleLength: cycleLengthKnown ? Number(cycleLength) : 28,
+      periodLengthKnown,
+      cycleLengthKnown,
+      hormonalMethod,
+      specialSituation,
+      perimenopauseMode,
+      contraceptive: HORMONAL_LABELS[hormonalMethod],
       isCeliac,
       hasDiabetes,
       hasObesity,
       hasDepression
     };
+
+    const problem = validateProfile(updatedProfile);
+    if (problem) {
+      setError(problem);
+      setActiveTab(/menstru|ciclo|anticonceptivo|período|periodo/i.test(problem) ? 'cycle' : 'personal');
+      return;
+    }
 
     onSave(updatedProfile);
     onClose();
@@ -155,29 +154,26 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Edad (años)</label>
-                    <input
-                      type="number"
-                      value={age}
-                      onChange={(e) => setAge(Number(e.target.value))}
-                      className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
-                      min="10"
-                      max="100"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Fecha de Nacimiento</label>
-                    <input
-                      type="date"
-                      value={birthDate}
-                      onChange={(e) => setBirthDate(e.target.value)}
-                      className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
-                      required
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Fecha de nacimiento</label>
+                  <input
+                    type="date"
+                    value={birthDate}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                    className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Edad (años)</label>
+                  <input
+                    type="number"
+                    value={age ?? ''}
+                    readOnly
+                    className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm"
+                  />
+                  <p className="mt-1 text-[10px] text-[#9A9A90]">Número calculado con la fecha de nacimiento.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -243,10 +239,12 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                       value={periodLength}
                       onChange={(e) => setPeriodLength(Number(e.target.value))}
                       className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
-                      min="2"
-                      max="15"
-                      required
+                      min="1"
+                      max="10"
+                      disabled={!periodLengthKnown}
+                      required={periodLengthKnown}
                     />
+                    <label className="mt-2 flex items-center gap-2 text-xs text-[#1E5631]"><input type="checkbox" checked={!periodLengthKnown} onChange={(event) => { setPeriodLengthKnown(!event.target.checked); if (event.target.checked) setPeriodLength(5); }} /> No sé (se usan 5 días)</label>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Duración Ciclo (días)</label>
@@ -255,24 +253,33 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                       value={cycleLength}
                       onChange={(e) => setCycleLength(Number(e.target.value))}
                       className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
-                      min="15"
+                      min="21"
                       max="45"
-                      required
+                      disabled={!cycleLengthKnown}
+                      required={cycleLengthKnown}
                     />
+                    <label className="mt-2 flex items-center gap-2 text-xs text-[#1E5631]"><input type="checkbox" checked={!cycleLengthKnown} onChange={(event) => { setCycleLengthKnown(!event.target.checked); if (event.target.checked) setCycleLength(28); }} /> No sé (se usan 28 días)</label>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Método Anticonceptivo</label>
-                  <input
-                    type="text"
-                    value={contraceptive}
-                    onChange={(e) => setContraceptive(e.target.value)}
-                    className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]"
-                    placeholder="Ej. Ninguno, Píldora oral, DIU, etc."
-                    required
-                  />
+                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Anticoncepción hormonal</label>
+                  <select value={hormonalMethod} onChange={(event) => setHormonalMethod(event.target.value as HormonalMethod)} className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]">
+                    {HORMONAL_METHODS.map((method) => <option key={method} value={method}>{HORMONAL_LABELS[method]}</option>)}
+                  </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Situación</label>
+                  <select value={specialSituation} onChange={(event) => setSpecialSituation(event.target.value as SpecialSituation)} className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E5631]">
+                    {SPECIAL_SITUATIONS.map((situation) => <option key={situation} value={situation}>{SITUATION_LABELS[situation]}</option>)}
+                  </select>
+                </div>
+                {(age ?? 0) >= 40 && (
+                  <label className="flex items-start gap-2 text-sm text-[#1E5631]">
+                    <input type="checkbox" className="mt-1" checked={perimenopauseMode === 'on'} onChange={(event) => setPerimenopauseMode(event.target.checked ? 'on' : 'off')} />
+                    <span>Modo perimenopausia. Las sugerencias siguen tu energía y tu ánimo, y la variación del ciclo se trata como parte de esta etapa.</span>
+                  </label>
+                )}
               </div>
             )}
 

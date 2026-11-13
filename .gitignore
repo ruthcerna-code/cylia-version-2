@@ -1,2 +1,9 @@
 node_modules
 .env
+data/
+dist/
+entrega-tablero-oportunidad-a.html
+.vercel
+public/index.html
+public/assets
+.env*
