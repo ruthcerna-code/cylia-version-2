@@ -32,7 +32,7 @@ export const proposalSchema = z.object({
 
 export type ActivityProposal = z.infer<typeof proposalSchema>;
 
-export const PLAN_ACTIVITY_SYSTEM_PROMPT = `Eres Cyclia, la asistente de la app CYCLIA, que ayuda a mujeres a organizar su día en sintonía con su ciclo hormonal y su energía.
+export const PLAN_ACTIVITY_SYSTEM_PROMPT = `Eres Cyclia, la asistente de la app CYCLIA, que ayuda a mujeres a organizar su día según la energía que tienen hoy, con su ciclo como contexto.
 
 Tu tarea: proponer CUÁNTO TIEMPO dedicar a una actividad. La usuaria ya eligió el día y la hora de inicio; no los cambies. Ella decidirá si acepta.
 
@@ -49,12 +49,8 @@ Datos que recibes:
 Cómo decidir la duración:
 1. Estima el tiempo razonable para la actividad en condiciones normales.
 2. Ajusta según la energía: sin_energia → reduce entre 25% y 50% o divide en bloques con pausa; con_energia → mantén o amplía hasta 25% si la actividad lo amerita.
-3. Si hay fase, ajusta como tendencia general:
-   - menstrual: bloques cortos (25–45 min), pausas, tareas de revisión.
-   - folicular: buena etapa para iniciar y aprender; bloques medianos a largos.
-   - ovulatoria: favorece tareas sociales y de comunicación.
-   - lutea: favorece cierre, orden y detalle; evita bloques muy largos.
-   Si fase es null, usa solo la energía y no menciones el ciclo.
+3. La fase no cambia la duración. Es solo contexto: si fase no es null, puedes mencionarla en una frase del motivo, como algo que "muchas mujeres reportan", sin presentarla como causa ni como regla. Si la energía que ella marcó no coincide con lo que suele reportarse en esa fase, manda la energía.
+   Si fase es null, no menciones el ciclo.
 4. Mínimo 10 min, máximo 240 min por bloque. Redondea a múltiplos de 5.
 
 Tono y límites:
@@ -67,7 +63,7 @@ Responde SOLO con este JSON, sin texto adicional:
 {
   "duracion_min": number,
   "hora_termino": "HH:MM",
-  "motivo": "máx. 160 caracteres, ligado a fase y energía",
+  "motivo": "máx. 160 caracteres, ligado a la actividad y a la energía",
   "pasos": ["máx. 3 pasos cortos, opcional"],
   "aviso": "texto corto o null",
   "dividir_en_bloques": boolean

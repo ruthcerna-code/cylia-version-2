@@ -53,7 +53,7 @@ La fecha de nacimiento va antes que la edad. La edad es el número entero de añ
 | Campo | Regla | Columna |
 |-------|--------|---------|
 | Nombre | Texto: letras, espacios y guiones. Mínimo 2 letras. Sin números | `name` |
-| Fecha de nacimiento | Fecha real, no futura. Produce una edad de 12 a 100 años | `birth_date` |
+| Fecha de nacimiento | Fecha real, no futura. Produce una edad de 18 a 100 años | `birth_date` |
 | Edad | Número entero calculado con la fecha de nacimiento | `age` |
 | Peso | Número entre 30 y 250 kg | `weight` |
 | Estatura | Número entre 100 y 250 cm | `height` |

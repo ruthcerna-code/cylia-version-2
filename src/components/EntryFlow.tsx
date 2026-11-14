@@ -3,7 +3,7 @@ import { PrivacyAcceptance } from './LegalDrafts';
 
 const GOALS = [
   { id: 'salud', title: 'Salud física', text: 'Energía, descanso y movimiento.' },
-  { id: 'productividad', title: 'Productividad', text: 'Foco según tu fase del ciclo.' },
+  { id: 'productividad', title: 'Productividad', text: 'Foco según tu energía de hoy.' },
   { id: 'autoconocimiento', title: 'Autoconocimiento', text: 'Humor, síntomas y patrones.' },
   { id: 'bienestar', title: 'Bienestar diario', text: 'Un check-in corto y constante.' },
 ];

@@ -187,7 +187,7 @@ export function CycleDataScreen({
 
 const GOAL_OPTIONS = [
   { id: 'salud', name: 'Salud física', sub: 'Energía, descanso y movimiento', dot: '#F49A9E' },
-  { id: 'productividad', name: 'Productividad', sub: 'Foco según tu fase del ciclo', dot: '#3A44C4' },
+  { id: 'productividad', name: 'Productividad', sub: 'Foco según tu energía de hoy', dot: '#3A44C4' },
   { id: 'autoconocimiento', name: 'Autoconocimiento', sub: 'Humor, síntomas y patrones', dot: '#A9C4F0' },
   { id: 'bienestar', name: 'Bienestar diario', sub: 'Un registro corto y constante', dot: '#F6E27F' },
 ];

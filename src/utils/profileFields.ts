@@ -40,7 +40,7 @@ export function validateBirthDate(value: string): string | null {
   if (born > startOfToday()) return 'La fecha de nacimiento no puede ser futura.';
   const age = ageFromBirthDate(value);
   if (age == null || age > 100) return 'La fecha de nacimiento debe corresponder a una edad de hasta 100 años.';
-  if (age < 12) return 'La edad calculada debe ser de al menos 12 años.';
+  if (age < 18) return 'Cyclia es para mayores de 18 años.';
   return null;
 }
 
