@@ -14,14 +14,14 @@ Rama de trabajo: `develop`.
 - **Interfaz:** React 19, Vite 6 y Tailwind 4.
 - **Servidor:** Node.js y Express (`server.ts`). En local escucha en `http://localhost:3001`.
 - **Datos y acceso:** Firebase Auth y Cloud Firestore, en el proyecto `cyclia-mvp`. No hay Supabase.
-- **Cuentas de Cyclia:** usuario y contraseña en `data/accounts.json`, en el servidor. Ese archivo no se publica.
+- **Cuentas de Cyclia:** correo y contraseña en Firebase Authentication. El servidor no guarda cuentas.
 - **Asistente:** Gemini, llamado desde el servidor con `GEMINI_API_KEY`, solo si la persona lo autorizó.
 
 ## Dónde vive cada dato
 
 | Dato | Dónde se guarda | Cuándo entra |
 |------|-----------------|--------------|
-| Usuario, contraseña y rol | Firebase Auth, y la cuenta de administración en `data/accounts.json` | Al entrar. Si el correo no existe, Firebase crea la cuenta en ese momento |
+| Correo y contraseña | Firebase Auth | Al entrar. Si el correo no existe, Firebase crea la cuenta en ese momento |
 | Sesión | Firebase Auth | En el mismo momento del acceso |
 | Recordar 24 horas | Navegador, si se marca la casilla | Al entrar. Si no se marca, la sesión termina al cerrar el navegador |
 | Política leída | `sessionStorage` y luego `users/{uid}/consent_events` | Antes de entrar y al continuar dentro de la app |
@@ -38,7 +38,7 @@ Las fechas del ciclo y del registro se guardan como texto `AAAA-MM-DD`. Cada per
 
 ## Recorrido y datos que se piden
 
-1. **Entrada.** Un solo formulario: usuario y contraseña. El usuario es el correo. Casilla opcional «Mantener la sesión por 24 horas». Hay que marcar la política. No hay botón «Sin cuenta».
+1. **Entrada.** Un solo formulario: correo y contraseña de al menos 6 caracteres. Debajo está «¿Olvidaste tu contraseña?». Casilla opcional «Mantener la sesión por 24 horas». Hay que marcar la política. No hay botón «Sin cuenta».
 2. **Cuenta nueva.** Si el correo no existe, se crea la cuenta y una ventana dice «Se creó una cuenta nueva». Después sigue el registro: región, objetivos y perfil.
 3. **Cuenta existente.** Si el correo y la contraseña coinciden, una ventana dice «Mostraremos tu calendario» y al continuar se abre la app. Si la contraseña no coincide, no entra.
 4. **Región.** Chile o Perú. Queda en el navegador.
@@ -76,7 +76,6 @@ El navegador habla con Express. Express habla con Gemini cuando el asistente est
 |------|------------|----------|
 | Navegador | `src/` | React 19, Vite y Tailwind. Una columna de hasta 480 px. |
 | Servidor | `server.ts` | Puerto 3001. Sirve la app, el acceso, el consentimiento, la exportación y Gemini. |
-| Cuentas | `accounts.ts`, `data/accounts.json` | Usuario o correo, contraseña y rol. No se publica. |
 | Datos | Firebase | Auth y Cloud Firestore del proyecto `cyclia-mvp`. Cada documento cuelga de `users/{uid}`. |
 | IA | `POST /api/analyze`, `POST /api/chat` | Gemini recibe el contexto del ciclo y del registro, con la clave del servidor y el consentimiento `gemini_assistant`. |
 | Agenda | `users/{uid}/activities` | Actividades en Firestore. No hay Google Calendar. |
@@ -85,12 +84,13 @@ El navegador habla con Express. Express habla con Gemini cuando el asistente est
 
 La entrada con correo es Firebase Auth. No hay pantalla «Sin cuenta».
 
-- **Usuario y contraseña.** El usuario es un correo. Si no existe, Cyclia crea la cuenta y avisa en una ventana. Si existe y la contraseña coincide, avisa que mostrará el calendario y abre la sesión. La contraseña queda cifrada en `data/accounts.json`. Cerrar sesión solo limpia este navegador; la cuenta sigue guardada para el próximo ingreso.
+- **Correo y contraseña.** Si el correo no existe, Firebase crea la cuenta y Cyclia avisa en una ventana. Si existe y la contraseña coincide, avisa que mostrará el calendario y abre la sesión. La contraseña la guarda y la comprueba Firebase Auth. Cerrar sesión solo limpia este navegador; la cuenta sigue guardada para el próximo ingreso.
 - **Clave que no coincide.** Si el correo ya tiene cuenta y la contraseña es otra, no entra y no crea una cuenta duplicada.
-- **Administración.** La cuenta `administrador` vive en el servidor, con rol admin. Si todavía no existe, se crea solo cuando `ADMIN_PASSWORD` está definida. Si ya existe, conserva su clave. Desde Perfil crea y elimina usuarios. Esa cuenta no se puede borrar.
+- **Contraseña olvidada.** «¿Olvidaste tu contraseña?» pide a Firebase un correo con un enlace para crear una contraseña nueva. El mensaje no dice si ese correo tiene cuenta.
+- **Administración.** No hay cuentas de administración dentro de la app. Las cuentas se ven, se bloquean o se borran en la consola de Firebase, en Authentication.
 - **24 horas.** Si se marca, la sesión se conserva 24 horas. Si no, termina al cerrar el navegador.
 
-La contraseña del correo la comprueba Firebase Auth. Con ese usuario se guardan el perfil y los registros. La cuenta `administrador` sigue en el servidor.
+La contraseña del correo la comprueba Firebase Auth. Con ese usuario se guardan el perfil y los registros.
 
 ### Modelo de datos
 
@@ -146,8 +146,6 @@ Lo que la app muestra a partir de eso:
 |------|--------------|
 | `src/` | App de teléfono: pantallas, validación del perfil, cálculo del ciclo, contexto del análisis, plan del día y acceso |
 | `server.ts` | Servidor Express, Gemini, consentimiento y exportación |
-| `accounts.ts` | Cuenta de administración y contraseñas provisionales |
-| `data/accounts.json` | Usuarios, contraseñas y roles locales. No se publica |
 | `public/` | Fondo floral de la app |
 | `firestore.rules` | Quién puede leer y escribir cada documento |
 | `src/firebase.ts` | Acceso y datos en Firebase |
@@ -169,8 +167,6 @@ Variables de entorno (ver `.env.example`):
 - `GEMINI_API_KEY`: clave de Gemini en el servidor.
 - `APP_URL`: origen de la app. En local es `http://localhost:3001`.
 - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID` y `VITE_FIREBASE_APP_ID`: configuración pública de la app web. La clave va solo en el entorno; sin `VITE_FIREBASE_API_KEY` el ingreso con correo no arranca.
-- `ADMIN_PASSWORD`: clave de la cuenta `administrador` la primera vez que se crea. Si esa cuenta ya existe, no se cambia.
-- `GMAIL_USER` y `GMAIL_APP_PASSWORD`: cuenta de Gmail y contraseña de aplicación. La entrada principal no las usa: la cuenta se crea con el usuario y la contraseña escritos en la pantalla.
 
 Para ver la versión compilada: `npm run build` y luego `npm start`. Si `dist/index.html` existe, `npm run dev` sirve esa carpeta.
 

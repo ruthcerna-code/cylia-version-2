@@ -64,6 +64,9 @@ export default function DesignHome({
   onMood,
   onActivity,
   onCalendar,
+  offerPerimenopause = false,
+  onActivatePerimenopause,
+  onDeclinePerimenopause,
 }: {
   name: string;
   dateLabel: string;
@@ -84,6 +87,9 @@ export default function DesignHome({
   onMood: () => void;
   onActivity: () => void;
   onCalendar: () => void;
+  offerPerimenopause?: boolean;
+  onActivatePerimenopause?: () => void;
+  onDeclinePerimenopause?: () => void;
 }) {
   const energy = showPhases ? ENERGY[phase] : { title: 'Hoy manda cómo te sientes', text: statusNote };
   const arcs = phaseArcs(periodLength, cycleLength);
@@ -146,6 +152,13 @@ export default function DesignHome({
         {showPhases && <button type="button" onClick={onOpenPhase} className="cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">Ver tu fase en detalle</button>}
       </section>
       <section className="flex flex-col gap-3 px-[18px] py-5">
+        {offerPerimenopause && (
+          <section className="rounded-[20px] bg-white p-4">
+            <p className="m-0 text-sm font-semibold leading-relaxed text-[#1B1F5E]">Tus ciclos están variando. Desde los 40 es esperable. ¿Quieres que Cyclia siga tu registro diario en vez del calendario?</p>
+            <button type="button" onClick={onActivatePerimenopause} className="mt-3 flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Activar</button>
+            <button type="button" onClick={onDeclinePerimenopause} className="mt-1 flex h-11 w-full cursor-pointer items-center justify-center text-sm font-extrabold text-[#3A44C4]">Ahora no</button>
+          </section>
+        )}
         {care && (
           <section className="rounded-[20px] bg-white p-4">
             <h2 className="m-0 text-base font-extrabold">Alimentación y bienestar</h2>

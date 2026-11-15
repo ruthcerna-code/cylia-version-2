@@ -7,7 +7,6 @@ import { EntryFlow, MoodGrid, ObjectivesScreen, RegionScreen } from './component
 import DesignHome from './components/DesignHome';
 import DesignRegister from './components/DesignRegister';
 import { ActivityScreen, CycleDataScreen, GoalsScreen, PhaseScreen, PrivacyScreen } from './components/DesignScreens';
-import UserAdminScreen from './components/UserAdminScreen';
 import CalendarView from './components/CalendarView';
 import DailyCheckin from './components/DailyCheckin';
 import ChatPanel from './components/ChatPanel';
@@ -15,9 +14,10 @@ import HealthProfileModal from './components/HealthProfileModal';
 import SymptomChart from './components/SymptomChart';
 import CycleProjectionScreen from './components/CycleProjectionScreen';
 import PhaseKnowledge from './components/PhaseKnowledge';
-import { getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
+import PhaseGuide from './components/PhaseGuide';
+import { addCalendarDays, getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
 import { analyzeCycle } from './utils/cycleModel';
-import { accountSessionExpired, beginEntry, bindAccountSessionSync, clearAccountSession, fetchAccountMe, finishAccountSession, type AccountRole, type PendingEntry } from './accountApi';
+import { beginEntry, finishAccountSession, requestPasswordReset, type PendingEntry } from './accountApi';
 import { authBearer, fetchConsentStatus, saveConsentDecisions, type ConsentStatus } from './consentApi';
 import { privacyAcceptedAtLogin, rememberPrivacyAcceptance } from './consentCopy';
 import ConsentScreen from './components/ConsentScreen';
@@ -121,6 +121,7 @@ export default function App() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [periOfferUntil, setPeriOfferUntil] = useState('');
   const [logs, setLogs] = useState<Record<string, DailyLog>>({});
   const [periods, setPeriods] = useState<PeriodRecord[]>([]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -131,7 +132,7 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
-  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil' | 'foco'>('inicio');
+  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil' | 'foco' | 'conocimiento' | 'bienestar'>('inicio');
   const [activities, setActivities] = useState<ScheduledActivity[]>([]);
   const [activitiesReady, setActivitiesReady] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
@@ -140,12 +141,11 @@ export default function App() {
   const [planRequest, setPlanRequest] = useState({ title: '', date: '' });
   const [homeSheet, setHomeSheet] = useState<null | 'fase' | 'actividad'>(null);
   const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion' | 'proyeccion'>(null);
-  const [profileSheet, setProfileSheet] = useState<null | 'ajustes' | 'ciclo' | 'objetivos' | 'privacidad' | 'datos' | 'usuarios'>(null);
+  const [profileSheet, setProfileSheet] = useState<null | 'ajustes' | 'ciclo' | 'objetivos' | 'privacidad' | 'datos'>(null);
   const [privacyBack, setPrivacyBack] = useState<null | 'ajustes'>(null);
   const [consentStatus, setConsentStatus] = useState<ConsentStatus | null>(null);
   const geminiEnabledRef = useRef(false);
   geminiEnabledRef.current = consentStatus?.purposes.gemini_assistant === 'accept';
-  const [account, setAccount] = useState<{ username: string; role: AccountRole } | null>(null);
   const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
   const [region, setRegion] = useState<string | null>(() => localStorage.getItem('cyclia_region'));
   const [objectivesDone, setObjectivesDone] = useState(() => localStorage.getItem('cyclia_objectives_done') === '1');
@@ -200,12 +200,19 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setPeriOfferUntil('');
+      return;
+    }
+    setPeriOfferUntil(localStorage.getItem(`cyclia-peri-offer-until:${user.id}`) || '');
+  }, [user?.id]);
+
+  useEffect(() => {
     if (!isFirebaseConfigured) {
       setIsLoadingAuth(false);
       return;
     }
     let active = true;
-    bindAccountSessionSync();
     const rememberUser = (sessionUser: { id: string; email?: string | null; isAnonymous?: boolean } | null) => {
       if (!active) return;
       if (!sessionUser) {
@@ -215,7 +222,6 @@ export default function App() {
         }
         userIdRef.current = null;
         setUser(null);
-        setAccount(null);
         setProfile(null);
         setLogs({});
         setChatHistory([]);
@@ -233,11 +239,6 @@ export default function App() {
     }, 2500);
     const stop = watchAuth((user) => {
       window.clearTimeout(stopWaiting);
-      if (accountSessionExpired()) {
-        clearAccountSession();
-        rememberUser(null);
-        return;
-      }
       rememberUser(user ? { id: user.uid, email: user.email, isAnonymous: user.isAnonymous } : null);
     });
     return () => {
@@ -246,26 +247,6 @@ export default function App() {
       stop();
     };
   }, []);
-
-  useEffect(() => {
-    if (!user) {
-      setAccount(null);
-      return;
-    }
-    let cancelled = false;
-    void fetchAccountMe(user.id).then(async (next) => {
-      if (cancelled) return;
-      if (next === 'expired') {
-        clearAccountSession();
-        try { await signOut(); } catch { /* La sesión local ya se limpia. */ }
-        return;
-      }
-      setAccount(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -416,6 +397,20 @@ export default function App() {
       console.error('No se pudo guardar el mensaje de bienvenida:', error);
     }
     return true;
+  };
+
+  const choosePerimenopause = async (mode: 'on' | 'offered') => {
+    if (!user || !profile) return;
+    const previous = profile;
+    const saved = await handleSaveProfile({ ...profile, perimenopauseMode: mode });
+    if (!saved) {
+      setProfile(previous);
+      return;
+    }
+    if (mode !== 'offered') return;
+    const until = addCalendarDays(formatDateStr(new Date()), 30);
+    localStorage.setItem(`cyclia-peri-offer-until:${user.id}`, until);
+    setPeriOfferUntil(until);
   };
 
   // Sync logs to Firebase
@@ -736,9 +731,7 @@ export default function App() {
     setEntryNotice('');
     setPendingEntry(null);
     userIdRef.current = null;
-    clearAccountSession();
     setUser(null);
-    setAccount(null);
     setProfile(null);
     setLogs({});
     setChatHistory([]);
@@ -829,6 +822,7 @@ export default function App() {
         onPasswordChange={setLoginPassword}
         onEnter={handleEnter}
         onContinue={() => { void handleContinue(); }}
+        onForgotPassword={() => requestPasswordReset(loginUsername)}
       />
     );
   }
@@ -870,6 +864,7 @@ export default function App() {
 
   // Calculate current state metrics based on active selection date
   const cycleView = analyzeCycle(profile, periods, selectedDateStr, logs);
+  const showPerimenopauseOffer = cycleView.offerPerimenopause && periOfferUntil <= formatDateStr(new Date());
   const selectedCycleDay = cycleView.cycleDay;
   const selectedPhase: MenstrualPhase = cycleView.phase ?? 'Folicular';
   const phaseDetails = PHASE_DETAILS[selectedPhase];
@@ -950,6 +945,9 @@ export default function App() {
             onMood={() => { setHomeSheet(null); setAppTab('humor'); }}
             onActivity={() => setHomeSheet('actividad')}
             onCalendar={() => { setHomeSheet(null); setAppTab('calendario'); }}
+            offerPerimenopause={showPerimenopauseOffer}
+            onActivatePerimenopause={() => { void choosePerimenopause('on'); }}
+            onDeclinePerimenopause={() => { void choosePerimenopause('offered'); }}
           />
         )}
         {false && appTab === 'inicio' && (
@@ -1246,7 +1244,6 @@ export default function App() {
               <div className="my-1 h-px bg-[#E1E5F5]" />
               <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {cycleView.nextPeriod ? formatFriendlyDate(cycleView.nextPeriod) : 'En pausa con los datos actuales.'}</p>
               {cycleView.alerts[0] && <p className="m-0 text-sm text-[#3B4070]">{cycleView.alerts[0].message}</p>}
-              {cycleView.offerPerimenopause && <p className="m-0 text-sm text-[#3B4070]">Desde los 40 años, tus ciclos muestran variación. Puedes activar el modo perimenopausia en la ficha si quieres que las sugerencias sigan tu registro diario.</p>}
               <div className="my-1 h-px bg-[#E1E5F5]" />
               <h3 className="m-0 text-sm font-extrabold">Tus registros y la proyección</h3>
               {compareRecords(profile, periods, logs).map((line) => <p key={line} className="m-0 text-sm text-[#3B4070]">{line}</p>)}
@@ -1260,9 +1257,14 @@ export default function App() {
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">3</span>
               <span><strong className="block text-base">Proyección de tu ciclo</strong><span className="text-[13px] text-[#3B4070]">Tres ciclos, fases y ovulación estimada</span></span>
             </button>
-            <PhaseKnowledge profile={profile} periods={periods} logs={logs} userId={user.id} />
             <button type="button" onClick={() => handleUpdatePeriodStart(formatDateStr(new Date()))} className="h-[50px] cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Registrar inicio de periodo hoy</button>
           </div>
+          {appTab === 'conocimiento' && (
+            <PhaseKnowledge profile={profile} periods={periods} logs={logs} userId={user.id} />
+          )}
+          {appTab === 'bienestar' && (
+            <PhaseGuide profile={profile} periods={periods} userId={user.id} />
+          )}
           {appTab === 'calendario' && cycleSheet === 'dia' && (
             <section className="flex flex-col gap-3 pt-4">
               <button type="button" onClick={() => setCycleSheet(null)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Calendario</button>
@@ -1563,9 +1565,6 @@ export default function App() {
             }}
           />
         )}
-        {appTab === 'perfil' && profileSheet === 'usuarios' && account?.role === 'admin' && (
-          <UserAdminScreen onBack={() => setProfileSheet(null)} />
-        )}
         {appTab === 'perfil' && profileSheet === 'ajustes' && (
           <CyclePrivacySettings
             profile={profile}
@@ -1616,7 +1615,6 @@ export default function App() {
                 { title: 'Privacidad y datos', subtitle: 'Decisiones, documentos y solicitudes', action: () => { setPrivacyBack(null); setProfileSheet('datos'); } },
                 { title: 'Privacidad y notificaciones', subtitle: darkMode ? 'Modo oscuro activo' : 'Recordatorios y apariencia', action: () => setProfileSheet('privacidad') },
                 { title: 'Objetivos', subtitle: 'Elige tu foco', action: () => setProfileSheet('objetivos') },
-                ...(account?.role === 'admin' ? [{ title: 'Administración de usuarios', subtitle: 'Crear y eliminar cuentas', action: () => setProfileSheet('usuarios') }] : []),
                 { title: 'Ayuda y soporte', subtitle: 'Preguntas frecuentes, contacto', action: () => setAppTab('chat') },
               ] satisfies { title: string; subtitle: string; action: () => void }[]).map((item) => (
                 <button key={item.title} type="button" onClick={item.action} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-left">
@@ -1632,7 +1630,6 @@ export default function App() {
                 type="button"
                 onClick={async () => {
                   if (confirm('¿Estás segura de que deseas cerrar sesión?')) {
-                    clearAccountSession();
                     await signOut();
                   }
                 }}
@@ -1647,10 +1644,12 @@ export default function App() {
 
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-5 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
+      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-7 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
         {([
           ['inicio', 'Inicio', '⌂'],
           ['calendario', 'Ciclo', '▦'],
+          ['conocimiento', 'Conocimiento de la fase', '◐'],
+          ['bienestar', 'Bienestar', '♡'],
           ['registro', 'Registro', '+'],
           ['foco', 'Organiza tu día', '◎'],
           ['perfil', 'Perfil', '•'],
@@ -1665,10 +1664,11 @@ export default function App() {
               setChatHistoryOpen(false);
               setAppTab(id);
             }}
+            aria-label={id === 'conocimiento' ? 'Conocimiento de la fase' : label}
             className={`flex cursor-pointer flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-extrabold leading-tight ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
           >
-            <span className="text-lg leading-none">{icon}</span>
-            {id === 'foco' ? <span className="text-center">Organiza<br />tu día</span> : label}
+            <span className={`flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none ${appTab === id ? 'bg-[#E3F1FB]' : ''}`}>{icon}</span>
+            {id === 'foco' ? <span className="text-center">Organiza<br />tu día</span> : id === 'conocimiento' ? <span className="text-center">Fases</span> : id === 'bienestar' ? <span className="text-center">Bienestar</span> : label}
           </button>
         ))}
       </nav>

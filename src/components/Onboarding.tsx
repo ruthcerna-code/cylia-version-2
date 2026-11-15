@@ -43,6 +43,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
   const [hasDiabetes, setHasDiabetes] = useState(initialProfile?.hasDiabetes || false);
   const [hasObesity, setHasObesity] = useState(initialProfile?.hasObesity || false);
   const [hasDepression, setHasDepression] = useState(initialProfile?.hasDepression || false);
+  const [irregularCycles, setIrregularCycles] = useState<'si' | 'no' | 'nose' | null>(null);
   const [error, setError] = useState('');
 
   const nextStep = () => {
@@ -121,12 +122,20 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
       setError('Elige una opción.');
       return;
     }
-    if (step === 11 && !specialSituation) {
-      setError('Elige la situación que corresponde.');
+    if (step === 11) {
+      if (!specialSituation) {
+        setError('Elige la situación que corresponde.');
+        return;
+      }
+      setStep(Number(age) >= 40 && specialSituation === 'ninguna' ? 12 : 13);
+      return;
+    }
+    if (step === 12 && !irregularCycles) {
+      setError('Elige una opción.');
       return;
     }
 
-    if (step === 12) {
+    if (step === 13) {
       handleFinish();
     } else {
       setStep(step + 1);
@@ -135,6 +144,10 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
 
   const prevStep = () => {
     setError('');
+    if (step === 13 && !(Number(age) >= 40 && specialSituation === 'ninguna')) {
+      setStep(11);
+      return;
+    }
     if (step > 0) setStep(step - 1);
   };
 
@@ -155,7 +168,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
       cycleLengthKnown,
       hormonalMethod: method,
       specialSituation: specialSituation || 'ninguna',
-      perimenopauseMode: 'off',
+      perimenopauseMode: Number(age) >= 40 && specialSituation === 'ninguna' && irregularCycles === 'si' ? 'on' : 'off',
       contraceptive: HORMONAL_LABELS[method],
       isCeliac,
       hasDiabetes,
@@ -183,7 +196,8 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
       case 9: return "¿Cuántos días dura habitualmente tu ciclo?";
       case 10: return "¿Usas anticoncepción hormonal?";
       case 11: return "¿Hay alguna situación que cambie las predicciones?";
-      case 12: return "¿Tienes alguna de las siguientes condiciones de salud?";
+      case 12: return "¿Tus ciclos se han vuelto irregulares en el último año?";
+      case 13: return "¿Tienes alguna de las siguientes condiciones de salud?";
       default: return "";
     }
   };
@@ -358,7 +372,12 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               <button
                 key={situation}
                 type="button"
-                onClick={() => { setSpecialSituation(situation); setError(''); setStep(12); }}
+                onClick={() => {
+                  setSpecialSituation(situation);
+                  setError('');
+                  if (situation !== 'ninguna') setIrregularCycles(null);
+                  setStep(Number(age) >= 40 && situation === 'ninguna' ? 12 : 13);
+                }}
                 className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${specialSituation === situation ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-white text-[#1E5631]'}`}
               >
                 {SITUATION_LABELS[situation]}
@@ -367,6 +386,25 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
           </div>
         );
       case 12:
+        return (
+          <div className="grid grid-cols-1 gap-3">
+            {([
+              ['si', 'Sí'],
+              ['no', 'No'],
+              ['nose', 'No sé'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => { setIrregularCycles(value); setError(''); }}
+                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${irregularCycles === value ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-white text-[#1E5631]'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        );
+      case 13:
         return (
           <div className="space-y-4">
             <p className="text-xs text-[#1B4D3E] mb-2">Selecciona las opciones que correspondan para personalizar tus recomendaciones de actividad física y de bienestar diario:</p>
@@ -430,6 +468,13 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
     }
   };
 
+  const askIrregular = Number(age) >= 40 && specialSituation === 'ninguna';
+  const stepOrder = askIrregular
+    ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+    : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13];
+  const stepPosition = Math.max(1, stepOrder.indexOf(step) + 1);
+  const stepTotal = stepOrder.length;
+
   if (step === 0) {
     return (
       <WelcomeScreen
@@ -452,7 +497,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
           <div className="h-1.5 w-full bg-[#EFEFEF]">
             <div
               className="h-full bg-[#F49A9E] transition-all duration-300"
-              style={{ width: `${(step / 12) * 100}%` }}
+              style={{ width: `${(stepPosition / stepTotal) * 100}%` }}
             />
           </div>
           <div className="h-14 px-5 flex items-center justify-between">
@@ -464,7 +509,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               ← Atrás
             </button>
             <span className="text-xs font-semibold tracking-wide text-[#1B1F5E]">
-              Paso {step} de 12
+              Paso {stepPosition} de {stepTotal}
             </span>
           </div>
         </header>
@@ -487,7 +532,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               onClick={nextStep}
               className="btn-fucsia w-full font-semibold text-base py-4 rounded-full cursor-pointer transition-colors"
             >
-              {step === 12 ? 'Finalizar Registro' : 'Siguiente'}
+              {step === 13 ? 'Finalizar Registro' : 'Siguiente'}
             </button>
           </div>
         )}

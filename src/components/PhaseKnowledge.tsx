@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { DailyLog, MenstrualPhase, PeriodRecord, UserProfile } from '../types';
 import { getPhaseForDay } from '../utils/cycle';
 import { analyzeCycle, projectCycleBoard } from '../utils/cycleModel';
-import PhaseGuide from './PhaseGuide';
 
 type Mood = 'Serena' | 'Enfocada' | 'Radiante' | 'Reflexiva' | 'Sensible';
 
@@ -13,30 +12,37 @@ const PHASE_TITLE: Record<MenstrualPhase, string> = {
   Lutea: 'Fase lútea',
 };
 
+const PHASE_LOOK: Record<MenstrualPhase, { bg: string; ink: string }> = {
+  Menstrual: { bg: '#F49A9E', ink: '#1B1F5E' },
+  Folicular: { bg: '#A9C4F0', ink: '#1B1F5E' },
+  Ovulacion: { bg: '#F6E27F', ink: '#1B1F5E' },
+  Lutea: { bg: '#3A44C4', ink: '#FFFFFF' },
+};
+
 const MOOD_COLOR: Record<Mood, string> = {
-  Serena: '#7FA8E8',
-  Enfocada: '#3D9A6A',
-  Radiante: '#E2A04A',
-  Reflexiva: '#8B6BB8',
-  Sensible: '#E06A6A',
+  Serena: '#F49A9E',
+  Enfocada: '#A9C4F0',
+  Radiante: '#F6E27F',
+  Reflexiva: '#3A44C4',
+  Sensible: '#1B1F5E',
 };
 
 const REFERENCE: Record<MenstrualPhase, { state: Mood; more: string }> = {
   Menstrual: {
     state: 'Serena',
-    more: 'Muchas mujeres reportan más descanso y menos ganas de exigirse. Cyclia no mide hormonas: esta frase no es un análisis de laboratorio.',
+    more: 'Muchas mujeres reportan más descanso y menos ganas de exigirse. No es una medición de tu energía.',
   },
   Folicular: {
     state: 'Enfocada',
-    more: 'Muchas mujeres reportan más foco y más ganas de empezar cosas. Cyclia no mide hormonas.',
+    more: 'Muchas mujeres reportan más foco y más ganas de empezar cosas. Si tu registro marca otra energía, manda el registro.',
   },
   Ovulacion: {
     state: 'Radiante',
-    more: 'Muchas mujeres reportan un ánimo más abierto. No es un cálculo de fertilidad ni un análisis de laboratorio.',
+    more: 'Muchas mujeres reportan un ánimo más abierto. No es un cálculo de fertilidad ni de tu energía de hoy.',
   },
   Lutea: {
     state: 'Reflexiva',
-    more: 'Muchas mujeres reportan un ritmo más reflexivo y, a ratos, más sensibilidad. Cyclia no mide hormonas.',
+    more: 'Muchas mujeres reportan un ritmo más pausado y, a ratos, más sensibilidad. Tu cansancio de hoy es el que marques.',
   },
 };
 
@@ -62,12 +68,12 @@ function wellbeingOf(logs: DailyLog[]): number {
 
 function Bars({ bars }: { bars: Array<{ mood: Mood; pct: number }> }) {
   return (
-    <ul className="m-0 mt-2 flex list-none flex-col gap-1.5 p-0">
+    <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
       {bars.map((bar) => (
-        <li key={bar.mood} className="grid grid-cols-[88px_1fr_36px] items-center gap-2 text-[12px] font-bold text-[#3B4070]">
+        <li key={bar.mood} className="grid grid-cols-[88px_1fr_36px] items-center gap-2 text-[13px] font-bold text-[#1B1F5E]">
           <span>{bar.mood}</span>
-          <span className="h-1.5 overflow-hidden rounded-full bg-[#E7EAF8]">
-            <span className="block h-1.5 rounded-full" style={{ width: `${bar.pct}%`, background: MOOD_COLOR[bar.mood] }} />
+          <span className="h-2 overflow-hidden rounded-full bg-[#E7EAF8]">
+            <span className="block h-2 rounded-full" style={{ width: `${bar.pct}%`, background: MOOD_COLOR[bar.mood] }} />
           </span>
           <span className="text-right">{bar.pct}%</span>
         </li>
@@ -81,13 +87,14 @@ export default function PhaseKnowledge({
   periods,
   logs,
   userId = '',
+  embedded = false,
 }: {
   profile: UserProfile;
   periods: PeriodRecord[];
   logs: Record<string, DailyLog>;
   userId?: string;
+  embedded?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const board = projectCycleBoard(profile, periods);
   const windows = board.cycles[0]?.phases.length
     ? board.cycles[0].phases
@@ -99,6 +106,10 @@ export default function PhaseKnowledge({
       if (!days.length) return [];
       return [{ phase, fromDay: days[0], toDay: days[days.length - 1], start: '', end: '' }];
     });
+  const today = analyzeCycle(profile, periods);
+  const current = today.showPhases ? today.phase : null;
+  const [chosen, setChosen] = useState<MenstrualPhase | 'none' | null>(null);
+  const active = chosen === 'none' ? null : (chosen ?? current ?? windows[0]?.phase ?? null);
   const byPhase = new Map<MenstrualPhase, DailyLog[]>();
   Object.values(logs).forEach((log) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(log.date)) return;
@@ -108,71 +119,91 @@ export default function PhaseKnowledge({
     list.push(log);
     byPhase.set(view.phase, list);
   });
+  const currentLook = current ? PHASE_LOOK[current] : null;
+  const totalDays = windows.reduce((sum, phase) => sum + (phase.toDay - phase.fromDay + 1), 0) || 1;
 
   return (
-    <section className="rounded-[20px] bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="m-0 text-[18px] font-extrabold leading-tight">Conocimiento por fase</h2>
-          <p className="m-0 mt-1 text-[13px] text-[#4A4F7A]">Referencia general, con los días de tu ciclo registrado.</p>
-        </div>
-        <button type="button" onClick={() => setOpen((value) => !value)} className="shrink-0 cursor-pointer text-[13px] font-extrabold text-[#3A44C4]" aria-expanded={open}>
-          {open ? 'Ver menos' : 'Ver más'}
-        </button>
+    <div className="flex flex-col gap-3">
+      {!embedded && (
+        <header className="rounded-[24px] bg-[#3A44C4] px-5 py-5 text-white">
+          <p className="m-0 text-[12px] font-extrabold tracking-[0.16em] text-[#F9C4C6]">CYCLIA</p>
+          <h1 className="m-0 mt-1 text-[26px] font-extrabold leading-tight">Conocimiento de la fase</h1>
+          <p className="m-0 mt-2 text-sm leading-relaxed text-[#E3F1FB]">Cuatro momentos para leer el ciclo. No miden tu energía ni tu rendimiento.</p>
+        </header>
+      )}
+
+      {current && currentLook ? (
+        <section className="rounded-[24px] px-5 py-4" style={{ background: currentLook.bg, color: currentLook.ink }}>
+          <p className="m-0 text-[12px] font-extrabold uppercase tracking-wide">Hoy</p>
+          <p className="m-0 mt-1 text-[32px] font-extrabold leading-none">Día {today.cycleDay}</p>
+          <p className="m-0 mt-2 text-base font-extrabold">{PHASE_TITLE[current]} · {REFERENCE[current].state}</p>
+          <p className="m-0 mt-2 text-sm leading-relaxed">{REFERENCE[current].more}</p>
+        </section>
+      ) : (
+        <p className="m-0 rounded-[24px] bg-white px-4 py-4 text-sm leading-relaxed text-[#1B1F5E]">{board.note} Abajo está la referencia de un ciclo de {board.projectedLength} días.</p>
+      )}
+
+      <div className="flex h-4 overflow-hidden rounded-full" role="img" aria-label={windows.map((phase) => `${PHASE_TITLE[phase.phase]}, días ${phase.fromDay} a ${phase.toDay}`).join('. ')}>
+        {windows.map((phase) => (
+          <span
+            key={phase.phase}
+            style={{
+              width: `${((phase.toDay - phase.fromDay + 1) / totalDays) * 100}%`,
+              background: PHASE_LOOK[phase.phase].bg,
+              boxShadow: phase.phase === current ? 'inset 0 0 0 2px #1B1F5E' : undefined,
+            }}
+          />
+        ))}
       </div>
-      {!open && (
-        <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0 text-[13px] font-bold text-[#1B1F5E]">
-          {windows.map((phase) => (
-            <li key={phase.phase}>{REFERENCE[phase.phase].state} · días {phase.fromDay}–{phase.toDay}</li>
-          ))}
-        </ul>
-      )}
-      {open && (
-        <div className="mt-3 flex flex-col gap-3">
-          {!board.showPhases && <p className="m-0 text-[13px] leading-relaxed text-[#3B4070]">{board.note} Los rangos de abajo son la referencia de un ciclo de {board.projectedLength} días y una regla de {board.periodLength}.</p>}
-          {windows.map((phase) => {
-            const reference = REFERENCE[phase.phase];
-            const own = byPhase.get(phase.phase) || [];
-            const ownBars = (['Serena', 'Enfocada', 'Radiante', 'Reflexiva', 'Sensible'] as const)
-              .map((mood) => ({ mood, pct: own.length ? Math.round(own.filter((log) => moodOf(log) === mood).length / own.length * 100) : 0 }))
-              .filter((bar) => bar.pct > 0);
-            const ownState = ownBars.slice().sort((a, b) => b.pct - a.pct)[0]?.mood;
-            return (
-              <article key={phase.phase} className="rounded-[18px] border border-[#E1E5F5] p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <strong className="rounded-full bg-[#F8F9FE] px-3 py-1 text-[13px]">{PHASE_TITLE[phase.phase]}</strong>
-                  <span className="text-[12px] font-bold text-[#4A4F7A]">Días {phase.fromDay} – {phase.toDay}</span>
+      <p className="m-0 -mt-1 text-[13px] font-semibold text-[#1B1F5E]">La barra suma {totalDays} días. Toca una fase para leerla.</p>
+
+      <div className="flex flex-col gap-2">
+        {windows.map((phase) => {
+          const look = PHASE_LOOK[phase.phase];
+          const reference = REFERENCE[phase.phase];
+          const open = active === phase.phase;
+          const own = byPhase.get(phase.phase) || [];
+          const ownBars = (['Serena', 'Enfocada', 'Radiante', 'Reflexiva', 'Sensible'] as const)
+            .map((mood) => ({ mood, pct: own.length ? Math.round(own.filter((log) => moodOf(log) === mood).length / own.length * 100) : 0 }))
+            .filter((bar) => bar.pct > 0);
+          return (
+            <article key={phase.phase} className="overflow-hidden rounded-[22px] bg-white">
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setChosen(open ? 'none' : phase.phase)}
+                className="flex min-h-16 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+                style={{ background: look.bg, color: look.ink }}
+              >
+                <span>
+                  <span className="block text-[18px] font-extrabold leading-tight">{reference.state}</span>
+                  <span className="mt-0.5 block text-[13px] font-bold">{PHASE_TITLE[phase.phase]}</span>
+                </span>
+                <span className="ml-auto text-right text-[13px] font-extrabold">
+                  Días {phase.fromDay}–{phase.toDay}
+                  <span className="mt-0.5 block font-bold">{open ? 'Cerrar' : 'Leer'}</span>
+                </span>
+              </button>
+              {open && (
+                <div className="px-4 py-4">
+                  {phase.phase === current && <p className="m-0 mb-2 text-[13px] font-extrabold text-[#3A44C4]">Esta es la fase de hoy.</p>}
+                  <p className="m-0 text-sm leading-relaxed text-[#1B1F5E]">{reference.more}</p>
+                  {own.length >= 2 ? (
+                    <>
+                      <p className="m-0 mt-3 text-[13px] font-extrabold text-[#1B1F5E]">En tus registros de estos días: {wellbeingOf(own)}% de bienestar</p>
+                      <Bars bars={ownBars} />
+                    </>
+                  ) : (
+                    <p className="m-0 mt-3 text-[13px] leading-relaxed text-[#3B4070]">Cuando tengas dos registros en estos días, aquí verás cómo te sentiste.</p>
+                  )}
                 </div>
-                <div className="mt-3 rounded-2xl bg-[#F8F9FE] p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <span>
-                      <span className="block text-[10px] font-extrabold uppercase tracking-wide text-[#4A4F7A]">Estado que muchas mujeres reportan</span>
-                      <strong className="mt-1 block text-[16px]" style={{ color: MOOD_COLOR[own.length >= 2 && ownState ? ownState : reference.state] }}>
-                        {own.length >= 2 && ownState ? ownState : reference.state}
-                      </strong>
-                    </span>
-                    <span className="text-right">
-                      <span className="block text-[10px] font-extrabold uppercase tracking-wide text-[#4A4F7A]">{own.length >= 2 ? 'Según tus registros' : 'Sin porcentaje'}</span>
-                      <strong className="mt-1 block text-[22px]">{own.length >= 2 ? `${wellbeingOf(own)}%` : '—'}</strong>
-                    </span>
-                  </div>
-                </div>
-                {own.length >= 2 ? (
-                  <>
-                    <p className="m-0 mt-3 text-[13px] font-extrabold">Frecuencia según tus registros</p>
-                    <Bars bars={ownBars} />
-                  </>
-                ) : (
-                  <p className="m-0 mt-3 text-[13px] text-[#4A4F7A]">Todavía no hay dos registros en estos días, así que no hay un porcentaje propio.</p>
-                )}
-                <p className="m-0 mt-3 text-[13px] leading-relaxed text-[#3B4070]">{reference.more}</p>
-              </article>
-            );
-          })}
-          <PhaseGuide profile={profile} periods={periods} userId={userId} windows={windows} />
-          <p className="m-0 text-[12px] leading-relaxed text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
-        </div>
-      )}
-    </section>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
+      <p className="m-0 text-[12px] leading-relaxed text-[#3B4070]">Cyclia es educativa. No diagnostica ni indica tratamientos.</p>
+    </div>
   );
 }

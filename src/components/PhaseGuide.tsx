@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react';
 import type { MenstrualPhase, PeriodRecord, UserProfile } from '../types';
-import { analyzeCycle } from '../utils/cycleModel';
+import { getPhaseForDay } from '../utils/cycle';
+import { analyzeCycle, projectCycleBoard } from '../utils/cycleModel';
 
 type Area = 'movimiento' | 'nutricion' | 'mente';
 
-const AREAS: Array<{ id: Area | 'todas'; label: string }> = [
-  { id: 'todas', label: 'Todas las guías' },
-  { id: 'movimiento', label: 'Entrenamiento' },
-  { id: 'nutricion', label: 'Nutrición' },
-  { id: 'mente', label: 'Mente y foco' },
+const AREAS: Array<{ id: Area | 'todas'; label: string; bg: string }> = [
+  { id: 'todas', label: 'Todo', bg: '#FFFFFF' },
+  { id: 'movimiento', label: 'Moverme', bg: '#F49A9E' },
+  { id: 'nutricion', label: 'Comer', bg: '#A9C4F0' },
+  { id: 'mente', label: 'Mente', bg: '#F6E27F' },
 ];
+
+const PHASE_LOOK: Record<MenstrualPhase, { bg: string; ink: string }> = {
+  Menstrual: { bg: '#F49A9E', ink: '#1B1F5E' },
+  Folicular: { bg: '#A9C4F0', ink: '#1B1F5E' },
+  Ovulacion: { bg: '#F6E27F', ink: '#1B1F5E' },
+  Lutea: { bg: '#3A44C4', ink: '#FFFFFF' },
+};
 
 const BLOCK_TITLE: Record<Area, string> = {
   movimiento: 'Movimiento y entrenamiento',
@@ -99,6 +107,19 @@ function storageKey(userId: string) {
   return `cyclia_phase_guide_${userId || 'local'}`;
 }
 
+function phaseWindows(profile: UserProfile, periods: PeriodRecord[]) {
+  const board = projectCycleBoard(profile, periods);
+  if (board.cycles[0]?.phases.length) return board.cycles[0].phases;
+  return (['Menstrual', 'Folicular', 'Ovulacion', 'Lutea'] as const).flatMap((phase) => {
+    const days: number[] = [];
+    for (let day = 1; day <= board.projectedLength; day += 1) {
+      if (getPhaseForDay(day, board.periodLength, board.projectedLength) === phase) days.push(day);
+    }
+    if (!days.length) return [];
+    return [{ phase, fromDay: days[0], toDay: days[days.length - 1], start: '', end: '' }];
+  });
+}
+
 export default function PhaseGuide({
   profile,
   periods,
@@ -108,10 +129,11 @@ export default function PhaseGuide({
   profile: UserProfile;
   periods: PeriodRecord[];
   userId?: string;
-  windows: Array<{ phase: MenstrualPhase; fromDay: number; toDay: number }>;
+  windows?: Array<{ phase: MenstrualPhase; fromDay: number; toDay: number }>;
 }) {
+  const ranges = windows?.length ? windows : phaseWindows(profile, periods);
   const today = analyzeCycle(profile, periods);
-  const fallback = windows[0]?.phase || 'Menstrual';
+  const fallback = ranges[0]?.phase || 'Menstrual';
   const [phase, setPhase] = useState<MenstrualPhase>(today.showPhases && today.phase ? today.phase : fallback);
   const [area, setArea] = useState<Area | 'todas'>('todas');
   const [checked, setChecked] = useState<string[]>([]);
@@ -133,7 +155,7 @@ export default function PhaseGuide({
     });
   };
 
-  const selected = windows.find((item) => item.phase === phase) || windows[0];
+  const selected = ranges.find((item) => item.phase === phase) || ranges[0];
   const blocks = (['movimiento', 'nutricion', 'mente'] as const)
     .filter((id) => area === 'todas' || area === id)
     .map((id) => ({
@@ -142,46 +164,91 @@ export default function PhaseGuide({
       items: GUIDE[phase][id],
     }));
 
+  const todayPhase = today.showPhases ? today.phase : null;
+  const todayLook = todayPhase ? PHASE_LOOK[todayPhase] : null;
+
   return (
-    <section className="rounded-[18px] border border-[#E1E5F5] p-3.5">
-      <p className="m-0 text-[12px] font-extrabold text-[#3A44C4]">Guía · {today.showPhases && today.phase ? `Hoy la proyección te ubica en fase ${PHASE_NAME[today.phase].toLowerCase()}, día ${today.cycleDay}` : 'Usa la fase que quieras revisar'}</p>
-      <h3 className="m-0 mt-1 text-[18px] font-extrabold">Recomendaciones de estilo de vida</h3>
-      <p className="m-0 mt-1 text-[13px] leading-relaxed text-[#4A4F7A]">Marca las que quieras probar. Muchas mujeres las reportan en estos días. No son una orden ni una medición de hormonas.</p>
-      <div className="mt-3 flex gap-2 overflow-x-auto">
-        {AREAS.map((item) => (
-          <button key={item.id} type="button" onClick={() => setArea(item.id)} className="h-9 shrink-0 cursor-pointer rounded-full px-3 text-[13px] font-extrabold" style={{ background: area === item.id ? '#1B1F5E' : '#F3F5FC', color: area === item.id ? '#FFFFFF' : '#1B1F5E' }}>{item.label}</button>
-        ))}
+    <div className="flex flex-col gap-3">
+      <header className="rounded-[24px] bg-[#3A44C4] px-5 py-5 text-white">
+        <p className="m-0 text-[12px] font-extrabold tracking-[0.16em] text-[#F9C4C6]">CYCLIA</p>
+        <h1 className="m-0 mt-1 text-[26px] font-extrabold leading-tight">Bienestar</h1>
+        <p className="m-0 mt-2 text-sm leading-relaxed text-[#E3F1FB]">Ideas para probar. Muchas mujeres las reportan en estos días. No son una orden.</p>
+      </header>
+
+      {todayPhase && todayLook ? (
+        <section className="rounded-[24px] px-5 py-4" style={{ background: todayLook.bg, color: todayLook.ink }}>
+          <p className="m-0 text-[12px] font-extrabold uppercase tracking-wide">Hoy · día {today.cycleDay}</p>
+          <p className="m-0 mt-1 text-[22px] font-extrabold leading-tight">Fase {PHASE_NAME[todayPhase].toLowerCase()}</p>
+          <p className="m-0 mt-2 text-sm leading-relaxed">Elige otra fase si quieres ver ideas distintas. Tu energía de hoy sigue siendo la que marques.</p>
+        </section>
+      ) : (
+        <p className="m-0 rounded-[24px] bg-white px-4 py-4 text-sm leading-relaxed text-[#1B1F5E]">Elige una fase para ver ideas. Cyclia no estima una fase para hoy.</p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        {ranges.map((item) => {
+          const look = PHASE_LOOK[item.phase];
+          const on = phase === item.phase;
+          return (
+            <button
+              key={item.phase}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setPhase(item.phase)}
+              className="min-h-16 cursor-pointer rounded-[20px] px-3 py-3 text-left"
+              style={{ background: look.bg, color: look.ink, boxShadow: on ? 'inset 0 0 0 3px #1B1F5E' : undefined }}
+            >
+              <span className="block text-[16px] font-extrabold">{PHASE_NAME[item.phase]}</span>
+              <span className="mt-0.5 block text-[13px] font-bold">Días {item.fromDay}–{item.toDay}{item.phase === todayPhase ? ' · hoy' : ''}</span>
+            </button>
+          );
+        })}
       </div>
-      <div className="mt-3 flex gap-2 overflow-x-auto">
-        {windows.map((item) => (
-          <button key={item.phase} type="button" onClick={() => setPhase(item.phase)} className="h-10 shrink-0 cursor-pointer rounded-2xl px-3 text-[12px] font-extrabold" style={{ background: phase === item.phase ? '#1B1F5E' : '#FFFFFF', color: phase === item.phase ? '#FFFFFF' : '#1B1F5E', border: '1px solid #E1E5F5' }}>
-            {PHASE_NAME[item.phase]}
-            <span className="mt-0.5 block font-bold opacity-80">Días {item.fromDay}–{item.toDay}</span>
-          </button>
-        ))}
+
+      <div className="grid grid-cols-4 gap-2">
+        {AREAS.map((item) => {
+          const on = area === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setArea(item.id)}
+              className="min-h-14 cursor-pointer rounded-[18px] px-1 text-[13px] font-extrabold"
+              style={{ background: on ? '#1B1F5E' : item.bg, color: on ? '#FFFFFF' : '#1B1F5E', boxShadow: on ? undefined : 'inset 0 0 0 1.5px #C9D3EF' }}
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </div>
-      {selected && <p className="m-0 mt-3 text-[13px] font-extrabold text-[#1B1F5E]">Fase {PHASE_NAME[phase].toLowerCase()} · días {selected.fromDay}–{selected.toDay} de {today.averageLength}</p>}
-      <div className="mt-3 flex flex-col gap-3">
-        {blocks.map((block) => (
-          <div key={block.id}>
-            <h4 className="m-0 text-[14px] font-extrabold">{block.title}</h4>
-            <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
-              {block.items.map((item, index) => {
-                const id = `${phase}:${block.id}:${index}`;
-                return (
-                  <li key={id}>
-                    <label className="flex min-h-12 cursor-pointer items-start gap-2.5 rounded-2xl border px-3 py-3 text-[14px] leading-relaxed text-[#1B1F5E]" style={{ background: checked.includes(id) ? '#E7F6EA' : '#F8F9FE', borderColor: checked.includes(id) ? '#8FCB9B' : '#E1E5F5' }}>
-                      <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-[#2F8F4E]" checked={checked.includes(id)} onChange={() => toggle(id)} />
-                      <span>{item}</span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
-      <p className="m-0 mt-3 text-[12px] leading-relaxed text-[#4A4F7A]">{phase === 'Menstrual' ? 'Algunas descripciones de estos días hablan de estrógeno y progesterona más bajos.' : phase === 'Folicular' ? 'Algunas descripciones de estos días hablan de un ascenso del estrógeno.' : phase === 'Ovulacion' ? 'Algunas descripciones de estos días hablan de un pico de estrógeno.' : 'Algunas descripciones de estos días hablan de la progesterona.'} Cyclia no mide tus hormonas. Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
-    </section>
+
+      {selected && <p className="m-0 text-sm font-extrabold text-[#1B1F5E]">Ideas de la fase {PHASE_NAME[phase].toLowerCase()}, días {selected.fromDay}–{selected.toDay}. Toca las que quieras probar.</p>}
+
+      {blocks.map((block) => (
+        <section key={block.id} className="flex flex-col gap-2">
+          <h2 className="m-0 text-base font-extrabold text-[#1B1F5E]">{block.title}</h2>
+          {block.items.map((item, index) => {
+            const id = `${phase}:${block.id}:${index}`;
+            const on = checked.includes(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggle(id)}
+                className="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-[20px] px-3 py-3 text-left"
+                style={{ background: on ? '#F6E27F' : '#FFFFFF' }}
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-extrabold" style={{ background: on ? '#1B1F5E' : '#E3F1FB', color: on ? '#F6E27F' : '#3A44C4' }}>{on ? '✓' : ''}</span>
+                <span className="text-[15px] font-semibold leading-snug text-[#1B1F5E]">{item}</span>
+              </button>
+            );
+          })}
+        </section>
+      ))}
+
+      <p className="m-0 text-[12px] leading-relaxed text-[#3B4070]">Cyclia no mide hormonas. Estas ideas son educativas y no indican un tratamiento.</p>
+    </div>
   );
 }

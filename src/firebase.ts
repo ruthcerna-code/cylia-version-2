@@ -5,6 +5,7 @@ import {
   createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -144,6 +145,19 @@ export async function openEmailAccount(email: string, password: string, remember
       const createCode = createError instanceof Error ? createError.message : '';
       throw new Error(firebaseMessage(createCode));
     }
+  }
+}
+
+/** Firebase envía el correo para crear una contraseña nueva. No dice si el correo tiene cuenta. */
+export async function sendPasswordReset(email: string): Promise<void> {
+  auth.languageCode = 'es';
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : '';
+    if (/auth\/user-not-found/i.test(code)) return;
+    if (/auth\/too-many-requests/i.test(code)) throw new Error('Pediste varios correos seguidos. Espera unos minutos e inténtalo de nuevo.');
+    throw new Error(firebaseMessage(code));
   }
 }
 

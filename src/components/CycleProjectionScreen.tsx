@@ -147,7 +147,7 @@ export default function CycleProjectionScreen({
             <p className="m-0 rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#3B4070]">{board.note}</p>
           )}
 
-          <PhaseKnowledge profile={profile} periods={periods} logs={logs} userId={userId} />
+          <PhaseKnowledge profile={profile} periods={periods} logs={logs} userId={userId} embedded />
           <p className="m-0 text-[12px] leading-relaxed text-[#4A4F7A]">
             {board.sample >= 3
               ? `Calculada con ${board.sample} ciclos de 21 a 45 días. `

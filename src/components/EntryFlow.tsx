@@ -27,6 +27,7 @@ export function EntryFlow({
   onPasswordChange,
   onEnter,
   onContinue,
+  onForgotPassword,
 }: {
   configured: boolean;
   processing: boolean;
@@ -38,8 +39,24 @@ export function EntryFlow({
   onPasswordChange: (value: string) => void;
   onEnter: (event: React.FormEvent) => void;
   onContinue: () => void;
+  onForgotPassword: () => Promise<string>;
 }) {
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [resetNote, setResetNote] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetSending, setResetSending] = useState(false);
+  const forgotPassword = async () => {
+    setResetNote('');
+    setResetError('');
+    setResetSending(true);
+    try {
+      setResetNote(await onForgotPassword());
+    } catch (failure) {
+      setResetError(failure instanceof Error ? failure.message : 'No se pudo enviar el correo.');
+    } finally {
+      setResetSending(false);
+    }
+  };
   const [privacyError, setPrivacyError] = useState('');
   const acceptPrivacyOrWarn = () => {
     if (privacyAccepted) return true;
@@ -53,19 +70,24 @@ export function EntryFlow({
         <header className="shrink-0 px-5 pt-10">
           <p className="login-kicker font-serif text-[15px] font-semibold tracking-[0.18em]">CYCLIA</p>
           <h1 className="login-title font-serif text-4xl">Entra a Cyclia</h1>
-          <p className="login-copy mt-2 text-sm font-semibold">El usuario es tu correo. Si no existe, se crea la cuenta. Si ya existe, verás tu calendario.</p>
+          <p className="login-copy mt-2 text-sm font-semibold">Entra con tu correo. Si todavía no tienes cuenta, se crea con ese correo. Si ya la tienes, verás tu calendario.</p>
         </header>
         <main className="flex-1 overflow-y-auto px-5 pt-6 pb-8">
           {error && <p className="text-xs text-red-700 bg-red-50 rounded-2xl p-3 mb-4">{error}</p>}
           {!configured && <p className="text-xs rounded-2xl p-3 mb-4" style={{ background: 'var(--menthe)', color: 'var(--emeraude)' }}>Falta la configuración de Firebase.</p>}
           <form onSubmit={(event) => { if (!acceptPrivacyOrWarn()) { event.preventDefault(); return; } onEnter(event); }} className="flex flex-col gap-3">
-            <input value={username} onChange={(event) => onUsernameChange(event.target.value)} type="text" required autoComplete="username" placeholder="Usuario (correo)" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
-            <input value={password} onChange={(event) => onPasswordChange(event.target.value)} type="password" required minLength={4} autoComplete="current-password" placeholder="Contraseña" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
+            <input value={username} onChange={(event) => onUsernameChange(event.target.value)} type="email" inputMode="email" required autoComplete="email" placeholder="Correo" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
+            <input value={password} onChange={(event) => onPasswordChange(event.target.value)} type="password" required minLength={6} autoComplete="current-password" placeholder="Contraseña (mínimo 6 caracteres)" className="min-h-12 rounded-2xl px-5 py-4 text-lg outline-none" style={{ background: 'var(--card)', color: 'var(--ink)', border: '2px solid var(--emeraude)' }} />
             <PrivacyAcceptance checked={privacyAccepted} error={privacyError} onChange={(value) => { setPrivacyAccepted(value); if (value) setPrivacyError(''); }} />
             <button type="submit" disabled={processing || !configured || !privacyAccepted} className="btn-fucsia min-h-12 rounded-full py-3 text-base font-extrabold cursor-pointer">
               {processing ? 'Entrando…' : 'Entrar'}
             </button>
           </form>
+          <button type="button" onClick={() => { void forgotPassword(); }} disabled={resetSending || !configured} className="mt-4 cursor-pointer text-sm font-bold underline" style={{ color: 'var(--emeraude)' }}>
+            {resetSending ? 'Enviando…' : '¿Olvidaste tu contraseña?'}
+          </button>
+          {resetNote && <p className="mt-3 rounded-2xl p-3 text-xs" style={{ background: 'var(--menthe)', color: 'var(--emeraude)' }}>{resetNote}</p>}
+          {resetError && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-xs text-red-700">{resetError}</p>}
         </main>
       </div>
       {entryNotice && (

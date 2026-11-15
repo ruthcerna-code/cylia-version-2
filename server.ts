@@ -4,11 +4,10 @@ import path from "path";
 import dotenv from "dotenv";
 import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
-import { ensureAdminAccount, registerAccountRoutes } from "./accounts.js";
 import { registerConsentRoutes } from "./consentRoutes.js";
 import { assertConsentFromRequest, ConsentError } from "./consentHttp.js";
 import { alignAssist, ASSIST_ACTIVITY_SYSTEM_PROMPT, assistRequestSchema, draftAssist, geminiKeyLooksUsable } from "./src/plan/assist.js";
-import { alignProposal, extractJson, PLAN_ACTIVITY_SYSTEM_PROMPT, planRequestSchema } from "./src/plan/proposal.js";
+import { alignProposal, draftProposal, extractJson, PLAN_ACTIVITY_SYSTEM_PROMPT, planRequestSchema } from "./src/plan/proposal.js";
 
 dotenv.config();
 
@@ -353,7 +352,6 @@ Responde a la consulta con esos datos. Si pregunta por su ciclo y no hay fase, d
   }
 });
 
-registerAccountRoutes(app);
 registerConsentRoutes(app);
 
 app.post("/api/plan-activity", async (req, res) => {
@@ -365,6 +363,10 @@ app.post("/api/plan-activity", async (req, res) => {
       return;
     }
     const input = parsed.data;
+    if (!geminiKeyLooksUsable(process.env.GEMINI_API_KEY)) {
+      res.json({ proposal: draftProposal(input) });
+      return;
+    }
     const ai = getAI();
     const ask = async (previous: string | null) => {
       const response = await generateContentWithRetry(ai, {
@@ -403,6 +405,13 @@ app.post("/api/plan-activity", async (req, res) => {
     if (error instanceof ConsentError) {
       res.status(error.status).json({ error: error.message });
       return;
+    }
+    if (isInvalidGeminiKey(error)) {
+      const again = planRequestSchema.safeParse(req.body);
+      if (again.success) {
+        res.json({ proposal: draftProposal(again.data) });
+        return;
+      }
     }
     console.error("Error en propuesta de actividad:", error);
     res.status(500).json({ error: "Cyclia no pudo armar una propuesta esta vez. Puedes intentarlo de nuevo." });
@@ -490,11 +499,6 @@ function localNetworkAddresses(): string[] {
 
 // Setup Vite Dev Server / Static Files Serving
 async function startServer() {
-  try {
-    await ensureAdminAccount();
-  } catch (error) {
-    console.error("[Cuentas] No se pudo preparar el usuario administrador:", error);
-  }
 
   const distPath = path.join(process.cwd(), "dist");
   const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(path.join(distPath, "index.html"));

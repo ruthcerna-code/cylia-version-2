@@ -161,3 +161,81 @@ export function monthLabel(dateStr: string): string {
   const label = new Date(`${dateStr}T12:00:00`).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
+
+const PHASE_REPORT: Record<PlanPhase, string> = {
+  menstrual: 'Muchas mujeres reportan más descanso en estos días.',
+  folicular: 'Muchas mujeres reportan más foco en estos días.',
+  ovulatoria: 'Muchas mujeres reportan un ánimo más abierto en estos días.',
+  lutea: 'Muchas mujeres reportan un ritmo más lento en estos días.',
+};
+
+function statedBlock(text: string): number | null {
+  const hours = text.match(/(\d+(?:[.,]\d+)?)\s*h(?:oras?)?\b/i);
+  const minutes = text.match(/(\d+)\s*min(?:utos?)?\b/i);
+  const halfHour = /hora y media|media hora/i.test(text);
+  let total = 0;
+  if (hours) total += Math.round(Number(hours[1].replace(',', '.')) * 60);
+  if (minutes) total += Number(minutes[1]);
+  if (halfHour) total += 30;
+  return total > 0 ? total : null;
+}
+
+function baseMinutes(text: string): number {
+  if (/proyecto|mudanza|informe largo/.test(text)) return 120;
+  if (/escrib|redact|informe|manual|presentaci/.test(text)) return 75;
+  if (/estudi|leer|clase|curso/.test(text)) return 60;
+  if (/reuni[oó]n|junta/.test(text)) return 45;
+  if (/entren|ejercicio|camin|yoga|limpi|orden|cocin|compr/.test(text)) return 40;
+  if (/correo|mail|mensaje|llamada|recado/.test(text)) return 20;
+  return 45;
+}
+
+export function draftProposal(input: PlanRequest): ActivityProposal {
+  const text = `${input.actividad} ${input.notas || ''}`.toLocaleLowerCase('es');
+  const named = statedBlock(text);
+  const base = named ?? baseMinutes(text);
+  const low = input.energia === 'sin_energia';
+  let minutes = roundDuration(low ? base * 0.65 : !named && base >= 75 ? base * 1.2 : base);
+  const previous = input.propuesta_anterior_min == null ? null : roundDuration(input.propuesta_anterior_min);
+  if (previous != null && previous === minutes) {
+    const shifted = low ? minutes - 15 : minutes + 15;
+    minutes = roundDuration(shifted === minutes ? minutes + (low ? 15 : -15) : shifted);
+  }
+  const title = input.actividad.trim().slice(0, 28);
+  const energyLine = low
+    ? `Sin energía, ${minutes} min alcanzan para ${title}, con pausa si hace falta.`
+    : `Con energía, ${minutes} min quedan bien para ${title}.`;
+  const mismatch = Boolean(input.fase) && (
+    (low && (input.fase === 'folicular' || input.fase === 'ovulatoria'))
+    || (!low && (input.fase === 'menstrual' || input.fase === 'lutea'))
+  );
+  const parts = [energyLine];
+  if (input.fase && mismatch && `${energyLine} Manda la energía que marcaste. ${PHASE_REPORT[input.fase]}`.length <= 160) {
+    parts.push('Manda la energía que marcaste.');
+  }
+  if (input.fase) parts.push(PHASE_REPORT[input.fase]);
+  let motivo = parts.join(' ').replace(/\s+/g, ' ').trim();
+  if (motivo.length > 160) motivo = energyLine.slice(0, 160);
+  const proposal = alignProposal({
+    duracion_min: minutes,
+    motivo,
+    pasos: [
+      `Empezar ${title}`,
+      low ? 'Hacer un tramo y pausar si el cuerpo lo pide' : 'Hacer el tramo principal',
+      'Cerrar y anotar lo que quede pendiente',
+    ],
+    aviso: low ? 'Si se alarga, pártala en otro bloque. No hace falta dejarla.' : null,
+    dividir_en_bloques: low && base >= 45,
+  }, input.hora_inicio, input.fase);
+  if (!proposal) {
+    return {
+      duracion_min: minutes,
+      hora_termino: endClock(input.hora_inicio, minutes),
+      motivo: energyLine.slice(0, 160),
+      pasos: [`Empezar ${title}`.slice(0, 80), 'Cerrar lo empezado'],
+      aviso: null,
+      dividir_en_bloques: false,
+    };
+  }
+  return proposal;
+}
