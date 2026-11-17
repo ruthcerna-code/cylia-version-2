@@ -78,7 +78,7 @@ export interface DailyLog {
   hotFlashIntensity?: number; // 1-3
   nightSweatCount?: number;
   nightSweatIntensity?: number; // 1-3
-  aiAnalysis?: string; // Cache the Gemini analysis for this specific log
+  aiAnalysis?: string; // Cache the AI analysis for this specific log
 }
 
 export interface PeriodRecord {
@@ -138,6 +138,15 @@ export interface ScheduledActivity {
   completedAt: string | null;
   /** cyclia: accepted a proposal. manual: she chose the minutes. */
   durationSource: 'cyclia' | 'manual' | null;
+  /** Conversation with "Cyclia te asiste" that defined this activity, oldest first. */
+  assistChat?: AssistChatTurn[];
+}
+
+export interface AssistChatTurn {
+  role: 'user' | 'assistant';
+  text: string;
+  /** ISO timestamp. */
+  at: string;
 }
 
 export interface PhaseInfo {

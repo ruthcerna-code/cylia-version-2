@@ -2,24 +2,80 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { ActivityDraft } from '../../firebase';
 import type { AssistAnalysis } from '../../plan/assist';
 import { endClock, localDate } from '../../plan/proposal';
-import type { ActivityEffort, ScheduledActivity } from '../../types';
+import type { ActivityEffort, AssistChatTurn, ScheduledActivity } from '../../types';
 import { formatDuration, overlappingActivity, suggestOpenSlot, validateAssistSchedule } from '../../utils/activities';
+import { formatFriendlyDate } from '../../utils/cycle';
 import { authBearer } from '../../consentApi';
 
 const FIELD = 'w-full rounded-2xl border-[1.5px] border-[#C9D3EF] bg-white px-3 py-3 text-base font-semibold text-[#1B1F5E] outline-none';
 const EFFORT_LABEL: Record<ActivityEffort, string> = { bajo: 'Bajo', medio: 'Medio', alto: 'Alto' };
+const GREETING = '¡Hola! Cuéntame qué actividad quieres realizar y cuánto esfuerzo crees que te tomará. Si tengo dudas sobre el alcance, te preguntaré antes de proponerla.';
 
-type Step = 'describe' | 'review' | 'schedule' | 'confirm' | 'saved';
+type SlotSource = 'conversacion' | 'sugerido' | 'manual';
 
-function readDuration(value: string, unit: 'minutos' | 'horas'): number | null {
+type AssistDraftState = {
+  chat: AssistChatTurn[];
+  result: AssistAnalysis | null;
+  name: string;
+  description: string;
+  stepsText: string;
+  effort: ActivityEffort;
+  effortReason: string;
+  durationValue: string;
+  date: string;
+  start: string;
+  slotSource: SlotSource;
+  localEstimate: boolean;
+};
+
+const EMPTY: AssistDraftState = {
+  chat: [],
+  result: null,
+  name: '',
+  description: '',
+  stepsText: '',
+  effort: 'medio',
+  effortReason: '',
+  durationValue: '30',
+  date: '',
+  start: '',
+  slotSource: 'sugerido',
+  localEstimate: false,
+};
+
+function draftKey(userId: string): string {
+  return `cyclia_asiste_borrador_${userId}`;
+}
+
+/** The unsaved conversation stays on this device until the activity is saved or she starts over. */
+function readDraft(userId: string): AssistDraftState | null {
+  try {
+    const raw = localStorage.getItem(draftKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AssistDraftState;
+    return parsed && Array.isArray(parsed.chat) ? { ...EMPTY, ...parsed } : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(userId: string, state: AssistDraftState | null): void {
+  try {
+    if (!state || state.chat.length === 0) localStorage.removeItem(draftKey(userId));
+    else localStorage.setItem(draftKey(userId), JSON.stringify(state));
+  } catch {
+    // Storage can be blocked; the conversation then lasts while the app stays open.
+  }
+}
+
+function readMinutes(value: string): number | null {
   const parsed = Number(value.replace(',', '.').trim());
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  const minutes = unit === 'horas' ? Math.round(parsed * 60) : Math.round(parsed);
-  return minutes > 0 ? minutes : null;
+  return Math.round(parsed);
 }
 
 function effortLine(effort: ActivityEffort, reason: string): string {
-  return reason.trim() ? `Esfuerzo ${effort}: ${reason.trim()} Esta estimación es orientativa.` : '';
+  return reason.trim() ? `Esfuerzo ${effort}: ${reason.trim()}` : '';
 }
 
 function buildDraft(input: {
@@ -56,24 +112,62 @@ function buildDraft(input: {
   };
 }
 
-function Panel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function resultMessage(analysis: AssistAnalysis): string {
+  const when = analysis.fecha
+    ? ` El ${formatFriendlyDate(analysis.fecha).toLocaleLowerCase('es')}${analysis.hora ? ` a las ${analysis.hora}` : ''}.`
+    : analysis.hora ? ` A las ${analysis.hora}.` : '';
+  return `Listo. Te propongo «${analysis.nombre}», con esfuerzo ${analysis.esfuerzo} y una duración estimada de ${formatDuration(analysis.duracion_min)}.${when} Revisa la actividad y guárdala en tu día, o escríbeme si quieres cambiar algo.`;
+}
+
+function Bubble({ turn }: { turn: Pick<AssistChatTurn, 'role' | 'text'> }) {
+  const mine = turn.role === 'user';
+  return (
+    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+      <p
+        className={`m-0 max-w-[85%] whitespace-pre-wrap rounded-[20px] px-4 py-3 text-[15px] leading-relaxed ${mine ? 'rounded-br-md bg-[#3A44C4] text-white' : 'rounded-bl-md bg-white text-[#1B1F5E]'}`}
+      >
+        {!mine && <span className="mb-1 block text-xs font-extrabold tracking-wide text-[#3A44C4]">CYCLIA</span>}
+        {turn.text}
+      </p>
+    </div>
+  );
+}
+
+function Panel({ title, onClose, children, headerAction }: { title: string; onClose: () => void; children: React.ReactNode; headerAction?: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B1F5E]/45 sm:items-center" role="presentation" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="cyclia-asiste-titulo"
-        className="max-h-[92dvh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-[#E3F1FB] px-4 pb-8 pt-3 sm:rounded-[28px]"
+        className="max-h-[92dvh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-[#E3F1FB] px-4 pb-6 pt-3 sm:rounded-[28px]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[#C9D3EF]" />
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 id="cyclia-asiste-titulo" className="m-0 text-xl font-extrabold text-[#1B1F5E]">{title}</h2>
-          <button type="button" onClick={onClose} className="flex h-11 cursor-pointer items-center px-2 text-sm font-extrabold text-[#3A44C4]">Cerrar</button>
+          <div className="flex items-center gap-1">
+            {headerAction}
+            <button type="button" onClick={onClose} className="flex h-11 cursor-pointer items-center px-2 text-sm font-extrabold text-[#3A44C4]">Cerrar</button>
+          </div>
         </div>
         {children}
       </div>
     </div>
+  );
+}
+
+export function AssistConversation({ turns }: { turns: AssistChatTurn[] }) {
+  if (!turns.length) return null;
+  return (
+    <details className="rounded-[20px] bg-white/60 px-3 py-2">
+      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-extrabold text-[#3A44C4]">
+        Conversación con Cyclia ({turns.length} {turns.length === 1 ? 'mensaje' : 'mensajes'})
+      </summary>
+      <div className="mt-2 flex flex-col gap-2 pb-2">
+        {turns.map((turn, index) => <Bubble key={`${turn.at}-${index}`} turn={turn} />)}
+      </div>
+    </details>
   );
 }
 
@@ -96,7 +190,7 @@ export function ActivityReviewSheet({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  const minutes = readDuration(durationValue, 'minutos');
+  const minutes = readMinutes(durationValue);
   const scheduleError = validateAssistSchedule({
     title,
     date,
@@ -158,6 +252,14 @@ export function ActivityReviewSheet({
           Descripción
           <textarea value={description} rows={4} onChange={(event) => setDescription(event.target.value)} className={`${FIELD} resize-none`} />
         </label>
+        {activity.steps.length > 0 && (
+          <div className="rounded-[20px] bg-white px-4 py-3 text-sm text-[#1B1F5E]">
+            <p className="m-0 font-extrabold">Pasos</p>
+            <ol className="mb-0 mt-1 list-decimal pl-5">
+              {activity.steps.map((step, index) => <li key={`${step.action}-${index}`}>{step.action}</li>)}
+            </ol>
+          </div>
+        )}
         <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
           Fecha
           <input type="date" min={localDate()} value={date} onChange={(event) => setDate(event.target.value)} className={FIELD} />
@@ -172,6 +274,7 @@ export function ActivityReviewSheet({
         </label>
         <p className="m-0 text-sm font-semibold text-[#1B1F5E]">Hora de término: {draft ? draft.endTime : '—'}</p>
         {clash && <p className="m-0 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold text-[#1B1F5E]" role="status">Este horario coincide con «{clash.title}».</p>}
+        <AssistConversation turns={activity.assistChat || []} />
         {error && <p className="m-0 text-sm font-semibold text-[#1B1F5E]" role="alert">{error}</p>}
         <button type="button" disabled={saving} onClick={() => { void save(); }} className="btn-fucsia flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">
           {saving ? 'Guardando…' : 'Guardar cambios'}
@@ -183,6 +286,7 @@ export function ActivityReviewSheet({
 
 export default function CycliaTeAsiste({
   open,
+  userId,
   activities,
   availabilityKnown,
   assistantEnabled,
@@ -192,6 +296,7 @@ export default function CycliaTeAsiste({
   onShow,
 }: {
   open: boolean;
+  userId: string;
   activities: ScheduledActivity[];
   availabilityKnown: boolean;
   assistantEnabled: boolean;
@@ -200,86 +305,51 @@ export default function CycliaTeAsiste({
   onSave: (draft: ActivityDraft) => Promise<ScheduledActivity | undefined>;
   onShow: (activity: ScheduledActivity, mode: 'calendar' | 'edit') => void;
 }) {
-  const [step, setStep] = useState<Step>('describe');
-  const [requestText, setRequestText] = useState('');
-  const [question, setQuestion] = useState('');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [stepsText, setStepsText] = useState('');
-  const [effort, setEffort] = useState<ActivityEffort>('medio');
-  const [effortReason, setEffortReason] = useState('');
-  const [suggestedMinutes, setSuggestedMinutes] = useState(30);
-  const [durationValue, setDurationValue] = useState('30');
-  const [durationUnit, setDurationUnit] = useState<'minutos' | 'horas'>('minutos');
-  const [date, setDate] = useState('');
-  const [start, setStart] = useState('');
-  const [needsReview, setNeedsReview] = useState(false);
-  const [timeTouched, setTimeTouched] = useState(false);
-  const [scheduleReady, setScheduleReady] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [localEstimate, setLocalEstimate] = useState(false);
+  const [state, setState] = useState<AssistDraftState>(EMPTY);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState<ScheduledActivity | null>(null);
   const savingRef = useRef(false);
   const draftIdRef = useRef<string | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
 
+  // Opening the panel brings back the unsaved conversation, if there is one.
   useEffect(() => {
     if (!open) return;
-    setStep('describe');
-    setRequestText('');
-    setQuestion('');
-    setName('');
-    setDescription('');
-    setStepsText('');
-    setEffort('medio');
-    setEffortReason('');
-    setSuggestedMinutes(30);
-    setDurationValue('30');
-    setDurationUnit('minutos');
-    setDate('');
-    setStart('');
-    setNeedsReview(false);
-    setTimeTouched(false);
-    setScheduleReady(false);
-    setAnalyzing(false);
+    setState(readDraft(userId) || EMPTY);
+    setInput('');
+    setSending(false);
     setSaving(false);
     setError('');
     setSaved(null);
     draftIdRef.current = null;
     savingRef.current = false;
-  }, [open]);
+  }, [open, userId]);
+
+  useEffect(() => {
+    if (open && !saved) writeDraft(userId, state);
+  }, [open, saved, state, userId]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView?.({ block: 'end' });
+  }, [state.chat.length, state.result, sending]);
 
   if (!open) return null;
 
-  const steps = stepsText.split('\n').map((item) => item.trim()).filter(Boolean);
-  const durationMinutes = readDuration(durationValue, durationUnit);
-  const applySlot = (minutes: number, chosenDate?: string) => {
-    const slot = suggestOpenSlot(activities, minutes, { availabilityKnown, date: chosenDate });
-    setDate(slot.date);
-    setStart(slot.startTime);
-    setNeedsReview(slot.needsReview);
-    setTimeTouched(false);
-  };
-  const goToSchedule = () => {
-    const minutes = durationMinutes && durationMinutes > 0 ? durationMinutes : 30;
-    if (!scheduleReady) {
-      setDurationValue(String(minutes));
-      setDurationUnit('minutos');
-      applySlot(minutes);
-      setScheduleReady(true);
-    }
-    setError('');
-    setStep('schedule');
-  };
+  const patch = (next: Partial<AssistDraftState>) => setState((current) => ({ ...current, ...next }));
+  const steps = state.stepsText.split('\n').map((item) => item.trim()).filter(Boolean);
+  const durationMinutes = readMinutes(state.durationValue);
 
-  const analyze = async () => {
-    const texto = requestText.trim();
-    if (!texto) {
-      setError('Escribe la actividad antes de analizar.');
-      return;
-    }
-    setAnalyzing(true);
+  const send = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    const turn: AssistChatTurn = { role: 'user', text: text.slice(0, 800), at: new Date().toISOString() };
+    const chat = [...state.chat, turn];
+    patch({ chat });
+    setInput('');
+    setSending(true);
     setError('');
     try {
       if (!assistantEnabled) {
@@ -290,59 +360,76 @@ export default function CycliaTeAsiste({
       const response = await fetch('/api/assist-activity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenValue}` },
-        body: JSON.stringify({ texto }),
+        body: JSON.stringify({
+          mensajes: chat.slice(-30).map((item) => ({ role: item.role, texto: item.text })),
+          hoy: localDate(),
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.analysis) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Cyclia no pudo analizar la actividad esta vez. Puedes intentarlo de nuevo.');
       }
       const analysis = data.analysis as AssistAnalysis;
-      setLocalEstimate(data.fuente === 'local');
+      const at = new Date().toISOString();
       if (analysis.necesita_datos) {
-        setQuestion(analysis.pregunta || 'Cuéntame un poco más sobre la actividad para poder estimar el trabajo.');
-        setStep('describe');
+        const question = analysis.pregunta || 'Cuéntame un poco más sobre la actividad para poder estimar el trabajo.';
+        setState((current) => ({ ...current, chat: [...chat, { role: 'assistant', text: question, at }] }));
         return;
       }
-      setQuestion('');
-      setName(analysis.nombre);
-      setDescription(analysis.descripcion);
-      setStepsText(analysis.pasos.join('\n'));
-      setEffort(analysis.esfuerzo);
-      setEffortReason(analysis.esfuerzo_motivo);
-      setSuggestedMinutes(analysis.duracion_min);
-      if (!scheduleReady) {
-        setDurationValue(String(analysis.duracion_min));
-        setDurationUnit('minutos');
-      }
-      setStep('review');
+      setState((current) => {
+        // Keep a day and time she typed by hand; otherwise use the ones from the conversation or a free slot.
+        const keepManual = current.slotSource === 'manual' && current.date && current.start;
+        const slot = suggestOpenSlot(activities, analysis.duracion_min, { availabilityKnown, date: analysis.fecha ?? undefined });
+        const date = keepManual ? current.date : analysis.fecha ?? slot.date;
+        const start = keepManual ? current.start : analysis.hora ?? slot.startTime;
+        const slotSource: SlotSource = keepManual ? 'manual' : analysis.fecha || analysis.hora ? 'conversacion' : 'sugerido';
+        return {
+          ...current,
+          chat: [...chat, { role: 'assistant', text: resultMessage(analysis), at }],
+          result: analysis,
+          name: analysis.nombre,
+          description: analysis.descripcion,
+          stepsText: analysis.pasos.join('\n'),
+          effort: analysis.esfuerzo,
+          effortReason: analysis.esfuerzo_motivo,
+          durationValue: String(analysis.duracion_min),
+          date,
+          start,
+          slotSource,
+          localEstimate: data.fuente === 'local',
+        };
+      });
     } catch (reason) {
+      // Her message goes back to the box so she can send it again.
+      setState((current) => ({ ...current, chat: current.chat.filter((item) => item !== turn) }));
+      setInput(text);
       setError(reason instanceof Error ? reason.message : 'Cyclia no pudo analizar la actividad esta vez. Puedes intentarlo de nuevo.');
     } finally {
-      setAnalyzing(false);
+      setSending(false);
     }
   };
 
-  const scheduleError = validateAssistSchedule({
-    title: name,
-    date,
-    startTime: start,
+  const scheduleError = state.result ? validateAssistSchedule({
+    title: state.name,
+    date: state.date,
+    startTime: state.start,
     durationMinutes: durationMinutes ?? 0,
-  });
-  const preview = durationMinutes ? buildDraft({
-    title: name,
-    description,
-    effort,
-    effortReason,
+  }) : null;
+  const preview = state.result && durationMinutes ? buildDraft({
+    title: state.name,
+    description: state.description,
+    effort: state.effort,
+    effortReason: state.effortReason,
     steps,
-    date,
-    startTime: start,
+    date: state.date,
+    startTime: state.start,
     durationMinutes,
   }) : null;
   const clash = preview ? overlappingActivity(activities, {
-    date,
-    startTime: start,
+    date: state.date,
+    startTime: state.start,
     endTime: preview.endTime,
-    durationMinutes,
+    durationMinutes: durationMinutes ?? undefined,
   }) : null;
 
   const save = async () => {
@@ -355,154 +442,146 @@ export default function CycliaTeAsiste({
     setSaving(true);
     setError('');
     try {
-      const stored = await onSave({ ...preview, id: draftIdRef.current });
+      const stored = await onSave({ ...preview, id: draftIdRef.current, assistChat: state.chat });
       if (!stored) throw new Error('No se pudo guardar la actividad.');
+      writeDraft(userId, null);
       setSaved(stored);
-      setStep('saved');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo guardar la actividad. Tus datos siguen aquí.');
+      setError(reason instanceof Error ? reason.message : 'No se pudo guardar la actividad. Tu conversación sigue aquí.');
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   };
 
+  const startOver = () => {
+    writeDraft(userId, null);
+    setState(EMPTY);
+    setInput('');
+    setError('');
+    setSaved(null);
+    draftIdRef.current = null;
+  };
+
+  const slotNote = state.slotSource === 'conversacion'
+    ? 'Día y hora que mencionaste en la conversación.'
+    : state.slotSource === 'manual'
+      ? 'Día y hora que elegiste.'
+      : 'Es el primer horario libre que encontré. Cámbialo si prefieres otro.';
+
   return (
-    <Panel title="Cyclia te asiste" onClose={onClose}>
-      {step === 'describe' && (
+    <Panel
+      title="Cyclia te asiste"
+      onClose={onClose}
+      headerAction={state.chat.length > 0 && !saved ? (
+        <button type="button" onClick={startOver} className="flex h-11 cursor-pointer items-center px-2 text-sm font-bold text-[#3B4070]">Empezar de nuevo</button>
+      ) : null}
+    >
+      {saved ? (
         <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]" htmlFor="asiste-texto">
-            ¿Qué actividad quieres realizar y cuánto esfuerzo necesitas dedicarle?
-            <textarea id="asiste-texto" value={requestText} rows={5} onChange={(event) => setRequestText(event.target.value)} className={`${FIELD} resize-none`} />
-          </label>
-          <p className="m-0 text-sm leading-relaxed text-[#1B1F5E]">Cuéntanos qué necesitas hacer. Cyclia te ayudará a definir la actividad y estimar el tiempo necesario.</p>
-          {question && <p className="m-0 rounded-2xl bg-white px-3 py-3 text-sm font-semibold leading-relaxed text-[#1B1F5E]" role="status">{question}</p>}
-          {error && <p className="m-0 text-sm font-semibold text-[#1B1F5E]" role="alert">{error}</p>}
-          <button type="button" disabled={analyzing || !requestText.trim()} onClick={() => { void analyze(); }} className="btn-fucsia flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">
-            {analyzing ? 'Analizando…' : 'Analizar con IA'}
-          </button>
+          <p className="m-0 rounded-[20px] bg-white px-4 py-4 text-base font-extrabold text-[#1B1F5E]" role="status">Tu actividad quedó guardada en tu día</p>
+          <p className="m-0 text-sm leading-relaxed text-[#1B1F5E]">{saved.title} · {formatFriendlyDate(saved.date)} · {saved.startTime}–{saved.endTime}</p>
+          <p className="m-0 text-sm text-[#3B4070]">La conversación con Cyclia quedó guardada junto a la actividad. La puedes ver al revisarla.</p>
+          <button type="button" onClick={() => onShow(saved, 'calendar')} className="btn-fucsia flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">Ver en mi día</button>
+          <button type="button" onClick={() => onShow(saved, 'edit')} className="btn-emeraude flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">Revisar o editar</button>
+          <button type="button" onClick={startOver} className="flex h-11 cursor-pointer items-center justify-center text-sm font-extrabold text-[#3A44C4]">Planificar otra actividad</button>
         </div>
-      )}
-
-      {step === 'review' && (
+      ) : (
         <div className="flex flex-col gap-3">
-          <p className="m-0 text-sm font-semibold text-[#1B1F5E]">Puedes corregir el resultado. La estimación es orientativa.</p>
-          {localEstimate && <p className="m-0 rounded-2xl bg-white px-3 py-3 text-sm font-semibold leading-relaxed text-[#1B1F5E]" role="status">La clave de Gemini del servidor no es válida, así que Cyclia ordenó esta actividad con tu texto. Puedes corregirla y guardarla.</p>}
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-            Descripción
-            <textarea value={description} rows={4} onChange={(event) => setDescription(event.target.value)} className={`${FIELD} resize-none`} />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-            Pasos principales
-            <textarea value={stepsText} rows={5} onChange={(event) => setStepsText(event.target.value)} className={`${FIELD} resize-none`} />
-            <span className="font-semibold text-[#3B4070]">Escribe un paso por línea.</span>
-          </label>
-          <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-            <legend className="p-0 text-sm font-extrabold text-[#1B1F5E]">Esfuerzo estimado</legend>
-            <div className="grid grid-cols-3 gap-2">
-              {(['bajo', 'medio', 'alto'] as const).map((item) => (
-                <button key={item} type="button" aria-pressed={effort === item} onClick={() => setEffort(item)} className="flex h-11 cursor-pointer items-center justify-center rounded-full text-sm font-extrabold text-[#1B1F5E]" style={{ background: effort === item ? '#F49A9E' : '#FFFFFF' }}>
-                  {EFFORT_LABEL[item]}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-            Por qué este esfuerzo
-            <textarea value={effortReason} rows={3} onChange={(event) => setEffortReason(event.target.value)} className={`${FIELD} resize-none`} />
-          </label>
-          <p className="m-0 text-sm text-[#1B1F5E]">Tiempo orientativo: {formatDuration(suggestedMinutes)}. Podrás ajustarlo al definir el horario.</p>
-          {error && <p className="m-0 text-sm font-semibold text-[#1B1F5E]" role="alert">{error}</p>}
-          <button type="button" onClick={() => { setError(''); setStep('describe'); }} className="flex h-11 cursor-pointer items-center justify-center text-sm font-extrabold text-[#3A44C4]">Volver</button>
-          <button type="button" disabled={analyzing} onClick={() => { void analyze(); }} className="btn-emeraude flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">
-            {analyzing ? 'Analizando…' : 'Analizar de nuevo'}
-          </button>
-          <button type="button" onClick={goToSchedule} className="btn-fucsia flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">Aceptar y definir horario</button>
-        </div>
-      )}
-
-      {step === 'schedule' && (
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-            Nombre de la actividad
-            <input value={name} onChange={(event) => setName(event.target.value)} className={FIELD} />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-            Descripción
-            <textarea value={description} rows={4} onChange={(event) => setDescription(event.target.value)} className={`${FIELD} resize-none`} />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-            Fecha
-            <input type="date" min={localDate()} value={date} onChange={(event) => { setDate(event.target.value); if (!timeTouched) applySlot(durationMinutes || 30, event.target.value); }} className={FIELD} />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-            Hora de inicio
-            <input type="time" value={start} onChange={(event) => { setStart(event.target.value); setTimeTouched(true); setNeedsReview(false); }} className={FIELD} />
-          </label>
-          <div className="grid grid-cols-[1fr_140px] gap-2">
-            <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-              Duración estimada
-              <input inputMode="decimal" value={durationValue} onChange={(event) => setDurationValue(event.target.value)} className={FIELD} />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-              Unidad
-              <select value={durationUnit} onChange={(event) => {
-                const next = event.target.value === 'horas' ? 'horas' : 'minutos';
-                const minutes = readDuration(durationValue, durationUnit);
-                if (minutes) setDurationValue(next === 'horas' ? String(Math.round((minutes / 60) * 100) / 100) : String(minutes));
-                setDurationUnit(next);
-              }} className={FIELD}>
-                <option value="minutos">Minutos</option>
-                <option value="horas">Horas</option>
-              </select>
-            </label>
-          </div>
-          <p className="m-0 text-sm font-semibold text-[#1B1F5E]">Hora de término: {preview ? preview.endTime : '—'}{durationMinutes && start && (parseClock(start) + durationMinutes >= 24 * 60) ? ' (al día siguiente)' : ''}</p>
-          {needsReview && <p className="m-0 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold leading-relaxed text-[#1B1F5E]">El horario propuesto requiere revisión. Confirma que te sirve antes de guardarlo.</p>}
-          {clash && <p className="m-0 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold text-[#1B1F5E]" role="status">Este horario coincide con «{clash.title}».</p>}
-          {scheduleError && <p className="m-0 text-sm font-semibold text-[#1B1F5E]" role="alert">{scheduleError}</p>}
-          <button type="button" onClick={() => setStep('review')} className="flex h-11 cursor-pointer items-center justify-center text-sm font-extrabold text-[#3A44C4]">Volver</button>
-          <button type="button" disabled={Boolean(scheduleError)} onClick={() => { setError(''); setStep('confirm'); }} className="btn-fucsia flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">Revisar resumen</button>
-        </div>
-      )}
-
-      {step === 'confirm' && preview && (
-        <div className="flex flex-col gap-3">
-          <div className="rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#1B1F5E]">
-            <p className="m-0 font-extrabold">{preview.title}</p>
-            <p className="mb-0 mt-2">{description}</p>
-            <p className="mb-0 mt-2">{date} · {preview.startTime}–{preview.endTime} · {formatDuration(durationMinutes || 0)}</p>
-            <p className="mb-0 mt-2">Esfuerzo {EFFORT_LABEL[effort].toLowerCase()}. {effortReason}</p>
-            {steps.length > 0 && (
-              <ol className="mb-0 mt-2 list-decimal pl-5">
-                {steps.map((item) => <li key={item}>{item}</li>)}
-              </ol>
+          <div className="flex flex-col gap-2" aria-live="polite">
+            <Bubble turn={{ role: 'assistant', text: GREETING }} />
+            {state.chat.map((turn, index) => <Bubble key={`${turn.at}-${index}`} turn={turn} />)}
+            {sending && (
+              <div className="flex justify-start">
+                <p className="m-0 rounded-[20px] rounded-bl-md bg-white px-4 py-3 text-[15px] text-[#3B4070]" role="status">Cyclia está pensando…</p>
+              </div>
             )}
           </div>
-          <p className="m-0 text-sm text-[#1B1F5E]">La estimación es orientativa. La actividad se guarda solo cuando aceptes este resumen.</p>
-          {needsReview && <p className="m-0 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold text-[#1B1F5E]">El horario propuesto requiere revisión.</p>}
-          {clash && <p className="m-0 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold text-[#1B1F5E]" role="status">Este horario coincide con «{clash.title}».</p>}
-          {error && <p className="m-0 text-sm font-semibold text-[#1B1F5E]" role="alert">{error}</p>}
-          <button type="button" onClick={() => setStep('schedule')} className="flex h-11 cursor-pointer items-center justify-center text-sm font-extrabold text-[#3A44C4]">Volver</button>
-          <button type="button" disabled={saving} onClick={() => { void save(); }} className="btn-fucsia flex h-12 cursor-pointer items-center justify-center rounded-full px-3 text-center text-[15px] font-extrabold">
-            {saving ? 'Guardando…' : 'Aceptar y guardar en mi calendario'}
-          </button>
-        </div>
-      )}
 
-      {step === 'saved' && saved && (
-        <div className="flex flex-col gap-3">
-          <p className="m-0 rounded-[20px] bg-white px-4 py-4 text-base font-extrabold text-[#1B1F5E]" role="status">Tu actividad fue agregada al calendario</p>
-          <p className="m-0 text-sm leading-relaxed text-[#1B1F5E]">{saved.title} · {saved.date} · {saved.startTime}–{saved.endTime}</p>
-          <button type="button" onClick={() => onShow(saved, 'calendar')} className="btn-fucsia flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">Ver en el calendario</button>
-          <button type="button" onClick={() => onShow(saved, 'edit')} className="btn-emeraude flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold">Revisar o editar</button>
+          {state.result && (
+            <section aria-labelledby="asiste-actividad" className="flex flex-col gap-3 rounded-[24px] bg-white p-4">
+              <h3 id="asiste-actividad" className="m-0 text-xs font-extrabold tracking-wide text-[#3A44C4]">ACTIVIDAD PROPUESTA</h3>
+              {state.localEstimate && <p className="m-0 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold leading-relaxed text-[#1B1F5E]" role="status">La IA no está disponible, así que Cyclia armó la actividad con tu texto. Revísala antes de guardar.</p>}
+              <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
+                Nombre
+                <input value={state.name} onChange={(event) => patch({ name: event.target.value })} className={FIELD} />
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
+                Descripción
+                <textarea value={state.description} rows={3} onChange={(event) => patch({ description: event.target.value })} className={`${FIELD} resize-none`} />
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
+                Pasos
+                <textarea value={state.stepsText} rows={4} onChange={(event) => patch({ stepsText: event.target.value })} className={`${FIELD} resize-none`} />
+                <span className="font-semibold text-[#3B4070]">Un paso por línea.</span>
+              </label>
+              <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+                <legend className="p-0 text-sm font-extrabold text-[#1B1F5E]">Esfuerzo</legend>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['bajo', 'medio', 'alto'] as const).map((item) => (
+                    <button key={item} type="button" aria-pressed={state.effort === item} onClick={() => patch({ effort: item })} className="flex h-11 cursor-pointer items-center justify-center rounded-full border-[1.5px] border-[#C9D3EF] text-sm font-extrabold text-[#1B1F5E]" style={{ background: state.effort === item ? '#F49A9E' : '#FFFFFF' }}>
+                      {EFFORT_LABEL[item]}
+                    </button>
+                  ))}
+                </div>
+                {state.effortReason && <p className="m-0 text-sm leading-relaxed text-[#3B4070]">{state.effortReason}</p>}
+              </fieldset>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
+                  Día
+                  <input type="date" min={localDate()} value={state.date} onChange={(event) => patch({ date: event.target.value, slotSource: 'manual' })} className={FIELD} />
+                </label>
+                <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
+                  Hora de inicio
+                  <input type="time" value={state.start} onChange={(event) => patch({ start: event.target.value, slotSource: 'manual' })} className={FIELD} />
+                </label>
+              </div>
+              <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
+                Duración (minutos)
+                <input inputMode="numeric" value={state.durationValue} onChange={(event) => patch({ durationValue: event.target.value })} className={FIELD} />
+                <span className="font-semibold text-[#3B4070]">Cyclia propuso {formatDuration(state.result.duracion_min)}. La estimación es orientativa.</span>
+              </label>
+              <p className="m-0 text-sm font-semibold text-[#1B1F5E]">
+                {state.date ? formatFriendlyDate(state.date) : '—'} · {state.start || '—'}–{preview ? preview.endTime : '—'}
+              </p>
+              <p className="m-0 text-xs text-[#4A4F7A]">{slotNote}</p>
+              {clash && <p className="m-0 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold text-[#1B1F5E]" role="status">Este horario coincide con «{clash.title}».</p>}
+              {scheduleError && <p className="m-0 text-sm font-semibold text-[#1B1F5E]" role="alert">{scheduleError}</p>}
+              <button type="button" disabled={saving || Boolean(scheduleError) || !preview} onClick={() => { void save(); }} className="btn-fucsia flex h-12 cursor-pointer items-center justify-center rounded-full text-[15px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50">
+                {saving ? 'Guardando…' : 'Guardar en mi día'}
+              </button>
+            </section>
+          )}
+
+          {error && <p className="m-0 text-sm font-semibold text-[#1B1F5E]" role="alert">{error}</p>}
+
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(event) => { event.preventDefault(); void send(); }}
+          >
+            <label className="sr-only" htmlFor="asiste-mensaje">Mensaje para Cyclia</label>
+            <textarea
+              id="asiste-mensaje"
+              value={input}
+              rows={2}
+              maxLength={800}
+              placeholder={state.result ? 'Escribe si quieres cambiar algo…' : 'Ej.: preparar la presentación del viernes a las 10, unas 2 horas'}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              className={`${FIELD} min-h-12 flex-1 resize-none`}
+            />
+            <button type="submit" disabled={sending || !input.trim()} className="btn-fucsia flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full px-5 text-[15px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50">
+              Enviar
+            </button>
+          </form>
+          <div ref={endRef} />
         </div>
       )}
     </Panel>
   );
-}
-
-function parseClock(value: string): number {
-  const [hours, minutes] = value.split(':').map(Number);
-  return (hours || 0) * 60 + (minutes || 0);
 }

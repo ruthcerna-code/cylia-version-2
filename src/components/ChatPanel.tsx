@@ -154,7 +154,7 @@ export default function ChatPanel({
       const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: "⚠️ Hubo un error al comunicarme con Cyclia. Asegúrate de que la clave de API de Gemini esté configurada en tus secretos.",
+        content: "⚠️ Hubo un error al comunicarme con Cyclia. Inténtalo de nuevo en unos minutos.",
         timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
       };
       onAddMessage(errorMsg);

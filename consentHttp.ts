@@ -40,21 +40,32 @@ type ConsentRow = {
   created_at: string;
 };
 
-type FirestoreValue = { stringValue?: string; integerValue?: string; booleanValue?: boolean; nullValue?: null; mapValue?: { fields?: Record<string, FirestoreValue> }; arrayValue?: { values?: FirestoreValue[] } };
+type FirestoreValue = { stringValue?: string; integerValue?: string; doubleValue?: number; booleanValue?: boolean; timestampValue?: string; nullValue?: null; mapValue?: { fields?: Record<string, FirestoreValue> }; arrayValue?: { values?: FirestoreValue[] } };
 type FirestoreDoc = { name?: string; fields?: Record<string, FirestoreValue>; createTime?: string };
 
 function fieldString(fields: Record<string, FirestoreValue> | undefined, name: string): string {
   return fields?.[name]?.stringValue || '';
 }
 
-function decodeDoc(doc: FirestoreDoc): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(doc.fields || {})) {
-    if (value.stringValue !== undefined) out[key] = value.stringValue;
-    else if (value.integerValue !== undefined) out[key] = Number(value.integerValue);
-    else if (value.booleanValue !== undefined) out[key] = value.booleanValue;
-    else if (value.nullValue !== undefined) out[key] = null;
+/** Converts one Firestore REST value, including lists and nested objects, to plain JSON. */
+export function decodeValue(value: FirestoreValue): unknown {
+  if (value.stringValue !== undefined) return value.stringValue;
+  if (value.integerValue !== undefined) return Number(value.integerValue);
+  if (value.doubleValue !== undefined) return Number(value.doubleValue);
+  if (value.booleanValue !== undefined) return value.booleanValue;
+  if (value.timestampValue !== undefined) return value.timestampValue;
+  if (value.arrayValue !== undefined) return (value.arrayValue.values || []).map(decodeValue);
+  if (value.mapValue !== undefined) {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value.mapValue.fields || {})) out[key] = decodeValue(item);
+    return out;
   }
+  return null;
+}
+
+export function decodeDoc(doc: FirestoreDoc): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(doc.fields || {})) out[key] = decodeValue(value);
   out.id = doc.name?.split('/').pop() || '';
   return out;
 }
@@ -86,7 +97,8 @@ export async function requireSession(req: Request) {
 }
 
 export async function readConsentRows(jwt: string, userId: string): Promise<ConsentRow[]> {
-  const response = await firestore(jwt, `users/${userId}/consent_events`);
+  // Ask for a large page so recent decisions are not left out of the first page.
+  const response = await firestore(jwt, `users/${userId}/consent_events?pageSize=300`);
   if (response.status === 404) return [];
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -144,12 +156,21 @@ export async function writeDataRequest(jwt: string, userId: string, kind: string
   }
 }
 
+/** Reads every page of a collection: the export must not stop at the first page. */
 async function readCollection(jwt: string, userId: string, name: string): Promise<Record<string, unknown>[]> {
-  const response = await firestore(jwt, `users/${userId}/${name}`);
-  if (response.status === 404) return [];
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new ConsentError(500, 'No pudimos preparar tu archivo. Inténtalo nuevamente.');
-  return ((body.documents || []) as FirestoreDoc[]).map(decodeDoc);
+  const rows: Record<string, unknown>[] = [];
+  let pageToken = '';
+  for (let page = 0; page < 200; page += 1) {
+    const query = `pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const response = await firestore(jwt, `users/${userId}/${name}?${query}`);
+    if (response.status === 404) return rows;
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new ConsentError(500, 'No pudimos preparar tu archivo. Inténtalo nuevamente.');
+    rows.push(...((body.documents || []) as FirestoreDoc[]).map(decodeDoc));
+    pageToken = typeof body.nextPageToken === 'string' ? body.nextPageToken : '';
+    if (!pageToken) break;
+  }
+  return rows;
 }
 
 export async function readExportBundle(jwt: string, userId: string) {
@@ -159,19 +180,23 @@ export async function readExportBundle(jwt: string, userId: string) {
     throw new ConsentError(500, 'No pudimos preparar tu archivo. Inténtalo nuevamente.');
   }
   const profile = profileResponse.ok ? decodeDoc(profileBody as FirestoreDoc) : null;
-  const [dailyLogs, activities, messages, dataRequests, periodRecords, focusDocs] = await Promise.all([
+  const [dailyLogs, activities, messages, dataRequests, periodRecords, focusDocs, behavior] = await Promise.all([
     readCollection(jwt, userId, 'daily_logs'),
     readCollection(jwt, userId, 'activities'),
     readCollection(jwt, userId, 'messages'),
     readCollection(jwt, userId, 'data_requests'),
     readCollection(jwt, userId, 'period_records'),
     readCollection(jwt, userId, 'focus'),
+    readCollection(jwt, userId, 'behavior'),
   ]);
-  return { profile, dailyLogs, activities, messages, dataRequests, periodRecords, focus: focusDocs[0]?.payload ?? null };
+  return { profile, dailyLogs, activities, messages, dataRequests, periodRecords, behavior, focus: focusDocs[0]?.payload ?? null };
 }
 
 export function summarizeConsent(rows: ConsentRow[]) {
-  const current = rows.filter((row) => row.policy_version === CONSENT_VERSION);
+  // Firestore lists documents by their random id, not by time: sort so the latest decision wins.
+  const current = rows
+    .filter((row) => row.policy_version === CONSENT_VERSION)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
   const latest: Partial<Record<ConsentPurpose, ConsentAction>> = {};
   for (const row of current) {
     if (isConsentPurpose(row.purpose) && isConsentAction(row.action)) latest[row.purpose] = row.action;

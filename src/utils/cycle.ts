@@ -132,8 +132,8 @@ export function getCycleDay(targetDateStr: string, lastPeriodDateStr: string, cy
   const length = habitualCycleDays(cycleLength);
   const diffDays = getDaysDifference(targetDateStr, lastPeriodDateStr);
   if (diffDays < 0) {
-    const mod = diffDays % length;
-    return mod === 0 ? length : length + mod;
+    // The day before the start is the last day of the previous cycle; one cycle back is day 1 again.
+    return dayWithinCycle(diffDays + 1, length);
   }
   return diffDays + 1;
 }

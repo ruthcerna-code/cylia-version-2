@@ -1,11 +1,27 @@
 import { z } from 'zod';
 import type { ActivityEffort } from '../types';
 
-export const assistRequestSchema = z.object({
+const DATE_TEXT = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_TEXT = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export const assistTurnSchema = z.object({
+  role: z.enum(['user', 'assistant']),
   texto: z.string().trim().min(1).max(800),
 });
 
+export const assistRequestSchema = z.object({
+  /** Single description, kept for older clients. */
+  texto: z.string().trim().min(1).max(800).optional(),
+  /** The whole conversation with Cyclia, oldest first. */
+  mensajes: z.array(assistTurnSchema).max(30).optional(),
+  /** Her local date, so "el viernes" can be turned into a date. */
+  hoy: z.string().regex(DATE_TEXT).optional(),
+}).refine((value) => Boolean(value.texto) || Boolean(value.mensajes?.some((turn) => turn.role === 'user')), {
+  message: 'Falta la descripción de la actividad.',
+});
+
 export type AssistRequest = z.infer<typeof assistRequestSchema>;
+export type AssistTurn = z.infer<typeof assistTurnSchema>;
 
 export type AssistAnalysis = {
   necesita_datos: boolean;
@@ -16,21 +32,29 @@ export type AssistAnalysis = {
   esfuerzo: ActivityEffort;
   esfuerzo_motivo: string;
   duracion_min: number;
+  /** Day she mentioned, YYYY-MM-DD, or null. */
+  fecha: string | null;
+  /** Start time she mentioned, HH:MM, or null. */
+  hora: string | null;
 };
 
 const EFFORTS: ActivityEffort[] = ['bajo', 'medio', 'alto'];
 
-export const ASSIST_ACTIVITY_SYSTEM_PROMPT = `Eres Cyclia, la asistente de la app CYCLIA. Una persona describe una actividad y el esfuerzo que quiere dedicarle. Tu tarea es ordenar esa actividad y estimar el trabajo. No elijas fecha ni hora: el calendario lo resuelve la app.
+export const ASSIST_ACTIVITY_SYSTEM_PROMPT = `Eres Cyclia, la asistente de la app CYCLIA. Conversas con una persona sobre una actividad que quiere realizar. Tu tarea es entender el alcance de la actividad, ordenarla y estimar el trabajo. Lee toda la conversación: sus respuestas completan lo que dijo antes.
 
-Si falta algo esencial para entender qué hay que hacer, o el texto es demasiado vago para estimar el trabajo, no inventes la actividad. Pide un solo dato concreto.
+Si falta algo esencial para entender qué hay que hacer, o el alcance es demasiado vago para estimar el trabajo, no inventes la actividad. Haz una sola pregunta concreta y breve. No repitas una pregunta que ya respondió.
 
-Si la información alcanza:
+Cuando la información alcance:
 - nombre: corto y claro
 - descripcion: dos o tres frases, ordenadas
 - pasos: entre 2 y 5 acciones concretas
 - esfuerzo: bajo, medio o alto, según el trabajo descrito
 - esfuerzo_motivo: una frase. Di que la estimación es orientativa
 - duracion_min: múltiplo de 5, entre 10 y 480
+- fecha: si la persona dijo qué día la hará, en formato AAAA-MM-DD, calculada desde la fecha de hoy que viene en la conversación. Si no lo dijo, null. No elijas un día por ella
+- hora: si dijo a qué hora empezará, en formato HH:MM de 24 horas. Si no lo dijo, null
+
+Si después de tu propuesta pide un cambio, devuelve la actividad completa con ese cambio.
 
 Límites:
 - Español neutro latinoamericano, cálido y breve.
@@ -46,15 +70,44 @@ Responde solo con este JSON:
   "pasos": ["string"],
   "esfuerzo": "bajo" | "medio" | "alto",
   "esfuerzo_motivo": "string",
-  "duracion_min": number
+  "duracion_min": number,
+  "fecha": "AAAA-MM-DD o null",
+  "hora": "HH:MM o null"
 }`;
+
+function weekdayOf(date: string): string {
+  try {
+    return new Date(`${date}T12:00:00`).toLocaleDateString('es-CL', { weekday: 'long' });
+  } catch {
+    return '';
+  }
+}
+
+/** The conversation as Claude needs it: starting with her, with today's date on her first message. */
+export function assistConversation(request: AssistRequest): Array<{ role: 'user' | 'assistant'; content: string }> {
+  const turns: AssistTurn[] = request.mensajes?.length
+    ? request.mensajes.slice(-30)
+    : [{ role: 'user', texto: request.texto || '' }];
+  const rows = turns.map((turn) => ({ role: turn.role, content: turn.texto.trim() })).filter((turn) => turn.content);
+  while (rows.length && rows[0].role !== 'user') rows.shift();
+  if (request.hoy && rows.length) {
+    rows[0] = { ...rows[0], content: `Hoy es ${weekdayOf(request.hoy)} ${request.hoy}.\n\n${rows[0].content}` };
+  }
+  return rows;
+}
+
+/** Everything she wrote, for the local estimate when the AI is not available. */
+export function assistUserText(request: AssistRequest): string {
+  const fromChat = (request.mensajes || []).filter((turn) => turn.role === 'user').map((turn) => turn.texto.trim());
+  return (fromChat.length ? fromChat.join('. ') : request.texto || '').slice(0, 800);
+}
 
 function roundDuration(value: number): number {
   const rounded = Math.round(value / 5) * 5;
   return Math.min(480, Math.max(10, rounded));
 }
 
-export function alignAssist(raw: unknown): AssistAnalysis | null {
+export function alignAssist(raw: unknown, today?: string): AssistAnalysis | null {
   if (!raw || typeof raw !== 'object') return null;
   const row = raw as Record<string, unknown>;
   const pregunta = typeof row.pregunta === 'string' ? row.pregunta.trim().slice(0, 240) : '';
@@ -69,8 +122,13 @@ export function alignAssist(raw: unknown): AssistAnalysis | null {
       esfuerzo: 'medio',
       esfuerzo_motivo: '',
       duracion_min: 30,
+      fecha: null,
+      hora: null,
     };
   }
+  // A day in the past or in another format is dropped: the app then proposes a free slot.
+  const fecha = typeof row.fecha === 'string' && DATE_TEXT.test(row.fecha) && (!today || row.fecha >= today) ? row.fecha : null;
+  const hora = typeof row.hora === 'string' && TIME_TEXT.test(row.hora) ? row.hora : null;
   const nombre = typeof row.nombre === 'string' ? row.nombre.trim().slice(0, 80) : '';
   const descripcion = typeof row.descripcion === 'string' ? row.descripcion.trim().slice(0, 500) : '';
   const pasos = (Array.isArray(row.pasos) ? row.pasos : [])
@@ -90,6 +148,8 @@ export function alignAssist(raw: unknown): AssistAnalysis | null {
     esfuerzo,
     esfuerzo_motivo: motivo,
     duracion_min: duracion,
+    fecha,
+    hora,
   };
 }
 
@@ -101,10 +161,10 @@ const FILLER = new Set([
   'hora', 'horas', 'minuto', 'minutos', 'min',
 ]);
 
-export function geminiKeyLooksUsable(key: string | undefined): boolean {
+export function aiKeyLooksUsable(key: string | undefined): boolean {
   const value = (key || '').trim().replace(/^["']|["']$/g, '');
   if (value.length < 20) return false;
-  return !/^(my_gemini_api_key|your_|xxxx)/i.test(value);
+  return !/^(my_|your_|xxxx|sk-ant-xxx)/i.test(value);
 }
 
 function statedMinutes(text: string): number | null {
@@ -139,6 +199,8 @@ export function draftAssist(texto: string): AssistAnalysis {
       esfuerzo: 'medio',
       esfuerzo_motivo: '',
       duracion_min: 30,
+      fecha: null,
+      hora: null,
     };
   }
   const nameSource = raw
@@ -165,6 +227,8 @@ export function draftAssist(texto: string): AssistAnalysis {
     esfuerzo,
     esfuerzo_motivo: 'La estimación es orientativa y se armó a partir de lo que escribiste.',
     duracion_min: duracion,
+    fecha: null,
+    hora: null,
   };
 }
 

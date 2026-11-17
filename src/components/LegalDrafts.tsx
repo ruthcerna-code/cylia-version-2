@@ -63,7 +63,7 @@ export function PrivacyDetails() {
         <h2 className="m-0 text-base font-extrabold">Servicios</h2>
         <ul className="mb-0 mt-2 list-disc space-y-1 pl-4">
           <li>Firebase guarda el acceso y los datos. Cada sesión lee solo lo suyo.</li>
-          <li>El servidor de Cyclia atiende al asistente. La clave de Gemini permanece en el servidor y solo se usa si autorizas esa opción.</li>
+          <li>El servidor de Cyclia atiende al asistente. El asistente usa Claude, de Anthropic. La clave de la IA permanece en el servidor y solo se usa si autorizas esa opción.</li>
           <li>No hay una herramienta de analítica de audiencia en esta aplicación.</li>
         </ul>
       </section>

@@ -3,11 +3,12 @@ import os from "os";
 import path from "path";
 import dotenv from "dotenv";
 import fs from "fs";
-import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { registerConsentRoutes } from "./consentRoutes.js";
 import { assertConsentFromRequest, ConsentError } from "./consentHttp.js";
-import { alignAssist, ASSIST_ACTIVITY_SYSTEM_PROMPT, assistRequestSchema, draftAssist, geminiKeyLooksUsable } from "./src/plan/assist.js";
+import { alignAssist, ASSIST_ACTIVITY_SYSTEM_PROMPT, assistConversation, assistRequestSchema, assistUserText, draftAssist, aiKeyLooksUsable } from "./src/plan/assist.js";
 import { alignProposal, draftProposal, extractJson, PLAN_ACTIVITY_SYSTEM_PROMPT, planRequestSchema } from "./src/plan/proposal.js";
+import { alignBehaviorReport, BEHAVIOR_SYSTEM_PROMPT, behaviorRequestSchema } from "./src/plan/behaviorPrompt.js";
 
 dotenv.config();
 
@@ -24,76 +25,57 @@ app.use((error: unknown, _req: express.Request, res: express.Response, next: exp
   next(error);
 });
 
-// Lazy-initialized GoogleGenAI client to prevent startup crash if API key is missing
-let aiClient: GoogleGenAI | null = null;
-function getAI(): GoogleGenAI {
+// Claude Haiku 5.5: the lowest-cost Claude model. Effort "low" keeps the reasoning, and the bill, short.
+const CLAUDE_MODEL = "claude-haiku-5-5";
+
+// Created on first use, so the server starts even without a key.
+let aiClient: Anthropic | null = null;
+function getAI(): Anthropic {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is required");
+      throw new Error("Falta ANTHROPIC_API_KEY en el servidor.");
     }
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
+    // The SDK already retries 429, 5xx and connection errors twice.
+    aiClient = new Anthropic({ apiKey });
   }
   return aiClient;
 }
 
-function isInvalidGeminiKey(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return /API_KEY_INVALID|API key not valid/i.test(message);
+function isInvalidAiKey(error: unknown): boolean {
+  return error instanceof Anthropic.AuthenticationError || /ANTHROPIC_API_KEY/.test(error instanceof Error ? error.message : "");
 }
 
-// Resilient helper to handle transient Gemini API errors (like 503 unavailable) via retry & fallback
-async function generateContentWithRetry(
-  ai: GoogleGenAI,
-  params: {
-    model: string;
-    contents: any;
-    config?: any;
+async function askClaude(system: string, messages: Anthropic.MessageParam[]): Promise<string> {
+  const response = await getAI().messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: 8000,
+    system,
+    output_config: { effort: "low" },
+    messages,
+  });
+  if (response.stop_reason === "refusal") {
+    throw new Error("Cyclia no puede responder esa consulta. Si es un tema de salud, consúltalo con un profesional.");
   }
-): Promise<any> {
-  const maxRetries = 2;
-  const delayMs = 1000;
-  let lastError: any = null;
+  return response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("")
+    .trim();
+}
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        console.log(`[Gemini] Retrying generation with ${params.model} (attempt ${attempt}/${maxRetries})...`);
-        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
-      }
-      return await ai.models.generateContent(params);
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[Gemini] Attempt ${attempt} with ${params.model} failed:`, err.message || err);
-      if (isInvalidGeminiKey(err)) break;
-    }
-  }
-
-  if (isInvalidGeminiKey(lastError)) throw lastError;
-
-  // If retries fail, fallback to gemini-3.1-flash-lite (highly available, fast fallback model)
-  const fallbackModel = "gemini-3.1-flash-lite";
-  if (params.model !== fallbackModel) {
-    console.warn(`[Gemini] All attempts with ${params.model} failed. Falling back to ${fallbackModel}...`);
-    try {
-      return await ai.models.generateContent({
-        ...params,
-        model: fallbackModel,
-      });
-    } catch (fallbackErr: any) {
-      console.error(`[Gemini] Fallback to ${fallbackModel} failed:`, fallbackErr.message || fallbackErr);
-      throw new Error(`Ambos modelos de inteligencia artificial fallaron. Error original: ${lastError.message || lastError}`);
-    }
-  }
-
-  throw lastError;
+/** The API needs the first message to be hers. Earlier Cyclia greetings are dropped. */
+function chatMessages(history: unknown, message: string): Anthropic.MessageParam[] {
+  const rows: Anthropic.MessageParam[] = (Array.isArray(history) ? history : [])
+    .map((item: any) => ({
+      role: item?.role === "user" ? "user" as const : "assistant" as const,
+      content: String(item?.content ?? item?.text ?? "").trim(),
+    }))
+    .filter((item) => item.content.length > 0)
+    .slice(-20);
+  while (rows.length && rows[0].role !== "user") rows.shift();
+  rows.push({ role: "user", content: message });
+  return rows;
 }
 
 // System Instruction for Cyclia
@@ -137,44 +119,6 @@ Estilo:
 - Si hay indicadores de alerta persistentes (alto estrés, fatiga, etc.), incluye un aviso sutil y amable de consultar a un profesional.
 `;
 
-// Resilient helper to handle AntiGravity Agent interactions via the Interactions API
-async function runAntigravityInteraction(
-  ai: GoogleGenAI,
-  params: {
-    input: any;
-    previousInteractionId?: string;
-    environmentId?: string;
-    systemInstruction?: string;
-  }
-): Promise<any> {
-  const maxRetries = 1;
-  let lastError: any = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        console.log(`[AntiGravity] Retrying interaction (attempt ${attempt}/${maxRetries})...`);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      }
-      
-      const interaction = await ai.interactions.create({
-        agent: "antigravity-preview-05-2026",
-        input: params.input,
-        previous_interaction_id: params.previousInteractionId,
-        environment: params.environmentId || "remote",
-        system_instruction: params.systemInstruction,
-      }, { timeout: 300000 });
-      
-      return interaction;
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[AntiGravity] Interaction attempt ${attempt} failed:`, err.message || err);
-    }
-  }
-
-  throw lastError;
-}
-
 function analysisPrompt(context: any): string {
   if (!context || typeof context !== "object") {
     return "No llegó el cálculo del ciclo ni el registro. No inventes una fase ni un porcentaje.";
@@ -206,63 +150,25 @@ Si no hay fase, omite la sección de fase. Si la hay, dilo como estimación. Má
 app.post("/api/analyze", async (req, res) => {
   try {
     await assertConsentFromRequest(req, "gemini_assistant");
-    const { context, previousInteractionId, environmentId } = req.body;
+    const { context } = req.body;
 
     if (!context) {
       return res.status(400).json({ error: "Falta el cálculo del ciclo y el registro" });
     }
 
-    const ai = getAI();
-    const prompt = analysisPrompt(context);
-
-    try {
-      console.log("[AntiGravity] Running check-in analysis via Antigravity agent...");
-      const interaction = await runAntigravityInteraction(ai, {
-        input: prompt,
-        previousInteractionId,
-        environmentId,
-        systemInstruction: CYCLIA_SYSTEM_PROMPT,
-      });
-
-      // Combine text parts from all model_output steps to avoid truncation
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find((c: any) => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-
-      res.json({
-        analysis: fullOutput || interaction.output_text || "",
-        interactionId: interaction.id,
-        environmentId: interaction.environment_id,
-        steps: interaction.steps,
-        usingAgent: true,
-      });
-    } catch (agentErr: any) {
-      console.warn("[AntiGravity] Antigravity analysis failed, falling back to standard Gemini 3.5 Flash:", agentErr.message || agentErr);
-      const response = await generateContentWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          systemInstruction: CYCLIA_SYSTEM_PROMPT,
-        }
-      });
-      res.json({
-        analysis: response.text,
-        usingAgent: false,
-      });
-    }
+    const analysis = await askClaude(CYCLIA_SYSTEM_PROMPT, [{ role: "user", content: analysisPrompt(context) }]);
+    res.json({ analysis, usingAgent: false });
   } catch (error: any) {
     if (error instanceof ConsentError) {
       res.status(error.status).json({ error: error.message });
       return;
     }
     console.error("Error en endpoint de análisis:", error);
-    res.status(500).json({ error: error.message || "Error al procesar la solicitud con la IA" });
+    res.status(isInvalidAiKey(error) ? 503 : 500).json({
+      error: isInvalidAiKey(error)
+        ? "El asistente no está disponible: falta configurar la clave de la IA en el servidor."
+        : "Cyclia no pudo analizar el registro esta vez. Puedes intentarlo de nuevo.",
+    });
   }
 });
 
@@ -270,9 +176,10 @@ app.post("/api/analyze", async (req, res) => {
 app.post("/api/chat", async (req, res) => {
   try {
     await assertConsentFromRequest(req, "gemini_assistant");
-    const { context, message, chatHistory, previousInteractionId, environmentId } = req.body;
-
-    const ai = getAI();
+    const { context, message, chatHistory } = req.body;
+    if (typeof message !== "string" || !message.trim()) {
+      return res.status(400).json({ error: "Escribe un mensaje." });
+    }
 
     const systemInstructionWithContext = `
 ${CYCLIA_SYSTEM_PROMPT}
@@ -283,72 +190,19 @@ ${analysisPrompt(context)}
 Responde a la consulta con esos datos. Si pregunta por su ciclo y no hay fase, dilo. No expliques hormonas como si las hubieras medido.
 `;
 
-    try {
-      console.log("[AntiGravity] Running chat via Antigravity agent...");
-      let input: any = message;
-      
-      // Feed conversation context if previousInteractionId is not set yet
-      if (!previousInteractionId && chatHistory && chatHistory.length > 0) {
-        const historyText = chatHistory.map((msg: any) => `${msg.role === 'user' ? 'Usuaria' : 'Cyclia'}: ${msg.content || msg.text}`).join('\n');
-        input = `Historial de conversación previa:\n${historyText}\n\nNueva consulta de la usuaria: ${message}`;
-      }
-
-      const interaction = await runAntigravityInteraction(ai, {
-        input,
-        previousInteractionId,
-        environmentId,
-        systemInstruction: systemInstructionWithContext,
-      });
-
-      // Combine text parts from all model_output steps to avoid truncation
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find((c: any) => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-
-      res.json({
-        reply: fullOutput || interaction.output_text || "",
-        interactionId: interaction.id,
-        environmentId: interaction.environment_id,
-        steps: interaction.steps,
-        usingAgent: true,
-      });
-    } catch (agentErr: any) {
-      console.warn("[AntiGravity] Antigravity chat failed, falling back to standard Gemini 3.5 Flash:", agentErr.message || agentErr);
-      
-      const formattedHistory = (chatHistory || []).map((msg: any) => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.content || msg.text }]
-      }));
-
-      const response = await generateContentWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: [
-          ...formattedHistory,
-          { role: "user", parts: [{ text: message }] }
-        ],
-        config: {
-          systemInstruction: systemInstructionWithContext,
-        }
-      });
-
-      res.json({
-        reply: response.text,
-        usingAgent: false,
-      });
-    }
+    const reply = await askClaude(systemInstructionWithContext, chatMessages(chatHistory, message.trim()));
+    res.json({ reply, usingAgent: false });
   } catch (error: any) {
     if (error instanceof ConsentError) {
       res.status(error.status).json({ error: error.message });
       return;
     }
     console.error("Error en endpoint de chat:", error);
-    res.status(500).json({ error: error.message || "Error al procesar el chat con la IA" });
+    res.status(isInvalidAiKey(error) ? 503 : 500).json({
+      error: isInvalidAiKey(error)
+        ? "El asistente no está disponible: falta configurar la clave de la IA en el servidor."
+        : "Cyclia no pudo responder esta vez. Puedes intentarlo de nuevo.",
+    });
   }
 });
 
@@ -363,24 +217,16 @@ app.post("/api/plan-activity", async (req, res) => {
       return;
     }
     const input = parsed.data;
-    if (!geminiKeyLooksUsable(process.env.GEMINI_API_KEY)) {
+    if (!aiKeyLooksUsable(process.env.ANTHROPIC_API_KEY)) {
       res.json({ proposal: draftProposal(input) });
       return;
     }
-    const ai = getAI();
-    const ask = async (previous: string | null) => {
-      const response = await generateContentWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: previous
-          ? `La respuesta anterior no cumplió el formato. Responde solo con el JSON pedido.\nDatos:\n${JSON.stringify(input)}\nRespuesta anterior:\n${previous}`
-          : JSON.stringify(input),
-        config: {
-          systemInstruction: PLAN_ACTIVITY_SYSTEM_PROMPT,
-          responseMimeType: "application/json",
-        },
-      });
-      return typeof response.text === "string" ? response.text : "";
-    };
+    const ask = (previous: string | null) => askClaude(PLAN_ACTIVITY_SYSTEM_PROMPT, [{
+      role: "user",
+      content: previous
+        ? `La respuesta anterior no cumplió el formato. Responde solo con el JSON pedido.\nDatos:\n${JSON.stringify(input)}\nRespuesta anterior:\n${previous}`
+        : JSON.stringify(input),
+    }]);
     let rawText = await ask(null);
     let proposal = null;
     try {
@@ -406,7 +252,7 @@ app.post("/api/plan-activity", async (req, res) => {
       res.status(error.status).json({ error: error.message });
       return;
     }
-    if (isInvalidGeminiKey(error)) {
+    if (isInvalidAiKey(error)) {
       const again = planRequestSchema.safeParse(req.body);
       if (again.success) {
         res.json({ proposal: draftProposal(again.data) });
@@ -426,35 +272,31 @@ app.post("/api/assist-activity", async (req, res) => {
       res.status(400).json({ error: "Escribe la actividad antes de analizar." });
       return;
     }
-    if (!geminiKeyLooksUsable(process.env.GEMINI_API_KEY)) {
-      res.json({ analysis: draftAssist(parsed.data.texto), fuente: "local" });
+    if (!aiKeyLooksUsable(process.env.ANTHROPIC_API_KEY)) {
+      res.json({ analysis: draftAssist(assistUserText(parsed.data)), fuente: "local" });
       return;
     }
-    const ai = getAI();
-    const ask = async (previous: string | null) => {
-      const response = await generateContentWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: previous
-          ? `La respuesta anterior no cumplió el formato. Responde solo con el JSON pedido.\nActividad:\n${parsed.data.texto}\nRespuesta anterior:\n${previous}`
-          : parsed.data.texto,
-        config: {
-          systemInstruction: ASSIST_ACTIVITY_SYSTEM_PROMPT,
-          responseMimeType: "application/json",
-        },
-      });
-      return typeof response.text === "string" ? response.text : "";
-    };
+    // The whole conversation goes to Claude, so her answers complete what she said before.
+    const conversation = assistConversation(parsed.data);
+    const today = parsed.data.hoy;
+    const ask = (previous: string | null) => askClaude(ASSIST_ACTIVITY_SYSTEM_PROMPT, previous
+      ? [
+        ...conversation,
+        { role: "assistant", content: previous },
+        { role: "user", content: "La respuesta anterior no cumplió el formato. Responde solo con el JSON pedido." },
+      ]
+      : conversation);
     let rawText = await ask(null);
     let analysis = null;
     try {
-      analysis = alignAssist(extractJson(rawText));
+      analysis = alignAssist(extractJson(rawText), today);
     } catch {
       analysis = null;
     }
     if (!analysis) {
-      rawText = await ask(rawText.slice(0, 800));
+      rawText = await ask(rawText.slice(0, 800) || "(sin respuesta)");
       try {
-        analysis = alignAssist(extractJson(rawText));
+        analysis = alignAssist(extractJson(rawText), today);
       } catch {
         analysis = null;
       }
@@ -463,14 +305,15 @@ app.post("/api/assist-activity", async (req, res) => {
       res.status(422).json({ error: "Cyclia no pudo analizar la actividad esta vez. Puedes intentarlo de nuevo." });
       return;
     }
-    res.json({ analysis, fuente: "gemini" });
+    res.json({ analysis, fuente: "ia" });
   } catch (error: any) {
     if (error instanceof ConsentError) {
       res.status(error.status).json({ error: error.message });
       return;
     }
-    if (isInvalidGeminiKey(error) && parsedTexto(req)) {
-      res.json({ analysis: draftAssist(parsedTexto(req) as string), fuente: "local" });
+    const again = assistRequestSchema.safeParse(req.body);
+    if (isInvalidAiKey(error) && again.success) {
+      res.json({ analysis: draftAssist(assistUserText(again.data)), fuente: "local" });
       return;
     }
     console.error("Error en Cyclia te asiste:", error);
@@ -478,10 +321,57 @@ app.post("/api/assist-activity", async (req, res) => {
   }
 });
 
-function parsedTexto(req: express.Request): string | null {
-  const parsed = assistRequestSchema.safeParse(req.body);
-  return parsed.success ? parsed.data.texto : null;
-}
+// Monthly behavior pattern: the AI studies one month of aggregated parameters (no free text).
+app.post("/api/behavior-pattern", async (req, res) => {
+  try {
+    await assertConsentFromRequest(req, "gemini_assistant");
+    const parsed = behaviorRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Faltan los parámetros del mes." });
+      return;
+    }
+    // Without a key the app writes the pattern itself from the same parameters.
+    if (!aiKeyLooksUsable(process.env.ANTHROPIC_API_KEY)) {
+      res.json({ report: null, fuente: "local" });
+      return;
+    }
+    const data = JSON.stringify({ actual: parsed.data.actual, anterior: parsed.data.anterior ?? null });
+    const ask = (previous: string | null) => askClaude(BEHAVIOR_SYSTEM_PROMPT, previous
+      ? [
+        { role: "user", content: data },
+        { role: "assistant", content: previous },
+        { role: "user", content: "La respuesta anterior no cumplió el formato. Responde solo con el JSON pedido." },
+      ]
+      : [{ role: "user", content: data }]);
+    let rawText = await ask(null);
+    let report = null;
+    try {
+      report = alignBehaviorReport(extractJson(rawText));
+    } catch {
+      report = null;
+    }
+    if (!report) {
+      rawText = await ask(rawText.slice(0, 800) || "(sin respuesta)");
+      try {
+        report = alignBehaviorReport(extractJson(rawText));
+      } catch {
+        report = null;
+      }
+    }
+    res.json({ report, fuente: report ? "ia" : "local" });
+  } catch (error: any) {
+    if (error instanceof ConsentError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    if (isInvalidAiKey(error)) {
+      res.json({ report: null, fuente: "local" });
+      return;
+    }
+    console.error("Error en el patrón del mes:", error);
+    res.status(500).json({ error: "Cyclia no pudo estudiar tu mes esta vez. Puedes intentarlo de nuevo." });
+  }
+});
 
 function localNetworkAddresses(): string[] {
   const addresses: string[] = [];
@@ -501,7 +391,11 @@ function localNetworkAddresses(): string[] {
 async function startServer() {
 
   const distPath = path.join(process.cwd(), "dist");
-  const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(path.join(distPath, "index.html"));
+  // `npm run dev` runs server.ts from source: always use Vite, even if an old dist/ exists.
+  // `npm start` runs the bundled dist/server.cjs: serve the build.
+  const runningFromSource = /server\.ts$/.test(process.argv[1] || "");
+  const isProduction = process.env.NODE_ENV === "production"
+    || (!runningFromSource && fs.existsSync(path.join(distPath, "index.html")));
 
   if (!isProduction) {
     console.log("[Server] Starting in development mode with Vite middleware...");

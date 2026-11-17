@@ -23,8 +23,9 @@ import {
   setDoc,
   type Firestore,
 } from 'firebase/firestore';
-import type { ActivityEffort, ActivityImportance, ActivityKind, ActivityPlanStatus, ActivityStep, BodyLevel, CervicalFluid, ChatMessage, CycleSymptom, DailyLog, EnergyFeel, FeltState, HormonalMethod, PeriodRecord, PerimenopauseMode, ScheduledActivity, SleepState, SpecialSituation, UserProfile } from './types';
+import type { ActivityEffort, ActivityImportance, ActivityKind, ActivityPlanStatus, ActivityStep, AssistChatTurn, BodyLevel, CervicalFluid, ChatMessage, CycleSymptom, DailyLog, EnergyFeel, FeltState, HormonalMethod, PeriodRecord, PerimenopauseMode, ScheduledActivity, SleepState, SpecialSituation, UserProfile } from './types';
 import { compareActivities } from './utils/activities';
+import type { BehaviorParams, BehaviorReport } from './utils/behavior';
 import { HORMONAL_LABELS, inferHormonalMethod, validateProfile } from './utils/profileFields';
 
 const firebaseConfig = {
@@ -424,6 +425,7 @@ export async function deleteAccountData(userId: string) {
     await deleteCollection(userId, 'period_records');
     await deleteCollection(userId, 'daily_logs');
     await deleteCollection(userId, 'focus');
+    await deleteCollection(userId, 'behavior');
     await deleteDoc(userDoc(userId));
   });
 }
@@ -448,7 +450,20 @@ export type ActivityDraft = {
   steps?: ActivityStep[];
   completedAt?: string | null;
   durationSource?: 'cyclia' | 'manual' | null;
+  assistChat?: AssistChatTurn[];
 };
+
+/** Conversation with Cyclia te asiste: at most 40 turns of up to 800 characters. */
+function readAssistChat(value: unknown): AssistChatTurn[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const turns = value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const row = item as { role?: unknown; text?: unknown; at?: unknown };
+    if ((row.role !== 'user' && row.role !== 'assistant') || typeof row.text !== 'string' || !row.text.trim()) return [];
+    return [{ role: row.role, text: row.text.trim().slice(0, 800), at: typeof row.at === 'string' ? row.at : '' } as AssistChatTurn];
+  });
+  return turns.slice(-40);
+}
 
 function readSteps(value: unknown): ActivityStep[] {
   if (!Array.isArray(value)) return [];
@@ -491,11 +506,39 @@ function docToActivity(id: string, data: Record<string, unknown>): ScheduledActi
     steps: readSteps(data.steps),
     completedAt: data.completedAt ? String(data.completedAt) : null,
     durationSource: data.durationSource === 'cyclia' || data.durationSource === 'manual' ? data.durationSource : null,
+    assistChat: readAssistChat(data.assistChat),
   };
 }
 
 export function activitiesStoredOnThisDevice(): boolean {
   return false;
+}
+
+/** Monthly behavior parameters and the pattern Cyclia wrote from them. */
+export interface BehaviorEntry {
+  block: number;
+  from: string;
+  to: string;
+  params: BehaviorParams;
+  report: BehaviorReport | null;
+  generatedAt: string;
+}
+
+export async function fetchBehaviorEntries(userId: string): Promise<BehaviorEntry[]> {
+  return guard('fetchBehavior', async () => {
+    const snap = await getDocs(collection(db, 'users', userId, 'behavior'));
+    return snap.docs
+      .map((item) => item.data() as BehaviorEntry)
+      .filter((entry) => Number.isInteger(entry.block) && entry.params)
+      .sort((a, b) => a.block - b.block);
+  });
+}
+
+export async function saveBehaviorEntry(userId: string, entry: BehaviorEntry): Promise<void> {
+  await guard('saveBehavior', async () => {
+    // JSON round trip drops undefined values, which Firestore rejects.
+    await setDoc(doc(db, 'users', userId, 'behavior', `mes-${entry.block}`), JSON.parse(JSON.stringify(entry)));
+  });
 }
 
 export async function fetchActivities(userId: string): Promise<ScheduledActivity[]> {
@@ -531,6 +574,7 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
       durationSource: draft.durationSource !== undefined
         ? draft.durationSource
         : (existing?.durationSource === 'cyclia' || existing?.durationSource === 'manual' ? existing.durationSource : null),
+      assistChat: draft.assistChat !== undefined ? draft.assistChat : existing?.assistChat,
     });
     await setDoc(doc(db, 'users', userId, 'activities', id), clean({
       title: saved.title,
@@ -552,6 +596,7 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
       steps: saved.steps,
       completedAt: saved.completedAt,
       durationSource: saved.durationSource,
+      assistChat: saved.assistChat,
     }), { merge: true });
     return saved;
   });

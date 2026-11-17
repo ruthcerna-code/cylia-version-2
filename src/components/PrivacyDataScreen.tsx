@@ -6,7 +6,7 @@ import { PrivacyDraft, TermsDraft } from './LegalDrafts';
 
 const WITHDRAW_EFFECT: Partial<Record<ConsentPurpose, string>> = {
   health_cycle: 'Si retiras la autorización de salud, el seguimiento del ciclo, los registros nuevos y las estimaciones dejan de estar disponibles. El historial que ya existe no se borra por este retiro.',
-  gemini_assistant: 'Si retiras la autorización del asistente, el análisis del registro y Cyclia IA dejan de enviarse a Google Gemini. El seguimiento del ciclo sigue disponible.',
+  gemini_assistant: 'Si retiras la autorización del asistente, el análisis del registro y Cyclia IA dejan de enviarse a Anthropic (Claude). El seguimiento del ciclo sigue disponible.',
 };
 
 const PURPOSE_LABEL: Record<ConsentPurpose, string> = {

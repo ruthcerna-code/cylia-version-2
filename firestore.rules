@@ -163,6 +163,21 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // Monthly behavior parameters and the pattern Cyclia wrote from them (mes-1, mes-2, ...).
+      match /behavior/{id} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && id == 'mes-' + string(request.resource.data.block)
+          && request.resource.data.block is int
+          && request.resource.data.block >= 1
+          && request.resource.data.block <= 240
+          && isDate(request.resource.data.from)
+          && isDate(request.resource.data.to)
+          && request.resource.data.params is map
+          && request.resource.data.generatedAt is string;
+        allow delete: if isOwner(uid);
+      }
+
       match /focus/{id} {
         allow read, write: if isOwner(uid);
       }

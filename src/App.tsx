@@ -28,6 +28,10 @@ import { compareActivities, explainActivityError, formatActivityWhen, LOCAL_ACTI
 import { compareRecords, dayRecordNote, indicatorNote } from './utils/recordCompare';
 import { suggestCare } from './utils/care';
 import DayMatch from './components/DayMatch';
+import OwnPatternCard from './components/OwnPatternCard';
+import BehaviorReportCard from './components/BehaviorReportCard';
+import { behaviorMonthLabel, behaviorTimeline } from './utils/behavior';
+import { usePlusNotice } from './components/PlusNotice';
 import { buildAnalysisContext } from './utils/analysisContext';
 import { generateActivityForDay } from './utils/activity';
 import {
@@ -133,6 +137,11 @@ export default function App() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
   const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil' | 'foco' | 'conocimiento' | 'bienestar'>('inicio');
+  const requestPlus = usePlusNotice();
+  // Chat Cyclia IA is a Plus feature: opening it shows the paid-option notice once.
+  useEffect(() => {
+    if (appTab === 'chat') void requestPlus('chat_ia');
+  }, [appTab, requestPlus]);
   const [activities, setActivities] = useState<ScheduledActivity[]>([]);
   const [activitiesReady, setActivitiesReady] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
@@ -198,6 +207,21 @@ export default function App() {
     setShowNotification(true);
     window.setTimeout(() => setShowNotification(false), 4000);
   };
+
+  // When she completes another month of records, tell her once that her monthly pattern is ready.
+  const completedMonths = behaviorTimeline(logs, formatDateStr(new Date())).completed.length;
+  useEffect(() => {
+    if (!user || completedMonths < 1) return;
+    const key = `cyclia_patron_mes_aviso_${user.id}`;
+    try {
+      if (Number(localStorage.getItem(key) || '0') >= completedMonths) return;
+      localStorage.setItem(key, String(completedMonths));
+    } catch {
+      return;
+    }
+    showNotice(`Ya cumpliste ${behaviorMonthLabel(completedMonths)} de registros. Tu patrón del mes está listo en la pestaña Ciclo.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, completedMonths]);
 
   useEffect(() => {
     if (!user) {
@@ -458,6 +482,7 @@ export default function App() {
       showNotice('El registro se guardó. El análisis con inteligencia artificial no se envió porque esa autorización no está vigente.');
       return;
     }
+    await requestPlus('analisis_dia');
     setIsAnalyzing(true);
     try {
       const token = await authBearer();
@@ -493,14 +518,16 @@ export default function App() {
     const activeLog = logs[selectedDateStr];
     if (!activeLog) return;
 
+    await requestPlus('analisis_dia');
     setIsAnalyzing(true);
     setAnalysisError('');
     setIsAnalysisOpen(true);
 
     try {
+      const token = await authBearer();
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           context: buildAnalysisContext(profile, periods, logs, selectedDateStr),
           previousInteractionId,
@@ -509,7 +536,8 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error("No se pudo obtener el análisis. Verifica tu conexión.");
+        const body = await response.json().catch(() => ({}));
+        throw new Error(typeof body?.error === 'string' && body.error ? body.error : "No se pudo obtener el análisis. Verifica tu conexión.");
       }
 
       const data = await response.json();
@@ -994,6 +1022,7 @@ export default function App() {
         {appTab === 'foco' && (
           <OrganizaTuDia
             openToken={planOpenToken}
+            userId={user.id}
             createTitle={planRequest.title}
             createDate={planRequest.date || formatDateStr(new Date())}
             profile={profile}
@@ -1008,6 +1037,7 @@ export default function App() {
               return status.purposes.gemini_assistant === 'accept';
             }}
             onSaveActivity={handleSaveActivity}
+            onDeleteActivity={handleDeleteActivity}
             onSaveEnergy={async (date, band) => {
               const current = logs[date];
               const energy = band === 'sin_energia' ? 2 : 4;
@@ -1249,7 +1279,17 @@ export default function App() {
               {compareRecords(profile, periods, logs).map((line) => <p key={line} className="m-0 text-sm text-[#3B4070]">{line}</p>)}
               <p className="m-0 text-xs text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
             </section>
-            <button type="button" onClick={() => setCycleSheet('evolucion')} className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
+            <OwnPatternCard profile={profile} periods={periods} logs={logs} today={formatDateStr(new Date())} />
+            <BehaviorReportCard
+              userId={user.id}
+              profile={profile}
+              periods={periods}
+              logs={logs}
+              activities={activities}
+              assistantEnabled={consentStatus?.purposes.gemini_assistant === 'accept'}
+              today={formatDateStr(new Date())}
+            />
+            <button type="button" onClick={() => setCycleSheet('evolucion')}className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">↗</span>
               <span><strong className="block text-base">Evolución de bienestar</strong><span className="text-[13px] text-[#3B4070]">Ánimo, estrés, dolor, sueño y cansancio</span></span>
             </button>

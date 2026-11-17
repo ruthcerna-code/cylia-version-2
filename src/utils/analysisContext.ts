@@ -94,7 +94,8 @@ export function buildAnalysisContext(
   const date = focusDate;
   const view = analyzeCycle(profile, periods, date);
   const recent = Object.values(record)
-    .filter((item) => item.date && item.date !== date)
+    // Only days before the analyzed one: a later record is not "recent" for that day.
+    .filter((item) => item.date && (date ? item.date < date : true))
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-4)
     .map(logForAnalysis);
