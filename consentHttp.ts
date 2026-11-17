@@ -180,7 +180,7 @@ export async function readExportBundle(jwt: string, userId: string) {
     throw new ConsentError(500, 'No pudimos preparar tu archivo. Inténtalo nuevamente.');
   }
   const profile = profileResponse.ok ? decodeDoc(profileBody as FirestoreDoc) : null;
-  const [dailyLogs, activities, messages, dataRequests, periodRecords, focusDocs, behavior] = await Promise.all([
+  const [dailyLogs, activities, messages, dataRequests, periodRecords, focusDocs, behavior, movementDays] = await Promise.all([
     readCollection(jwt, userId, 'daily_logs'),
     readCollection(jwt, userId, 'activities'),
     readCollection(jwt, userId, 'messages'),
@@ -188,8 +188,9 @@ export async function readExportBundle(jwt: string, userId: string) {
     readCollection(jwt, userId, 'period_records'),
     readCollection(jwt, userId, 'focus'),
     readCollection(jwt, userId, 'behavior'),
+    readCollection(jwt, userId, 'movement_days'),
   ]);
-  return { profile, dailyLogs, activities, messages, dataRequests, periodRecords, behavior, focus: focusDocs[0]?.payload ?? null };
+  return { profile, dailyLogs, activities, messages, dataRequests, periodRecords, behavior, movementDays, focus: focusDocs[0]?.payload ?? null };
 }
 
 export function summarizeConsent(rows: ConsentRow[]) {

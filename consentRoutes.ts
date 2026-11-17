@@ -111,6 +111,8 @@ export function registerConsentRoutes(app: Express) {
         periodRecords: bundle.periodRecords,
         activities: bundle.activities,
         messages: bundle.messages,
+        behavior: bundle.behavior,
+        movementDays: bundle.movementDays,
         focus: bundle.focus,
         consentEvents: consent.map((row) => ({
           purpose: row.purpose,

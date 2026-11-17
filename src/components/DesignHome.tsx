@@ -58,6 +58,7 @@ export default function DesignHome({
   statusNote = '',
   activityTitle,
   care,
+  movement,
   onOpenPhase,
   onRegister,
   onChat,
@@ -81,6 +82,8 @@ export default function DesignHome({
   statusNote?: string;
   activityTitle: string;
   care?: { foods: string[]; exercises: string[] };
+  /** "Tu movimiento de hoy" for the "Salud física" focus. When present, it replaces the 3 exercises of care. */
+  movement?: React.ReactNode;
   onOpenPhase: () => void;
   onRegister: () => void;
   onChat: () => void;
@@ -166,13 +169,18 @@ export default function DesignHome({
             <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#3B4070]">
               {care.foods.map((item) => <li key={item}>{item}</li>)}
             </ol>
-            <p className="m-0 mt-3 text-[13px] font-extrabold text-[#1B1F5E]">3 ejercicios</p>
-            <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#3B4070]">
-              {care.exercises.map((item) => <li key={item}>{item}</li>)}
-            </ol>
+            {!movement && (
+              <>
+                <p className="m-0 mt-3 text-[13px] font-extrabold text-[#1B1F5E]">3 ejercicios</p>
+                <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#3B4070]">
+                  {care.exercises.map((item) => <li key={item}>{item}</li>)}
+                </ol>
+              </>
+            )}
             <p className="m-0 mt-2 text-[12px] leading-relaxed text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
           </section>
         )}
+        {movement}
         <button type="button" onClick={onRegister} className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
           <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-[#1B1F5E] text-2xl text-[#F6E27F]">+</span>
           <span><strong className="block text-base">Registro de hoy</strong><span className="text-[13px]">Toma menos de un minuto</span></span>

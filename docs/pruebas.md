@@ -1,6 +1,6 @@
 # Pruebas de Cyclia
 
-Creadas el 17-11-2026. **133 pruebas automáticas, todas pasan.**
+Creadas el 17-11-2026. **157 pruebas automáticas, todas pasan.**
 
 ## Cómo correrlas
 

@@ -46,12 +46,13 @@ Scripts:
 | `npm run build` y luego `npm start` | Compila y sirve la versión de producción desde `dist/` |
 | `npm test` | Corre las pruebas automáticas una vez |
 | `npm run test:watch` | Vuelve a correr las pruebas al guardar |
+| `npm run catalog:build` | Regenera `src/catalog/movementCatalog.ts` desde `src/catalog/catalogo-salud-fisica.csv`. Se detiene con un mensaje si no hay 120 filas, si un N.º se repite o si la energía no está entre 1 y 5 |
 
 El servidor lee el `.env` solo al arrancar: después de cambiar una variable o `server.ts`, hay que reiniciarlo.
 
 ## Pruebas
 
-133 pruebas automáticas en `tests/`, que cubren el cálculo del ciclo, los modos de etapa y las alertas, la validación del perfil, los datos que se envían a la IA, el consentimiento, la exportación, el plan del día, Tu patrón propio, Tu patrón del mes, Hoy es un día difícil, el aviso Plus y las rutas del servidor.
+157 pruebas automáticas en `tests/`, que cubren el cálculo del ciclo, los modos de etapa y las alertas, la validación del perfil, los datos que se envían a la IA, el consentimiento, la exportación, el plan del día, Tu patrón propio, Tu patrón del mes, Hoy es un día difícil, el aviso Plus, el catálogo y la selección de movimiento, y las rutas del servidor.
 
 No llaman a Claude ni a Firebase: la IA y el consentimiento se simulan. No gastan créditos ni tocan datos reales. El detalle, los errores que encontraron y la lista de revisión manual están en [docs/pruebas.md](docs/pruebas.md).
 
@@ -207,6 +208,25 @@ Seis funciones son de pago (Cyclia Plus) y por ahora están activadas para todas
 - La lista de funciones y los textos están en `src/plus/plusFeatures.ts`. La ventana está en `src/components/PlusNotice.tsx` (`usePlusNotice`, `PlusBadge`).
 - Cuando exista el plan Plus, ese mismo punto es donde cada función revisará si la cuenta lo tiene.
 
+### Foco «Salud física»: Tu movimiento de hoy
+
+Si en «Elige tu foco» (o en Perfil → Objetivos) marcó **Salud física** (id `'salud'` en `cyclia_objectives`), Inicio cambia los «3 ejercicios» de `suggestCare` por la tarjeta **Tu movimiento de hoy** (`src/components/MovementCard.tsx`). Los otros focos no cambian.
+
+- **Catálogo:** 120 actividades en `src/catalog/catalogo-salud-fisica.csv` (N.º, actividad, fases sugeridas, intensidad, energía mínima, tipo, duración, lugar, equipo y cuidado). `npm run catalog:build` lo convierte en `src/catalog/movementCatalog.ts`, un arreglo tipado `MovementActivity[]`. «Todas» equivale a las cuatro fases. No se edita a mano: se cambia la hoja y se vuelve a generar.
+- **Selección** (`src/utils/movementPicker.ts`, `pickMovement`), sin IA. Cada día propone 3 actividades, cada una con una frase de motivo. Las reglas, en orden:
+  1. **Energía:** `energy` del registro; si no hay número, `energyFeel` (baja 2, estable 3, inquieta 3, radiante 4). Sin registro de hoy, 3 y nada de intensidad alta. Solo entran actividades con energía mínima menor o igual.
+  2. **Síntomas:** cólicos medios o dolor de 3 o más, solo suaves. Dolor de cabeza: nada de intensidad alta.
+  3. **Sueño:** menos de 6 horas (`readSleep`) baja la energía un punto.
+  4. **Tiempo y recursos:** respeta el tiempo libre y el lugar y equipo disponibles, si se conocen. Hoy la app no guarda esos datos, así que no filtra por ellos.
+  5. **Variedad:** no repite lo sugerido en los últimos 7 días ni lo que marcó «No me gusta». Las 3 son de tipos distintos, con prioridad para fuerza, cardio o movilidad si faltan en la semana.
+  6. **Fase:** en modo natural, las actividades sugeridas para la fase de hoy pesan el triple en el sorteo. En los modos hormonal, perimenopausia, menopausia y pausa, la fase no se usa. Si el motivo menciona la fase, dice «muchas mujeres reportan».
+  7. **Perimenopausia y menopausia:** asegura 2 de fuerza y 1 de equilibrio en la semana.
+  8. **Azar reproducible:** semilla = uid + fecha. Las mismas 3 todo el día; otras al día siguiente. Lo ya mostrado hoy se mantiene mientras siga permitido.
+  9. Si quedan menos de 3, relaja la variedad semanal, después los tipos distintos y después el tiempo. Nunca la energía, los síntomas ni la seguridad.
+- **Seguridad:** con embarazo o posparto y lactancia no se muestra el catálogo: «Antes de retomar o cambiar tu actividad física, conversa con tu matrona o médico». Con una condición de salud marcada aparece «Si tienes dudas por tu condición de salud, consúltalo con tu profesional». El cuidado de cada actividad se muestra cuando existe.
+- **Botones:** «La hice» la marca como hecha; «No me gusta» la cambia por otra y no vuelve a proponerla.
+- **Datos:** cada día se guarda en `users/{uid}/movement_days/{fecha}`, con los ids sugeridos, hechos y rechazados. Se incluye en la exportación y se borra al eliminar la cuenta.
+
 ### Tu patrón del mes (comportamiento)
 
 En la pestaña Ciclo (`src/utils/behavior.ts`, `src/components/BehaviorReportCard.tsx`, `src/plan/behaviorPrompt.ts`). Cyclia estudia el comportamiento de cada usuaria mes a mes.
@@ -243,6 +263,7 @@ Cada documento cuelga de `users/{uid}`, y solo esa persona lo lee o lo edita (`f
 | `activities` | `users/{uid}/activities/{id}` | Actividad, fecha, horario, duración, esfuerzo, importancia, fecha límite, pasos, estado y, si se creó con Cyclia te asiste, la conversación (`assistChat`, hasta 40 mensajes) |
 | `consent_events` | `users/{uid}/consent_events/{id}` | Cada decisión de consentimiento, con la versión del texto |
 | `data_requests` | `users/{uid}/data_requests/{id}` | Solicitudes de acceso, corrección o eliminación |
+| `movement_days` | `users/{uid}/movement_days/{fecha}` | Tu movimiento de hoy: `date`, `suggestedIds`, `doneIds`, `dislikedIds` y `updatedAt`. Solo la dueña lee y escribe |
 | `behavior` | `users/{uid}/behavior/mes-{N}` | Parámetros de comportamiento de cada mes y el patrón que escribió Cyclia |
 | `focus`, `day_plans` | `users/{uid}/...` | Datos de versiones anteriores (Mi Foco y el plan por minutos). La app actual ya no los escribe; se borran al eliminar la cuenta |
 
@@ -270,7 +291,8 @@ Las reglas están en `src/utils/profileFields.ts`, y `saveProfile` las vuelve a 
 
 | Ruta | Qué contiene |
 |------|--------------|
-| `src/` | La app: pantallas (`components/`), plan del día (`plan/`), cálculos (`utils/`), acceso a Firebase (`firebase.ts`) y textos de consentimiento (`consentCopy.ts`) |
+| `src/` | La app: pantallas (`components/`), plan del día (`plan/`), cálculos (`utils/`), catálogo de movimiento (`catalog/`), acceso a Firebase (`firebase.ts`) y textos de consentimiento (`consentCopy.ts`) |
+| `scripts/` | `build-catalog.mjs` (catálogo de movimiento) y `stage-vercel-public.mjs` (despliegue en Vercel) |
 | `server.ts` | Servidor Express y rutas de IA |
 | `consentRoutes.ts`, `consentHttp.ts` | Consentimiento, exportación y solicitudes de datos |
 | `tests/` | Pruebas automáticas |

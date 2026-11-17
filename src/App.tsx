@@ -30,6 +30,7 @@ import { suggestCare } from './utils/care';
 import DayMatch from './components/DayMatch';
 import OwnPatternCard from './components/OwnPatternCard';
 import BehaviorReportCard from './components/BehaviorReportCard';
+import MovementCard from './components/MovementCard';
 import { behaviorMonthLabel, behaviorTimeline } from './utils/behavior';
 import { usePlusNotice } from './components/PlusNotice';
 import { buildAnalysisContext } from './utils/analysisContext';
@@ -967,6 +968,9 @@ export default function App() {
             statusNote={cycleView.note}
             activityTitle={selectedActivity.title}
             care={suggestCare(profile, periods, logs, selectedDateStr)}
+            movement={savedGoals.includes('salud') ? (
+              <MovementCard userId={user.id} profile={profile} periods={periods} logs={logs} today={formatDateStr(new Date())} />
+            ) : undefined}
             onOpenPhase={() => setHomeSheet('fase')}
             onRegister={() => setAppTab('registro')}
             onChat={() => { setHomeSheet(null); setAppTab('chat'); }}

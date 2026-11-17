@@ -163,6 +163,22 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // "Tu movimiento de hoy": the activities suggested, done and disliked each day.
+      match /movement_days/{day} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && isDate(day)
+          && request.resource.data.date == day
+          && request.resource.data.suggestedIds is list
+          && request.resource.data.suggestedIds.size() <= 50
+          && request.resource.data.doneIds is list
+          && request.resource.data.doneIds.size() <= 50
+          && request.resource.data.dislikedIds is list
+          && request.resource.data.dislikedIds.size() <= 50
+          && request.resource.data.updatedAt is string;
+        allow delete: if isOwner(uid);
+      }
+
       // Monthly behavior parameters and the pattern Cyclia wrote from them (mes-1, mes-2, ...).
       match /behavior/{id} {
         allow read: if isOwner(uid);

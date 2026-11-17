@@ -9,7 +9,8 @@
     "vercel-build": "vite build && node scripts/stage-vercel-public.mjs",
     "start": "node dist/server.cjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "catalog:build": "node scripts/build-catalog.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.10.0",

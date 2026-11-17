@@ -426,6 +426,7 @@ export async function deleteAccountData(userId: string) {
     await deleteCollection(userId, 'daily_logs');
     await deleteCollection(userId, 'focus');
     await deleteCollection(userId, 'behavior');
+    await deleteCollection(userId, 'movement_days');
     await deleteDoc(userDoc(userId));
   });
 }
@@ -538,6 +539,49 @@ export async function saveBehaviorEntry(userId: string, entry: BehaviorEntry): P
   await guard('saveBehavior', async () => {
     // JSON round trip drops undefined values, which Firestore rejects.
     await setDoc(doc(db, 'users', userId, 'behavior', `mes-${entry.block}`), JSON.parse(JSON.stringify(entry)));
+  });
+}
+
+/** One day of movement proposals in "Tu movimiento de hoy". */
+export interface MovementDay {
+  date: string;
+  suggestedIds: number[];
+  doneIds: number[];
+  dislikedIds: number[];
+  updatedAt: string;
+}
+
+function readIds(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((item): item is number => Number.isInteger(item)).slice(0, 50) : [];
+}
+
+export async function fetchMovementDays(userId: string): Promise<MovementDay[]> {
+  return guard('fetchMovementDays', async () => {
+    const snap = await getDocs(collection(db, 'users', userId, 'movement_days'));
+    return snap.docs
+      .map((item) => {
+        const data = item.data();
+        return {
+          date: String(data.date || item.id),
+          suggestedIds: readIds(data.suggestedIds),
+          doneIds: readIds(data.doneIds),
+          dislikedIds: readIds(data.dislikedIds),
+          updatedAt: String(data.updatedAt || ''),
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+  });
+}
+
+export async function saveMovementDay(userId: string, day: MovementDay): Promise<void> {
+  await guard('saveMovementDay', async () => {
+    await setDoc(doc(db, 'users', userId, 'movement_days', day.date), {
+      date: day.date,
+      suggestedIds: day.suggestedIds,
+      doneIds: day.doneIds,
+      dislikedIds: day.dislikedIds,
+      updatedAt: day.updatedAt,
+    });
   });
 }
 
