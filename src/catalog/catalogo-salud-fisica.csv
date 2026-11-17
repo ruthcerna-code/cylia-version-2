@@ -1,0 +1,121 @@
+N.º,Actividad,Fases sugeridas,Intensidad,Energía mínima (1 a 5),Tipo,Duración (min),Lugar,Equipo,Cuidado
+1,Caminata suave al aire libre,Todas,Suave,1,Cardio,20,Aire libre,Ninguno,
+2,Yoga restaurativo,"Menstrual, lútea",Suave,1,Movilidad,20,Casa,Mat,
+3,Postura del niño con respiración,Menstrual,Suave,1,Respiración,5,Casa,Mat,
+4,Respiración diafragmática,Todas,Suave,1,Respiración,5,Cualquier lugar,Ninguno,
+5,Estiramiento de cadera en el suelo,"Menstrual, lútea",Suave,1,Movilidad,10,Casa,Mat,
+6,Movilidad de columna gato-vaca,Todas,Suave,1,Movilidad,8,Casa,Mat,
+7,Piernas en la pared,Menstrual,Suave,1,Movilidad,10,Casa,Ninguno,
+8,Estiramientos en la silla de la oficina,Todas,Suave,1,Movilidad,8,Oficina,Silla,
+9,Respiración 4-7-8 antes de dormir,"Menstrual, lútea",Suave,1,Respiración,5,Casa,Ninguno,
+10,Automasaje de espalda con pelota,"Menstrual, lútea",Suave,1,Movilidad,10,Casa,Pelota,
+11,Tai chi básico,Todas,Suave,1,Equilibrio,15,Casa,Ninguno,
+12,Caminata consciente en un parque,Menstrual,Suave,1,Cardio,25,Aire libre,Ninguno,
+13,Yoga nidra guiado,"Menstrual, lútea",Suave,1,Respiración,20,Casa,Mat,
+14,Estiramiento de isquiotibiales con banda,Todas,Suave,1,Movilidad,10,Casa,Banda elástica,
+15,Rotaciones de hombros y cuello,Todas,Suave,1,Movilidad,5,Oficina,Ninguno,
+16,Bicicleta estática suave,"Menstrual, lútea",Suave,2,Cardio,20,Gimnasio,Bicicleta estática,
+17,Natación suave o caminar en el agua,"Menstrual, lútea",Suave,2,Cardio,25,Piscina,Ninguno,Según su comodidad durante la regla
+18,Pilates suave de suelo,"Menstrual, lútea",Suave,2,Core,20,Casa,Mat,
+19,Ejercicios de suelo pélvico,Todas,Suave,1,Suelo pélvico,5,Cualquier lugar,Ninguno,
+20,Yoga yin,"Menstrual, lútea",Suave,1,Movilidad,30,Casa,Mat,
+21,Estiramiento de pecho en el marco de la puerta,Todas,Suave,1,Movilidad,5,Casa,Ninguno,
+22,Movilidad de tobillos y pies,Todas,Suave,1,Movilidad,5,Casa,Ninguno,
+23,Caminata después de almorzar,Todas,Suave,1,Cardio,15,Aire libre,Ninguno,
+24,Balanceo de piernas y caderas,Todas,Suave,1,Movilidad,5,Casa,Ninguno,
+25,Puente de glúteo suave,"Menstrual, lútea",Suave,2,Fuerza,8,Casa,Mat,
+26,Yoga en silla,Todas,Suave,1,Movilidad,15,Oficina,Silla,
+27,Equilibrio en un pie apoyada en la pared,Todas,Suave,1,Equilibrio,5,Casa,Ninguno,
+28,Qi gong,"Menstrual, lútea",Suave,1,Respiración,15,Casa,Ninguno,
+29,Paseo con su mascota a ritmo tranquilo,Todas,Suave,1,Cardio,20,Aire libre,Ninguno,
+30,Estiramiento completo antes de dormir,Todas,Suave,1,Movilidad,10,Casa,Mat,
+31,Caminata rápida,"Folicular, lútea",Moderada,3,Cardio,30,Aire libre,Ninguno,
+32,Pilates de suelo intermedio,"Folicular, lútea",Moderada,3,Core,30,Casa,Mat,
+33,Yoga vinyasa,"Folicular, ovulatoria",Moderada,3,Movilidad,30,Casa,Mat,
+34,"Fuerza con peso corporal: sentadillas, zancadas y flexiones","Folicular, lútea",Moderada,3,Fuerza,20,Casa,Ninguno,
+35,Bicicleta al aire libre en plano,"Folicular, lútea",Moderada,3,Cardio,40,Aire libre,Bicicleta,Usar casco
+36,Natación continua,"Folicular, lútea",Moderada,3,Cardio,30,Piscina,Ninguno,
+37,Elíptica,Todas,Moderada,3,Cardio,25,Gimnasio,Elíptica,
+38,Fuerza con bandas elásticas,Todas,Moderada,3,Fuerza,20,Casa,Banda elástica,
+39,Remo en máquina a ritmo constante,"Folicular, lútea",Moderada,3,Cardio,20,Gimnasio,Máquina de remo,
+40,Baile libre en casa,"Folicular, ovulatoria",Moderada,3,Cardio,20,Casa,Ninguno,
+41,Subir escaleras,"Folicular, lútea",Moderada,3,Cardio,10,Oficina,Ninguno,
+42,Senderismo suave,"Folicular, lútea",Moderada,3,Cardio,60,Aire libre,Zapatillas,Llevar agua
+43,Pilates con máquina (reformer),"Folicular, lútea",Moderada,3,Core,45,Estudio,Reformer,
+44,Mancuernas livianas para brazos y espalda,"Folicular, lútea",Moderada,3,Fuerza,20,Casa,Mancuernas,
+45,"Circuito de core: plancha, bicho muerto y pájaro-perro","Folicular, lútea",Moderada,3,Core,15,Casa,Mat,
+46,Aquagym,"Menstrual, lútea",Moderada,2,Cardio,45,Piscina,Ninguno,
+47,Barre,"Folicular, lútea",Moderada,3,Fuerza,30,Estudio,Barra,
+48,Patinaje recreativo,"Folicular, ovulatoria",Moderada,3,Cardio,30,Aire libre,Patines,Usar protecciones
+49,Yoga con bloques para fuerza,Lútea,Moderada,3,Fuerza,25,Casa,Bloques,
+50,Caminata nórdica con bastones,Todas,Moderada,3,Cardio,40,Aire libre,Bastones,
+51,Zancadas caminando y sentadilla en la pared,Folicular,Moderada,3,Fuerza,15,Casa,Ninguno,
+52,Práctica de golf,Lútea,Moderada,2,Recreativo,60,Aire libre,Palos de golf,
+53,Jardinería activa,Todas,Moderada,2,Recreativo,30,Casa,Herramientas,Cuidar la espalda al agacharse
+54,Ciclismo indoor a ritmo moderado,"Folicular, lútea",Moderada,3,Cardio,30,Gimnasio,Bicicleta estática,
+55,Peso muerto rumano con kettlebell,Folicular,Moderada,3,Fuerza,20,Gimnasio,Kettlebell,Aprender la técnica primero
+56,Movilidad con rodillo de espuma,Todas,Suave,2,Movilidad,10,Casa,Rodillo,
+57,Step aeróbico básico,Folicular,Moderada,3,Cardio,25,Casa,Step,
+58,Tenis de mesa,"Folicular, ovulatoria",Moderada,3,Grupal,30,Club,Paleta,
+59,Equilibrio en una pierna con alcance,Todas,Moderada,2,Equilibrio,10,Casa,Ninguno,
+60,Fuerza de glúteos con banda,"Folicular, lútea",Moderada,3,Fuerza,15,Casa,Banda elástica,
+61,Kayak o remo recreativo,"Folicular, ovulatoria",Moderada,3,Cardio,45,Aire libre,Kayak,Usar chaleco salvavidas
+62,Zumba a ritmo moderado,Folicular,Moderada,3,Cardio,30,Estudio,Ninguno,
+63,Pilates de pie para la postura,Todas,Moderada,2,Core,15,Oficina,Ninguno,
+64,Caminata con cuestas,"Folicular, lútea",Moderada,3,Cardio,30,Aire libre,Ninguno,
+65,Fuerza en máquinas guiadas,"Folicular, lútea",Moderada,3,Fuerza,40,Gimnasio,Máquinas,
+66,Danza árabe o flamenco básico,"Folicular, ovulatoria",Moderada,3,Cardio,45,Estudio,Ninguno,
+67,Yoga para la espalda baja,"Menstrual, lútea",Suave,2,Movilidad,15,Casa,Mat,
+68,Bádminton recreativo,"Folicular, ovulatoria",Moderada,3,Grupal,30,Club,Raqueta,
+69,Escaleras con paso lento y controlado,Lútea,Moderada,2,Fuerza,10,Casa,Ninguno,
+70,Saltos suaves en mini trampolín,Folicular,Moderada,3,Cardio,10,Casa,Mini trampolín,Evitar si hay molestias en el suelo pélvico
+71,Intervalos de alta intensidad con peso corporal,"Folicular, ovulatoria",Alta,4,Cardio,20,Casa,Ninguno,Calentar 5 minutos
+72,Trote continuo,"Folicular, ovulatoria",Alta,4,Cardio,30,Aire libre,Zapatillas,
+73,Intervalos de carrera: 1 minuto rápido y 2 suaves,"Folicular, ovulatoria",Alta,4,Cardio,25,Aire libre,Zapatillas,
+74,Sentadilla con barra,"Folicular, ovulatoria",Alta,4,Fuerza,45,Gimnasio,Barra,Con supervisión si es nueva
+75,Peso muerto con barra,Folicular,Alta,4,Fuerza,45,Gimnasio,Barra,Técnica supervisada
+76,Spinning,"Folicular, ovulatoria",Alta,4,Cardio,45,Estudio,Bicicleta estática,
+77,Clase de baile intensa (zumba o salsa),Ovulatoria,Alta,4,Cardio,45,Estudio,Ninguno,
+78,Boxeo o kickboxing,"Folicular, ovulatoria",Alta,4,Cardio,45,Estudio,Guantes,
+79,Entrenamiento funcional en circuito,"Folicular, ovulatoria",Alta,4,Fuerza,40,Gimnasio,Varios,
+80,Saltar la cuerda por intervalos,"Folicular, ovulatoria",Alta,4,Cardio,15,Casa,Cuerda,Evitar si hay molestias en el suelo pélvico
+81,Escalada en muro,"Folicular, ovulatoria",Alta,4,Fuerza,60,Gimnasio,Arnés,Con instructor
+82,Fútbol o básquetbol recreativo,Ovulatoria,Alta,4,Grupal,60,Cancha,Balón,Calentar bien
+83,Vóleibol,Ovulatoria,Alta,4,Grupal,60,Cancha,Balón,
+84,Pádel o tenis,"Folicular, ovulatoria",Alta,4,Grupal,60,Club,Raqueta,
+85,Remo por intervalos,"Folicular, ovulatoria",Alta,4,Cardio,20,Gimnasio,Máquina de remo,
+86,Trekking con desnivel,"Folicular, ovulatoria",Alta,4,Cardio,120,Aire libre,Zapatillas,Llevar agua y avisar la ruta
+87,Ciclismo de ruta con subidas,"Folicular, ovulatoria",Alta,4,Cardio,60,Aire libre,Bicicleta,Usar casco
+88,Natación por series,"Folicular, ovulatoria",Alta,4,Cardio,40,Piscina,Ninguno,
+89,Saltos al cajón,Folicular,Alta,5,Fuerza,20,Gimnasio,Cajón,Evitar si hay molestias en rodillas o suelo pélvico
+90,Entrenamiento de alta intensidad guiado,"Folicular, ovulatoria",Alta,5,Fuerza,60,Gimnasio,Varios,Con instructor
+91,Carrera de 5 km,Ovulatoria,Alta,5,Cardio,35,Aire libre,Zapatillas,
+92,Hip thrust con barra,"Folicular, ovulatoria",Alta,4,Fuerza,30,Gimnasio,Barra,
+93,Clase de step intensa,Folicular,Alta,4,Cardio,45,Estudio,Step,
+94,Surf o bodyboard,Ovulatoria,Alta,4,Recreativo,60,Playa,Tabla,Nadar bien y no ir sola
+95,Escaleras rápidas por intervalos,Folicular,Alta,4,Cardio,15,Aire libre,Ninguno,
+96,Power yoga,"Folicular, ovulatoria",Alta,4,Fuerza,45,Estudio,Mat,
+97,Circuito con kettlebell: swing y sentadilla goblet,Folicular,Alta,4,Fuerza,25,Gimnasio,Kettlebell,
+98,Hockey u otro deporte de equipo con contacto,Ovulatoria,Alta,5,Grupal,60,Cancha,Equipo del deporte,Usar protecciones
+99,Esquí o snowboard,"Folicular, ovulatoria",Alta,4,Recreativo,180,Montaña,Equipo de nieve,Tomar clase si es principiante
+100,Carrera en cerro (trail),"Folicular, ovulatoria",Alta,5,Cardio,60,Aire libre,Zapatillas,No ir sola
+101,Rutina completa de fuerza con mancuernas,Todas,Moderada,3,Fuerza,35,Casa,Mancuernas,Clave en perimenopausia y menopausia
+102,Caminata con chaleco de peso liviano,Lútea,Moderada,3,Fuerza,30,Aire libre,Chaleco con peso,Consultar si tiene problemas de espalda
+103,Saltos pequeños en el lugar,Folicular,Moderada,3,Fuerza,10,Casa,Ninguno,Evitar si hay molestias en el suelo pélvico
+104,Caminar en línea talón-punta,Todas,Suave,2,Equilibrio,5,Casa,Ninguno,
+105,Pilates para suelo pélvico y core profundo,Todas,Suave,2,Suelo pélvico,20,Casa,Mat,
+106,Respiración lenta para bochornos,Todas,Suave,1,Respiración,5,Cualquier lugar,Ninguno,Pensada para perimenopausia
+107,Yoga para dormir mejor,Lútea,Suave,1,Movilidad,15,Casa,Mat,
+108,Fuerza de agarre y antebrazos,Todas,Suave,2,Fuerza,5,Oficina,Pelota,
+109,Sentarse y pararse de la silla 10 veces,Todas,Suave,2,Fuerza,5,Oficina,Silla,
+110,Remo con banda sentada,Todas,Suave,2,Fuerza,10,Oficina,Banda elástica,
+111,Pausa activa de 5 minutos,Todas,Suave,1,Movilidad,5,Oficina,Ninguno,
+112,Caminar durante una llamada,Todas,Suave,1,Cardio,20,Oficina,Ninguno,
+113,Estiramiento de muñecas y manos,Todas,Suave,1,Movilidad,3,Oficina,Ninguno,
+114,Sentadilla isométrica en la pared,Lútea,Moderada,3,Fuerza,5,Casa,Ninguno,
+115,Plancha lateral progresiva,"Folicular, lútea",Moderada,3,Core,8,Casa,Mat,
+116,Movimiento libre con música calmada,"Menstrual, lútea",Suave,1,Recreativo,15,Casa,Ninguno,
+117,Bicicleta de paseo,Todas,Suave,2,Cardio,30,Aire libre,Bicicleta,Usar casco
+118,Paddle surf en agua calma,"Folicular, lútea",Moderada,3,Equilibrio,45,Playa,Tabla,Usar chaleco salvavidas
+119,Clase grupal de yoga,"Folicular, ovulatoria",Moderada,3,Grupal,60,Estudio,Mat,
+120,Club de caminata,"Ovulatoria, lútea",Suave,2,Grupal,45,Aire libre,Ninguno,
