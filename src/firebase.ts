@@ -662,34 +662,3 @@ export function subscribeUserData(userId: string, onChange: () => void) {
   ];
   return () => stops.forEach((stop) => stop());
 }
-
-export async function loadDayPlan(userId: string, date: string): Promise<Record<string, unknown> | null> {
-  const snap = await getDoc(doc(db, 'users', userId, 'day_plans', date));
-  return snap.exists() ? snap.data() : null;
-}
-
-export async function saveDayPlan(userId: string, date: string, availableMinutes: number, reportedEnergy: number | null, reportedFeel: string | null) {
-  await setDoc(doc(db, 'users', userId, 'day_plans', date), clean({
-    planDate: date,
-    availableMinutes: asInt(availableMinutes, 0),
-    bufferMinutes: 30,
-    reportedEnergy,
-    reportedFeel,
-  }), { merge: true });
-}
-
-export async function loadFocusDoc(userId: string): Promise<unknown> {
-  const snap = await getDoc(doc(db, 'users', userId, 'focus', 'state'));
-  return snap.exists() ? snap.data().payload : null;
-}
-
-export async function saveFocusDoc(userId: string, payload: unknown) {
-  await setDoc(doc(db, 'users', userId, 'focus', 'state'), {
-    payload,
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-export async function deleteFocusDoc(userId: string) {
-  await deleteDoc(doc(db, 'users', userId, 'focus', 'state'));
-}

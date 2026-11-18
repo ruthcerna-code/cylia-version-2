@@ -323,7 +323,7 @@ Las reglas están en `src/utils/profileFields.ts`, y `saveProfile` las vuelve a 
 | `public/` | Fondo floral |
 | `design/` | Pantallas HTML para revisar el diseño sin levantar la app |
 
-Hay componentes de versiones anteriores que ninguna pantalla usa (`OrganizaDia.tsx`, `AgendaScreen.tsx`, `FocusModule.tsx`, `src/focus/`, `src/utils/dayPlan.ts`, `src/utils/dayPlanStore.ts`). Se pueden borrar cuando se confirme que no se necesitan.
+Los componentes de versiones anteriores que ninguna pantalla usaba (Agenda, Mi Foco y el plan por minutos) se borraron el 18-11-2026; siguen disponibles en el historial de Git. Las colecciones `focus` y `day_plans` de cuentas antiguas se siguen exportando y borrando con la cuenta.
 
 ## Documentación adicional
 
