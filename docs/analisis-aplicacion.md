@@ -149,12 +149,12 @@ Ordenados por importancia. 🔴 Alta: resolver antes de cobrar o de tener usuari
 - Tiene un bloque oculto de unas 100 líneas que nunca se muestra (`App.tsx:1116`, `className="hidden"`).
 - **Qué hacer:** separar por pestaña y mover la carga de datos a hooks.
 
-**B2. Código sin uso.**
+**B2. Código sin uso.** ✅ Resuelto el 18-11-2026: se borraron los 7 archivos y las funciones que solo ellos usaban.
 - Ninguna pantalla usa estos archivos: `OrganizaDia.tsx`, `AgendaScreen.tsx`, `FocusModule.tsx`, `src/focus/`, `src/utils/dayPlan.ts` y `dayPlanStore.ts` (unas 2.700 líneas).
 - Firestore conserva reglas y datos para `day_plans` y `focus`, y existe el propósito de consentimiento `google_calendar` y el bloque `/credentials`.
 - **Qué hacer:** borrarlos, conservando en Git lo que sirva de referencia.
 
-**B3. El diseño está duplicado en el repositorio.**
+**B3. El diseño está duplicado en el repositorio.** ✅ Resuelto el 18-11-2026: queda solo `design/`.
 - `design/` y `cylia-version-2-diseno/` son casi iguales, y además está `cylia-version-2-diseno.zip`.
 - **Qué hacer:** dejar solo `design/`.
 

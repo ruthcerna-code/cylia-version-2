@@ -321,7 +321,8 @@ Las reglas están en `src/utils/profileFields.ts`, y `saveProfile` las vuelve a 
 | `docs/` | Estado de las funciones, guía de la clave de Claude y guía de pruebas |
 | `firestore.rules` | Quién puede leer y escribir cada documento |
 | `public/` | Fondo floral |
-| `design/` | Pantallas HTML para revisar el diseño sin levantar la app |
+| `design/` | Pantallas HTML para revisar el diseño sin levantar la app. Es la única referencia de diseño |
+| `security_spec.md` | Resumen de quién puede leer y escribir cada colección |
 
 Los componentes de versiones anteriores que ninguna pantalla usaba (Agenda, Mi Foco y el plan por minutos) se borraron el 18-11-2026; siguen disponibles en el historial de Git. Las colecciones `focus` y `day_plans` de cuentas antiguas se siguen exportando y borrando con la cuenta.
 
