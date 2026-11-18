@@ -66,7 +66,7 @@ export default function AgendaList({
         days.map((day) => {
           const past = day.date < today;
           return (
-            <div key={day.date} className={`rounded-[20px] bg-white px-4 pb-1 pt-3 shadow-[0_8px_24px_rgba(27,31,94,0.06)] ${past ? 'opacity-80' : ''}`}>
+            <div key={day.date} className={`flex flex-col gap-2 ${past ? 'opacity-80' : ''}`}>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="m-0 text-sm font-extrabold text-[#3A44C4]">
                   {day.label}
@@ -78,8 +78,8 @@ export default function AgendaList({
                   Ver día
                 </button>
               </div>
-              {day.activities.map((activity, index) => (
-                <div key={activity.id} className={index > 0 ? 'border-t border-dashed border-[#C9D3EF]' : ''}>
+              {day.activities.map((activity) => (
+                <div key={activity.id}>
                   <ActivityItem
                     activity={activity}
                     energy={energyOf(activity.date)}

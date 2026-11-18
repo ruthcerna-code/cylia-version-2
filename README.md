@@ -138,7 +138,7 @@ Al entrar, la persona decide sobre cuatro autorizaciones:
 | Fases | Conocimiento por fase. El porcentaje aparece solo con al menos dos registros en esa fase | Perfil, `period_records`, `daily_logs` |
 | Bienestar | Guía de movimiento, nutrición y mente por fase. Lo marcado se guarda en el navegador | Perfil, `period_records` |
 | Registro | ¿Cómo estás hoy?: ánimo, energía, cuerpo, números y notas. Al guardar, ofrece el análisis con IA | `daily_logs` |
-| Organiza tu día | Semana, actividades del día, **Cyclia te asiste**, **Hoy es un día difícil** y crear actividad | `activities` |
+| Bandeja de entrada | Mes y semana, tareas del día con color, estado y subtareas, **Cyclia te asiste**, **Hoy es un día difícil** y el botón **+** para crear una tarea | `activities` |
 | Perfil | Cuenta, ciclo, objetivos, privacidad, recordatorios, exportación y solicitudes de datos | Perfil, `consent_events`, `data_requests` |
 
 ## Funciones principales
@@ -171,11 +171,21 @@ En la pestaña Ciclo (`src/utils/ownPattern.ts` y `src/components/OwnPatternCard
 - Cada hallazgo necesita al menos 4 registros por grupo y una diferencia de 0,7 o más en la escala de 1 a 5, y dice cuántos registros lo respaldan.
 - Si nada cumple, dice que todavía no aparece un patrón claro. No usa IA y no envía datos fuera de la app.
 
-### Organiza tu día
+### Bandeja de entrada
 
-Pestaña principal de actividades (`src/components/plan/`). Cada actividad tiene fecha, horario, esfuerzo, importancia, fecha límite, pasos y estado (pendiente, en curso, hecha o no realizada).
+Pestaña principal de actividades (`src/components/plan/`; antes se llamaba «Organiza tu día»). Cada actividad tiene fecha, horario, esfuerzo, importancia, fecha límite, pasos y estado. Desde esta versión también tiene **color**, **subtareas** y **alertas** (campos opcionales `color`, `subtasks` y `alerts` del documento de `activities`; las actividades antiguas siguen funcionando sin ellos).
 
-- **Crear actividad.** Al elegir el horario, Cyclia propone cuánto tiempo dedicarle según la energía de hoy (`POST /api/plan-activity`). La fase solo se menciona como algo que «muchas mujeres reportan»; no cambia la duración.
+- **Encabezado.** Botón con el mes y el año (`MonthPicker.tsx`) que abre los 12 meses de un año; «Hoy» vuelve al día actual.
+- **Semana** (`WeekStrip.tsx`). Los días son lavanda; el elegido es coral con borde azul marino; hoy dice «Hoy» y su número va en un círculo azul marino. Al volver de crear o editar se queda en el día de la tarea.
+- **Tarjetas** (`ActivityItem.tsx`). Franja del color elegido (lavanda si no eligió), hora, duración, estado y avance de subtareas («3/6»). El estado se calcula en `src/plan/task.ts`: Pendiente, En curso, Vencida, Completada o No realizada. Pasar la hora nunca la marca como completada. Tocar la tarjeta abre **Editar tarea**.
+- **Nueva tarea y Editar tarea** (`TaskEditorScreen.tsx`). Se abren con el botón amarillo **+**, desde «Agendar» en Inicio o desde Cyclia te asiste. Es una sola pantalla completa con scroll:
+  - Nombre, «¿Cuándo?» (fecha), horas rápidas cada 15 minutos u otra hora, y duración (15 min, 30 min, 45 min, 1 h, 1 h 30 o «Más…» en minutos, hasta 18 horas).
+  - La hora de término se calcula sola y avisa si termina al día siguiente.
+  - Si choca con otra actividad muestra «Ya tienes una actividad programada en este horario» con **Cambiar hora** o **Guardar igual**. Al editar, solo avisa si cambió el horario.
+  - Con el asistente autorizado, **Sugerir duración con Cyclia** usa `POST /api/plan-activity` según la energía de ese día. La fase solo se menciona como algo que «muchas mujeres reportan».
+  - **Más opciones** (abierto al editar): color (8 colores o sin color), **Frecuencia** (por ahora solo «Única vez»; diario, semanal y mensual llegarán en la próxima versión), **¿Necesita alertas?** (al inicio, al terminar, 5, 15 o 30 minutos o 1 hora antes, sin repetir), **¿Algún detalle?** (subtareas: añadir, editar, completar, subir, bajar y eliminar; si la tarea vino de Cyclia te asiste, sus pasos aparecen como subtareas) y **Notas**.
+  - Las alertas **se guardan, pero todavía no envían avisos**: la app aún no tiene notificaciones al teléfono.
+  - La X pide confirmación si hay cambios sin guardar.
 - **Cyclia te asiste** (`CycliaTeAsiste.tsx`, `src/plan/assist.ts`). Es un chat con la IA:
   - Ella describe la actividad. Si el alcance no está claro, Cyclia hace una pregunta a la vez. La IA recibe toda la conversación, así que no olvida lo que ella ya respondió.
   - Cuando la información alcanza, Cyclia muestra la actividad propuesta: nombre, descripción, 2 a 5 pasos, esfuerzo con su motivo y duración estimada. Si ella mencionó día u hora («el jueves a las 15:00»), se usan; si no, se propone el primer horario libre.
@@ -186,7 +196,7 @@ Pestaña principal de actividades (`src/components/plan/`). Cada actividad tiene
   - **Agenda:** todas las actividades programadas, ordenadas por fecha y hora y agrupadas por día («Hoy», «Mañana», «Sábado, 21 de noviembre»). Las que no tienen hora van al final de su día. «Próximas» muestra desde hoy; «Todas» agrega los días pasados. El número junto a «Agenda» son las pendientes desde hoy. «Ver día» abre ese día en la vista Día.
 - **Cada actividad tiene tres botones de ícono** (`ActivityItem.tsx`, íconos de `lucide-react`), en las dos vistas:
   - **Tachar** (círculo azul con check): la marca como hecha y la tacha; otro toque la destacha. Si pasó la hora sin marcarla, el círculo se pone rosado y dice «Pasó la hora. ¿La hiciste?».
-  - **Editar** (lápiz, fondo amarillo): abre la actividad para cambiar nombre, descripción, día, hora y duración, y muestra la conversación con Cyclia si la tiene.
+  - **Editar** (lápiz, fondo amarillo): abre **Editar tarea**, con la conversación con Cyclia al final si la tiene.
   - **Eliminar** (papelera, fondo rosado): pide confirmación, la borra y ofrece **Deshacer** durante 6 segundos, que la recupera con sus pasos y su conversación.
 - **Hoy es un día difícil** (`src/plan/difficultDay.ts`, `DifficultDaySheet.tsx`). Con un toque reorganiza las actividades pendientes de hoy en tres grupos:
   - **Se mantiene:** vence hoy, es muy importante, es de cuidado o descanso, o dura 20 minutos o menos.

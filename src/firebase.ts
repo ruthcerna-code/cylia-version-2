@@ -23,7 +23,7 @@ import {
   setDoc,
   type Firestore,
 } from 'firebase/firestore';
-import type { ActivityEffort, ActivityImportance, ActivityKind, ActivityPlanStatus, ActivityStep, AssistChatTurn, BodyLevel, CervicalFluid, ChatMessage, CycleSymptom, DailyLog, EnergyFeel, FeltState, HormonalMethod, PeriodRecord, PerimenopauseMode, ScheduledActivity, SleepState, SpecialSituation, UserProfile } from './types';
+import type { ActivityEffort, ActivityImportance, ActivityKind, ActivityPlanStatus, ActivityStep, ActivityColor, AlertKey, AssistChatTurn, Subtask, BodyLevel, CervicalFluid, ChatMessage, CycleSymptom, DailyLog, EnergyFeel, FeltState, HormonalMethod, PeriodRecord, PerimenopauseMode, ScheduledActivity, SleepState, SpecialSituation, UserProfile } from './types';
 import { compareActivities } from './utils/activities';
 import { ACCOUNT_COLLECTIONS, deleteCollectionsTolerant, OPTIONAL_ACCOUNT_COLLECTIONS } from './utils/tolerantDelete';
 import type { BehaviorParams, BehaviorReport } from './utils/behavior';
@@ -81,6 +81,8 @@ const SYMPTOMS = ['colicos', 'dolor_cabeza', 'hinchazon', 'sensibilidad_mamaria'
 const IMPORTANCE = ['alta', 'media', 'baja'] as const;
 const KINDS = ['trabajo', 'movimiento', 'cuidado', 'descanso', 'social', 'tramite'] as const;
 const EFFORTS = ['bajo', 'medio', 'alto'] as const;
+const COLORS = ['coral', 'naranjo', 'amarillo', 'verde', 'azulgris', 'lavanda', 'burdeo', 'azul'] as const;
+const ALERT_KEYS = ['inicio', 'fin', '5', '15', '30', '60'] as const;
 const PLAN_STATUS = ['pendiente', 'en_curso', 'hecha', 'pospuesta'] as const;
 
 function oneOf<T extends string>(values: readonly T[], value: unknown): T | undefined {
@@ -455,7 +457,27 @@ export type ActivityDraft = {
   completedAt?: string | null;
   durationSource?: 'cyclia' | 'manual' | null;
   assistChat?: AssistChatTurn[];
+  color?: ActivityColor | null;
+  subtasks?: Subtask[];
+  alerts?: AlertKey[];
 };
+
+/** Subtasks: at most 30, each with a title. */
+function readSubtasks(value: unknown): Subtask[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((item, index) => {
+    if (!item || typeof item !== 'object') return [];
+    const row = item as { id?: unknown; title?: unknown; done?: unknown };
+    if (typeof row.title !== 'string' || !row.title.trim()) return [];
+    return [{ id: typeof row.id === 'string' && row.id ? row.id : `s${index}`, title: row.title.trim().slice(0, 120), done: row.done === true }];
+  }).slice(0, 30);
+}
+
+/** Alerts: known keys only, without repeats. */
+function readAlerts(value: unknown): AlertKey[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return [...new Set(value.filter((item): item is AlertKey => (ALERT_KEYS as readonly string[]).includes(String(item))))];
+}
 
 /** Conversation with Cyclia te asiste: at most 40 turns of up to 800 characters. */
 function readAssistChat(value: unknown): AssistChatTurn[] | undefined {
@@ -511,6 +533,9 @@ function docToActivity(id: string, data: Record<string, unknown>): ScheduledActi
     completedAt: data.completedAt ? String(data.completedAt) : null,
     durationSource: data.durationSource === 'cyclia' || data.durationSource === 'manual' ? data.durationSource : null,
     assistChat: readAssistChat(data.assistChat),
+    color: oneOf<ActivityColor>(COLORS, data.color) || null,
+    subtasks: readSubtasks(data.subtasks),
+    alerts: readAlerts(data.alerts),
   };
 }
 
@@ -622,6 +647,9 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
         ? draft.durationSource
         : (existing?.durationSource === 'cyclia' || existing?.durationSource === 'manual' ? existing.durationSource : null),
       assistChat: draft.assistChat !== undefined ? draft.assistChat : existing?.assistChat,
+      color: draft.color !== undefined ? draft.color : existing?.color,
+      subtasks: draft.subtasks !== undefined ? draft.subtasks : existing?.subtasks,
+      alerts: draft.alerts !== undefined ? draft.alerts : existing?.alerts,
     });
     await setDoc(doc(db, 'users', userId, 'activities', id), clean({
       title: saved.title,
@@ -644,6 +672,9 @@ export async function saveScheduledActivity(userId: string, draft: ActivityDraft
       completedAt: saved.completedAt,
       durationSource: saved.durationSource,
       assistChat: saved.assistChat,
+      color: saved.color,
+      subtasks: saved.subtasks,
+      alerts: saved.alerts,
     }), { merge: true });
     return saved;
   });

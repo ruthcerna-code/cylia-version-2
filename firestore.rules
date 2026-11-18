@@ -35,6 +35,12 @@ service cloud.firestore {
             && request.resource.data[field] <= high);
     }
 
+    function optionalList(field, max) {
+      return !(field in request.resource.data)
+        || request.resource.data[field] == null
+        || (request.resource.data[field] is list && request.resource.data[field].size() <= max);
+    }
+
     function scale(field) {
       return field in request.resource.data
         && request.resource.data[field] is int
@@ -134,7 +140,11 @@ service cloud.firestore {
           && isTime(request.resource.data.startTime)
           && isTime(request.resource.data.endTime)
           && optionalEnum('importance', ['alta', 'media', 'baja'])
-          && oneOf(request.resource.data.planStatus, ['pendiente', 'en_curso', 'hecha', 'pospuesta']);
+          && oneOf(request.resource.data.planStatus, ['pendiente', 'en_curso', 'hecha', 'pospuesta'])
+          // Bandeja de entrada: color, subtareas y alertas son opcionales.
+          && optionalEnum('color', ['coral', 'naranjo', 'amarillo', 'verde', 'azulgris', 'lavanda', 'burdeo', 'azul'])
+          && optionalList('subtasks', 30)
+          && optionalList('alerts', 6);
         allow delete: if isOwner(uid);
       }
 

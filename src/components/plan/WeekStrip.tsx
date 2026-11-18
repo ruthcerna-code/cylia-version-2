@@ -4,7 +4,9 @@ import { PHASE_DOT } from '../../plan/dayContext';
 import { shiftDate } from '../../plan/proposal';
 
 const LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const NAVY = '#1B1F5E';
 
+/** Week of the Bandeja de entrada: lavender days, the chosen one in coral with a navy border, today always marked. */
 export default function WeekStrip({
   monday,
   selected,
@@ -56,19 +58,24 @@ export default function WeekStrip({
               type="button"
               onClick={() => onSelect(date)}
               aria-pressed={active}
-              aria-label={`${LETTERS[index]} ${dayNumber}, ${count.done} de ${count.total}`}
-              className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl px-0.5 py-1.5"
+              aria-current={isToday ? 'date' : undefined}
+              aria-label={`${isToday ? 'Hoy, ' : ''}${LETTERS[index]} ${dayNumber}, ${count.done} de ${count.total}`}
+              className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl px-0.5 py-1.5 transition-colors"
               style={{
-                background: active ? '#1B1F5E' : '#F8F9FE',
-                color: active ? '#FFFFFF' : '#1B1F5E',
-                outline: isToday ? '2px solid #F49A9E' : 'none',
-                outlineOffset: 1,
+                background: active ? '#F49A9E' : '#A9C4F0',
+                color: NAVY,
+                boxShadow: active ? `inset 0 0 0 2.5px ${NAVY}` : 'none',
               }}
             >
-              <span className="text-[10px] font-extrabold" style={{ color: active ? '#DCE5FA' : '#8B90B8' }}>{LETTERS[index]}</span>
-              <span className="text-sm font-extrabold">{dayNumber}</span>
-              <span className="h-2 w-2 rounded-full" style={{ background: phase ? PHASE_DOT[phase] : 'transparent', border: phase ? 'none' : '1px solid #C9D3EF' }} aria-hidden="true" />
-              <span className="text-[10px] font-bold" style={{ color: active ? '#DCE5FA' : '#4A4F7A' }}>{count.done}/{count.total}</span>
+              <span className="text-[10px] font-extrabold" style={{ color: NAVY, opacity: 0.75 }}>{isToday ? 'Hoy' : LETTERS[index]}</span>
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-extrabold"
+                style={isToday ? { background: NAVY, color: '#FFFFFF' } : undefined}
+              >
+                {dayNumber}
+              </span>
+              <span className="h-2 w-2 rounded-full" style={{ background: phase ? PHASE_DOT[phase] : 'transparent', border: phase ? '1px solid #FFFFFF' : `1px solid ${NAVY}33` }} aria-hidden="true" />
+              <span className="text-[10px] font-bold" style={{ color: NAVY }}>{count.done}/{count.total}</span>
             </button>
           );
         })}

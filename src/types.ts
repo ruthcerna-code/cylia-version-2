@@ -140,7 +140,23 @@ export interface ScheduledActivity {
   durationSource: 'cyclia' | 'manual' | null;
   /** Conversation with "Cyclia te asiste" that defined this activity, oldest first. */
   assistChat?: AssistChatTurn[];
+  /** Color she chose for the activity, shown as a side stripe. */
+  color?: ActivityColor | null;
+  /** Checklist of the activity. When missing, `steps` are shown as unchecked subtasks. */
+  subtasks?: Subtask[];
+  /** Alerts she configured. They are saved; sending them is a later step. */
+  alerts?: AlertKey[];
 }
+
+export type ActivityColor = 'coral' | 'naranjo' | 'amarillo' | 'verde' | 'azulgris' | 'lavanda' | 'burdeo' | 'azul';
+
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
+export type AlertKey = 'inicio' | 'fin' | '5' | '15' | '30' | '60';
 
 export interface AssistChatTurn {
   role: 'user' | 'assistant';

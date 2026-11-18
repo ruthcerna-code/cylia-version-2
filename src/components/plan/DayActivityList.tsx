@@ -32,9 +32,9 @@ export default function DayActivityList({
     );
   }
   return (
-    <div className="mx-4 rounded-[20px] bg-white px-4 shadow-[0_8px_24px_rgba(27,31,94,0.06)]">
-      {ordered.map((activity, index) => (
-        <div key={activity.id} className={index > 0 ? 'border-t border-dashed border-[#C9D3EF]' : ''}>
+    <div className="mx-4 flex flex-col gap-2">
+      {ordered.map((activity) => (
+        <div key={activity.id}>
           <ActivityItem
             activity={activity}
             energy={energyOf(activity.date)}

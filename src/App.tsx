@@ -1533,7 +1533,7 @@ export default function App() {
           ['conocimiento', 'Conocimiento de la fase', '◐'],
           ['bienestar', 'Bienestar', '♡'],
           ['registro', 'Registro', '+'],
-          ['foco', 'Organiza tu día', '◎'],
+          ['foco', 'Bandeja de entrada', '◎'],
           ['perfil', 'Perfil', '•'],
         ] as const).map(([id, label, icon]) => (
           <button
@@ -1550,7 +1550,7 @@ export default function App() {
             className={`flex cursor-pointer flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-extrabold leading-tight ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
           >
             <span className={`flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none ${appTab === id ? 'bg-[#E3F1FB]' : ''}`}>{icon}</span>
-            {id === 'foco' ? <span className="text-center">Organiza<br />tu día</span> : id === 'conocimiento' ? <span className="text-center">Fases</span> : id === 'bienestar' ? <span className="text-center">Bienestar</span> : label}
+            {id === 'foco' ? <span className="text-center">Bandeja<br />de entrada</span> : id === 'conocimiento' ? <span className="text-center">Fases</span> : id === 'bienestar' ? <span className="text-center">Bienestar</span> : label}
           </button>
         ))}
       </nav>
