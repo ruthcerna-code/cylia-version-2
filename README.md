@@ -68,7 +68,7 @@ npx firebase-tools deploy --only firestore:rules --project cyclia-mvp
 
 ## Pruebas
 
-166 pruebas automáticas en `tests/`, que cubren el cálculo del ciclo, los modos de etapa y las alertas, la validación del perfil, los datos que se envían a la IA, el consentimiento, la exportación, el plan del día, Tu patrón propio, Tu patrón del mes, Hoy es un día difícil, el aviso Plus, el catálogo y la selección de movimiento, la exportación y el borrado tolerantes, y las rutas del servidor.
+171 pruebas automáticas en `tests/`, que cubren el cálculo del ciclo, los modos de etapa y las alertas, la validación del perfil, los datos que se envían a la IA, el consentimiento, la exportación, el plan del día, Tu patrón propio, Tu patrón del mes, Hoy es un día difícil, el aviso Plus, el catálogo y la selección de movimiento, la exportación y el borrado tolerantes, y las rutas del servidor.
 
 No llaman a Claude ni a Firebase: la IA y el consentimiento se simulan. No gastan créditos ni tocan datos reales. El detalle, los errores que encontraron y la lista de revisión manual están en [docs/pruebas.md](docs/pruebas.md).
 
@@ -181,7 +181,10 @@ Pestaña principal de actividades (`src/components/plan/`). Cada actividad tiene
   - Cuando la información alcanza, Cyclia muestra la actividad propuesta: nombre, descripción, 2 a 5 pasos, esfuerzo con su motivo y duración estimada. Si ella mencionó día u hora («el jueves a las 15:00»), se usan; si no, se propone el primer horario libre.
   - Ella puede editar todo o seguir escribiendo para pedir cambios. **Guardar en mi día** crea la actividad en ese día, a esa hora y con la duración propuesta.
   - La conversación se guarda con la actividad (campo `assistChat`) y se ve al revisarla. Mientras no se guarda, queda en el navegador (`cyclia_asiste_borrador_` más el id de la cuenta) y vuelve al abrir el panel; «Empezar de nuevo» la borra.
-- **Cada actividad tiene tres botones de ícono** (`ActivityItem.tsx`, íconos de `lucide-react`):
+- **Día o Agenda** (`AgendaList.tsx`, `src/plan/agenda.ts`). Bajo los botones hay dos opciones:
+  - **Día:** la semana y las actividades del día elegido.
+  - **Agenda:** todas las actividades programadas, ordenadas por fecha y hora y agrupadas por día («Hoy», «Mañana», «Sábado, 21 de noviembre»). Las que no tienen hora van al final de su día. «Próximas» muestra desde hoy; «Todas» agrega los días pasados. El número junto a «Agenda» son las pendientes desde hoy. «Ver día» abre ese día en la vista Día.
+- **Cada actividad tiene tres botones de ícono** (`ActivityItem.tsx`, íconos de `lucide-react`), en las dos vistas:
   - **Tachar** (círculo azul con check): la marca como hecha y la tacha; otro toque la destacha. Si pasó la hora sin marcarla, el círculo se pone rosado y dice «Pasó la hora. ¿La hiciste?».
   - **Editar** (lápiz, fondo amarillo): abre la actividad para cambiar nombre, descripción, día, hora y duración, y muestra la conversación con Cyclia si la tiene.
   - **Eliminar** (papelera, fondo rosado): pide confirmación, la borra y ofrece **Deshacer** durante 6 segundos, que la recupera con sus pasos y su conversación.

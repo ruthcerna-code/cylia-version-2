@@ -12,6 +12,9 @@ import CycliaTeAsiste, { ActivityReviewSheet } from './CycliaTeAsiste';
 import DifficultDaySheet from './DifficultDaySheet';
 import { readReplanUndo, toDraft, writeReplanUndo, type ReplanUndo } from '../../plan/difficultDay';
 import { PlusBadge, usePlusNotice } from '../PlusNotice';
+import AgendaList from './AgendaList';
+import { pendingAhead, type AgendaRange } from '../../plan/agenda';
+import { CalendarDays, ListOrdered } from 'lucide-react';
 
 export default function OrganizaTuDia({
   openToken,
@@ -56,6 +59,9 @@ export default function OrganizaTuDia({
   const [assistOpen, setAssistOpen] = useState(false);
   const [review, setReview] = useState<ScheduledActivity | null>(null);
   const [deleting, setDeleting] = useState<ScheduledActivity | null>(null);
+  const [view, setView] = useState<'dia' | 'agenda'>('dia');
+  const [agendaRange, setAgendaRange] = useState<AgendaRange>('proximas');
+  const ahead = pendingAhead(activities, today);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [justDoneId, setJustDoneId] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ activity: ScheduledActivity; until: number } | null>(null);
@@ -231,33 +237,74 @@ export default function OrganizaTuDia({
           </div>
         )}
       </div>
-      <WeekStrip
-        monday={monday}
-        selected={selected}
-        today={today}
-        phaseOf={phaseOf}
-        counts={(date) => {
-          const items = activities.filter((item) => item.date === date);
-          return { done: items.filter((item) => item.planStatus === 'hecha').length, total: items.length };
-        }}
-        onSelect={setSelected}
-        onShift={(days) => {
-          const next = shiftDate(monday, days);
-          setMonday(next);
-          setSelected(next);
-        }}
-      />
+      <div className="mx-4 grid grid-cols-2 gap-1 rounded-full bg-white p-1 shadow-[0_8px_24px_rgba(27,31,94,0.06)]" role="tablist" aria-label="Cómo ver tus actividades">
+        {([
+          { id: 'dia', label: 'Día', Icon: CalendarDays },
+          { id: 'agenda', label: 'Agenda', Icon: ListOrdered },
+        ] as const).map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={view === id}
+            onClick={() => setView(id)}
+            className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full text-sm font-extrabold transition-colors"
+            style={{ background: view === id ? '#3A44C4' : 'transparent', color: view === id ? '#FFFFFF' : '#3A44C4' }}
+          >
+            <Icon size={18} strokeWidth={2.25} aria-hidden="true" />
+            {label}
+            {id === 'agenda' && ahead > 0 && (
+              <span className="rounded-full px-1.5 text-[11px]" style={{ background: view === id ? '#F6E27F' : '#EEF1FD', color: '#1B1F5E' }}>{ahead}</span>
+            )}
+          </button>
+        ))}
+      </div>
       {markError && <p className="mx-4 m-0 text-sm text-[#3B4070]" role="alert">{markError}</p>}
-      <DayActivityList
-        activities={dayItems}
-        energyOf={(date) => energyBandFromLog(logs[date])}
-        justDoneId={justDoneId}
-        busyId={busyId}
-        onToggleDone={(activity) => { void toggleDone(activity); }}
-        onEdit={setReview}
-        onDelete={setDeleting}
-        onReschedule={(activity) => setSheet({ token: Date.now(), title: activity.title, date: today })}
-      />
+      {view === 'dia' ? (
+        <>
+          <WeekStrip
+            monday={monday}
+            selected={selected}
+            today={today}
+            phaseOf={phaseOf}
+            counts={(date) => {
+              const items = activities.filter((item) => item.date === date);
+              return { done: items.filter((item) => item.planStatus === 'hecha').length, total: items.length };
+            }}
+            onSelect={setSelected}
+            onShift={(days) => {
+              const next = shiftDate(monday, days);
+              setMonday(next);
+              setSelected(next);
+            }}
+          />
+          <DayActivityList
+            activities={dayItems}
+            energyOf={(date) => energyBandFromLog(logs[date])}
+            justDoneId={justDoneId}
+            busyId={busyId}
+            onToggleDone={(activity) => { void toggleDone(activity); }}
+            onEdit={setReview}
+            onDelete={setDeleting}
+            onReschedule={(activity) => setSheet({ token: Date.now(), title: activity.title, date: today })}
+          />
+        </>
+      ) : (
+        <AgendaList
+          activities={activities}
+          today={today}
+          range={agendaRange}
+          onRange={setAgendaRange}
+          energyOf={(date) => energyBandFromLog(logs[date])}
+          justDoneId={justDoneId}
+          busyId={busyId}
+          onToggleDone={(activity) => { void toggleDone(activity); }}
+          onEdit={setReview}
+          onDelete={setDeleting}
+          onReschedule={(activity) => setSheet({ token: Date.now(), title: activity.title, date: today })}
+          onOpenDay={(date) => { setSelected(date); setMonday(mondayOf(date)); setView('dia'); }}
+        />
+      )}
       {deleting && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B1F5E]/40" onClick={() => setDeleting(null)}>
           <div role="alertdialog" aria-modal="true" aria-labelledby="eliminar-titulo" aria-describedby="eliminar-texto" className="w-full max-w-[480px] rounded-t-[28px] bg-white px-4 pb-8 pt-5" onClick={(event) => event.stopPropagation()}>
