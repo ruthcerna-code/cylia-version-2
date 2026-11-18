@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { DailyLog, MenstrualPhase, PeriodRecord, UserProfile } from '../types';
-import { getPhaseForDay } from '../utils/cycle';
+import { getPhaseForDay, PHASE_DETAILS } from '../utils/cycle';
 import { analyzeCycle, projectCycleBoard } from '../utils/cycleModel';
 
 type Mood = 'Serena' | 'Enfocada' | 'Radiante' | 'Reflexiva' | 'Sensible';
@@ -13,18 +13,18 @@ const PHASE_TITLE: Record<MenstrualPhase, string> = {
 };
 
 const PHASE_LOOK: Record<MenstrualPhase, { bg: string; ink: string }> = {
-  Menstrual: { bg: '#F49A9E', ink: '#1B1F5E' },
-  Folicular: { bg: '#A9C4F0', ink: '#1B1F5E' },
-  Ovulacion: { bg: '#F6E27F', ink: '#1B1F5E' },
-  Lutea: { bg: '#3A44C4', ink: '#FFFFFF' },
+  Menstrual: { bg: PHASE_DETAILS.Menstrual.cellHex, ink: PHASE_DETAILS.Menstrual.textHex },
+  Folicular: { bg: PHASE_DETAILS.Folicular.cellHex, ink: PHASE_DETAILS.Folicular.textHex },
+  Ovulacion: { bg: PHASE_DETAILS.Ovulacion.cellHex, ink: PHASE_DETAILS.Ovulacion.textHex },
+  Lutea: { bg: PHASE_DETAILS.Lutea.cellHex, ink: PHASE_DETAILS.Lutea.textHex },
 };
 
 const MOOD_COLOR: Record<Mood, string> = {
-  Serena: '#F49A9E',
-  Enfocada: '#A9C4F0',
-  Radiante: '#F6E27F',
-  Reflexiva: '#3A44C4',
-  Sensible: '#1B1F5E',
+  Serena: '#FF8243',
+  Enfocada: '#FFD3BC',
+  Radiante: '#FCE883',
+  Reflexiva: '#069494',
+  Sensible: '#153E40',
 };
 
 const REFERENCE: Record<MenstrualPhase, { state: Mood; more: string }> = {
@@ -70,9 +70,9 @@ function Bars({ bars }: { bars: Array<{ mood: Mood; pct: number }> }) {
   return (
     <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
       {bars.map((bar) => (
-        <li key={bar.mood} className="grid grid-cols-[88px_1fr_36px] items-center gap-2 text-[13px] font-bold text-[#1B1F5E]">
+        <li key={bar.mood} className="grid grid-cols-[88px_1fr_36px] items-center gap-2 text-[13px] font-bold text-[#153E40]">
           <span>{bar.mood}</span>
-          <span className="h-2 overflow-hidden rounded-full bg-[#E7EAF8]">
+          <span className="h-2 overflow-hidden rounded-full bg-[#FFF1E8]">
             <span className="block h-2 rounded-full" style={{ width: `${bar.pct}%`, background: MOOD_COLOR[bar.mood] }} />
           </span>
           <span className="text-right">{bar.pct}%</span>
@@ -125,10 +125,12 @@ export default function PhaseKnowledge({
   return (
     <div className="flex flex-col gap-3">
       {!embedded && (
-        <header className="rounded-[24px] bg-[#3A44C4] px-5 py-5 text-white">
-          <p className="m-0 text-[12px] font-extrabold tracking-[0.16em] text-[#F9C4C6]">CYCLIA</p>
-          <h1 className="m-0 mt-1 text-[26px] font-extrabold leading-tight">Conocimiento de la fase</h1>
-          <p className="m-0 mt-2 text-sm leading-relaxed text-[#E3F1FB]">Cuatro momentos para leer el ciclo. No miden tu energía ni tu rendimiento.</p>
+        <header className="flex items-center justify-between gap-3 rounded-[22px] bg-[#153E40] px-5 py-4 text-[#FFF8EE]">
+          <div>
+            <h2 className="m-0 text-[26px] font-normal leading-[1.15] text-[#FFF8EE]">Conocimiento de la fase</h2>
+            <p className="m-0 mt-1 text-sm leading-snug text-[#E7F4F2]">Cuándo comienza y qué notar de ella. Te ayuda a entender tu energía y tus necesidades.</p>
+          </div>
+          <span aria-hidden="true" className="text-2xl">›</span>
         </header>
       )}
 
@@ -140,7 +142,7 @@ export default function PhaseKnowledge({
           <p className="m-0 mt-2 text-sm leading-relaxed">{REFERENCE[current].more}</p>
         </section>
       ) : (
-        <p className="m-0 rounded-[24px] bg-white px-4 py-4 text-sm leading-relaxed text-[#1B1F5E]">{board.note} Abajo está la referencia de un ciclo de {board.projectedLength} días.</p>
+        <p className="m-0 rounded-[24px] bg-[#FFF8EE] px-4 py-4 text-sm leading-relaxed text-[#153E40]">{board.note} Abajo está la referencia de un ciclo de {board.projectedLength} días.</p>
       )}
 
       <div className="flex h-4 overflow-hidden rounded-full" role="img" aria-label={windows.map((phase) => `${PHASE_TITLE[phase.phase]}, días ${phase.fromDay} a ${phase.toDay}`).join('. ')}>
@@ -150,12 +152,12 @@ export default function PhaseKnowledge({
             style={{
               width: `${((phase.toDay - phase.fromDay + 1) / totalDays) * 100}%`,
               background: PHASE_LOOK[phase.phase].bg,
-              boxShadow: phase.phase === current ? 'inset 0 0 0 2px #1B1F5E' : undefined,
+              boxShadow: phase.phase === current ? 'inset 0 0 0 2px #153E40' : undefined,
             }}
           />
         ))}
       </div>
-      <p className="m-0 -mt-1 text-[13px] font-semibold text-[#1B1F5E]">La barra suma {totalDays} días. Toca una fase para leerla.</p>
+      <p className="m-0 -mt-1 text-[13px] font-semibold text-[#153E40]">La barra suma {totalDays} días. Toca una fase para leerla.</p>
 
       <div className="flex flex-col gap-2">
         {windows.map((phase) => {
@@ -167,7 +169,7 @@ export default function PhaseKnowledge({
             .map((mood) => ({ mood, pct: own.length ? Math.round(own.filter((log) => moodOf(log) === mood).length / own.length * 100) : 0 }))
             .filter((bar) => bar.pct > 0);
           return (
-            <article key={phase.phase} className="overflow-hidden rounded-[22px] bg-white">
+            <article key={phase.phase} className="overflow-hidden rounded-[22px] bg-[#FFF8EE]">
               <button
                 type="button"
                 aria-expanded={open}
@@ -186,15 +188,15 @@ export default function PhaseKnowledge({
               </button>
               {open && (
                 <div className="px-4 py-4">
-                  {phase.phase === current && <p className="m-0 mb-2 text-[13px] font-extrabold text-[#3A44C4]">Esta es la fase de hoy.</p>}
-                  <p className="m-0 text-sm leading-relaxed text-[#1B1F5E]">{reference.more}</p>
+                  {phase.phase === current && <p className="m-0 mb-2 text-[13px] font-extrabold text-[#069494]">Esta es la fase de hoy.</p>}
+                  <p className="m-0 text-sm leading-relaxed text-[#153E40]">{reference.more}</p>
                   {own.length >= 2 ? (
                     <>
-                      <p className="m-0 mt-3 text-[13px] font-extrabold text-[#1B1F5E]">En tus registros de estos días: {wellbeingOf(own)}% de bienestar</p>
+                      <p className="m-0 mt-3 text-[13px] font-extrabold text-[#153E40]">En tus registros de estos días: {wellbeingOf(own)}% de bienestar</p>
                       <Bars bars={ownBars} />
                     </>
                   ) : (
-                    <p className="m-0 mt-3 text-[13px] leading-relaxed text-[#3B4070]">Cuando tengas dos registros en estos días, aquí verás cómo te sentiste.</p>
+                    <p className="m-0 mt-3 text-[13px] leading-relaxed text-[#245456]">Cuando tengas dos registros en estos días, aquí verás cómo te sentiste.</p>
                   )}
                 </div>
               )}
@@ -203,7 +205,7 @@ export default function PhaseKnowledge({
         })}
       </div>
 
-      <p className="m-0 text-[12px] leading-relaxed text-[#3B4070]">Cyclia es educativa. No diagnostica ni indica tratamientos.</p>
+      <p className="m-0 text-[12px] leading-relaxed text-[#245456]">Cyclia es educativa. No diagnostica ni indica tratamientos.</p>
     </div>
   );
 }

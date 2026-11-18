@@ -1,4 +1,6 @@
 import type { DailyLog, PeriodRecord, UserProfile } from '../types';
+import { formatDateStr } from './cycle';
+import { recordCoverage, recordPattern, type RecordPatternDay } from './dailyRecord';
 import { sleepHours } from './recordCompare';
 import { analyzeCycle } from './cycleModel';
 
@@ -46,6 +48,12 @@ export type AnalysisContext = {
   };
   log: AnalysisLog | null;
   recent: AnalysisLog[];
+  /** Days with mood and behavior, and the longest consecutive run, up to the analyzed day. */
+  registeredDays: number;
+  continuousDays: number;
+  continuous30: boolean;
+  /** Saved records up to the analyzed day. The analysis reads this pattern. */
+  pattern: RecordPatternDay[];
 };
 
 const PHASE_NAME = {
@@ -99,6 +107,8 @@ export function buildAnalysisContext(
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-4)
     .map(logForAnalysis);
+  const asOf = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : formatDateStr(new Date());
+  const coverage = recordCoverage(record, asOf);
   return {
     cycleLength: view.averageLength,
     periodLength: view.periodLength,
@@ -118,5 +128,9 @@ export function buildAnalysisContext(
     },
     log: date && record[date] ? logForAnalysis(record[date]) : null,
     recent,
+    registeredDays: coverage.registeredDays,
+    continuousDays: coverage.continuousDays,
+    continuous30: coverage.continuous30,
+    pattern: recordPattern(record, asOf),
   };
 }

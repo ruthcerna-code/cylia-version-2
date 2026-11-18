@@ -16,6 +16,8 @@ import { PlusBadge, usePlusNotice } from '../PlusNotice';
 import AgendaList from './AgendaList';
 import { pendingAhead, type AgendaRange } from '../../plan/agenda';
 import { CalendarDays, ListOrdered, Plus } from 'lucide-react';
+import DayFocusCard from './DayFocusCard';
+import { buildDayFocus } from '../../plan/dayFocus';
 
 type EditorState =
   | { mode: 'crear'; token: number; title: string; date: string }
@@ -92,6 +94,11 @@ export default function OrganizaTuDia({
     return view.showPhases ? view.phase : null;
   };
   const dayItems = activities.filter((item) => item.date === selected);
+  const now = new Date();
+  const todayEnergy = energyBandFromLog(logs[today]);
+  const dayFocus = selected === today
+    ? buildDayFocus(activities, today, todayEnergy, now.getHours() * 60 + now.getMinutes())
+    : null;
   const openToday = activities.some((item) => item.date === today && item.planStatus !== 'hecha');
   // The undo copy lives on this device. Show it only if every activity in it belongs to this account.
   const undoAvailable = Boolean(replanUndo && replanUndo.before.every((draft) => activities.some((item) => item.id === draft.id)));
@@ -191,16 +198,16 @@ export default function OrganizaTuDia({
 
   return (
     <div className="-mx-0 flex flex-col gap-4 pb-28">
-      <header className="bg-[#3A44C4] px-4 pb-5 pt-8 text-white">
+      <header className="rounded-[20px] bg-[#FFF8EE] px-4 py-5 text-[#153E40]">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <h1 className="m-0 text-[26px] font-extrabold">Bandeja de entrada</h1>
+            <h1 className="m-0 text-[36px] font-normal leading-[1.1]">Bandeja de entrada</h1>
             <MonthPicker selected={selected} today={today} onPick={(date) => { goTo(date); setView('dia'); }} />
           </div>
           <button
             type="button"
             onClick={() => goTo(today)}
-            className="flex h-11 cursor-pointer items-center rounded-full bg-white px-4 text-sm font-extrabold text-[#1B1F5E]"
+            className="flex h-11 cursor-pointer items-center rounded-full bg-[#FFF8EE] px-4 text-sm font-extrabold text-[#153E40]"
           >
             Hoy
           </button>
@@ -210,7 +217,7 @@ export default function OrganizaTuDia({
         <button
           type="button"
           onClick={() => { void requestPlus('cyclia_asiste').then(() => setAssistOpen(true)); }}
-          className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#F6E27F] text-[15px] font-extrabold text-[#1B1F5E]"
+          className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#FCE883] text-[15px] font-extrabold text-[#153E40]"
         >
           Cyclia te asiste <PlusBadge />
         </button>
@@ -218,16 +225,16 @@ export default function OrganizaTuDia({
           <button
             type="button"
             onClick={() => { void requestPlus('dia_dificil').then(() => setDifficultOpen(true)); }}
-            className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-[#3A44C4] bg-white text-[15px] font-extrabold text-[#3A44C4]"
+            className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-[#069494] bg-[#FFF8EE] text-[15px] font-extrabold text-[#069494]"
           >
             Hoy es un día difícil <PlusBadge />
           </button>
         )}
         {undoAvailable && replanUndo && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[20px] bg-[#1B1F5E] px-4 py-2 text-sm text-white" role="status">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[20px] bg-[#153E40] px-4 py-2 text-sm text-white" role="status">
             <span>Replanificaste hoy {replanUndo.before.length} {replanUndo.before.length === 1 ? 'actividad' : 'actividades'}.</span>
             <span className="flex gap-3">
-              <button type="button" disabled={replanBusy} onClick={() => { void undoReplan(); }} className="flex h-11 cursor-pointer items-center font-extrabold text-[#F6E27F] disabled:opacity-50">
+              <button type="button" disabled={replanBusy} onClick={() => { void undoReplan(); }} className="flex h-11 cursor-pointer items-center font-extrabold text-[#FCE883] disabled:opacity-50">
                 {replanBusy ? 'Deshaciendo…' : 'Deshacer'}
               </button>
               <button type="button" disabled={replanBusy} onClick={dismissReplanUndo} className="flex h-11 cursor-pointer items-center font-bold text-[#DCE5FA]">
@@ -237,7 +244,7 @@ export default function OrganizaTuDia({
           </div>
         )}
       </div>
-      <div className="mx-4 grid grid-cols-2 gap-1 rounded-full bg-white p-1 shadow-[0_8px_24px_rgba(27,31,94,0.06)]" role="tablist" aria-label="Cómo ver tus actividades">
+      <div className="mx-4 grid grid-cols-2 gap-1 rounded-full bg-[#FFF8EE] p-1 shadow-[0_8px_24px_rgba(27,31,94,0.06)]" role="tablist" aria-label="Cómo ver tus actividades">
         {([
           { id: 'dia', label: 'Día', Icon: CalendarDays },
           { id: 'agenda', label: 'Agenda', Icon: ListOrdered },
@@ -249,17 +256,17 @@ export default function OrganizaTuDia({
             aria-selected={view === id}
             onClick={() => setView(id)}
             className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full text-sm font-extrabold transition-colors"
-            style={{ background: view === id ? '#3A44C4' : 'transparent', color: view === id ? '#FFFFFF' : '#3A44C4' }}
+            style={{ background: view === id ? '#069494' : 'transparent', color: view === id ? '#FFFFFF' : '#069494' }}
           >
             <Icon size={18} strokeWidth={2.25} aria-hidden="true" />
             {label}
             {id === 'agenda' && ahead > 0 && (
-              <span className="rounded-full px-1.5 text-[11px]" style={{ background: view === id ? '#F6E27F' : '#EEF1FD', color: '#1B1F5E' }}>{ahead}</span>
+              <span className="rounded-full px-1.5 text-[11px]" style={{ background: view === id ? '#FCE883' : '#EEF1FD', color: '#153E40' }}>{ahead}</span>
             )}
           </button>
         ))}
       </div>
-      {markError && <p className="mx-4 m-0 text-sm text-[#3B4070]" role="alert">{markError}</p>}
+      {markError && <p className="mx-4 m-0 text-sm text-[#245456]" role="alert">{markError}</p>}
       {view === 'dia' ? (
         <>
           <WeekStrip
@@ -278,6 +285,7 @@ export default function OrganizaTuDia({
               setSelected(next);
             }}
           />
+          {dayFocus && <DayFocusCard focus={dayFocus} energy={todayEnergy} onEdit={openEdit} />}
           <DayActivityList
             activities={dayItems}
             energyOf={(date) => energyBandFromLog(logs[date])}
@@ -306,21 +314,21 @@ export default function OrganizaTuDia({
         />
       )}
       {deleting && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B1F5E]/40" onClick={() => setDeleting(null)}>
-          <div role="alertdialog" aria-modal="true" aria-labelledby="eliminar-titulo" aria-describedby="eliminar-texto" className="w-full max-w-[480px] rounded-t-[28px] bg-white px-4 pb-8 pt-5" onClick={(event) => event.stopPropagation()}>
-            <h2 id="eliminar-titulo" className="m-0 text-lg font-extrabold text-[#1B1F5E]">¿Eliminar esta actividad?</h2>
-            <p id="eliminar-texto" className="mt-1 text-sm text-[#3B4070]">«{deleting.title}» se quitará de tu día. Podrás deshacerlo durante unos segundos.</p>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#153E40]/40" onClick={() => setDeleting(null)}>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="eliminar-titulo" aria-describedby="eliminar-texto" className="w-full max-w-[480px] rounded-t-[28px] bg-[#FFF8EE] px-4 pb-8 pt-5" onClick={(event) => event.stopPropagation()}>
+            <h2 id="eliminar-titulo" className="m-0 text-lg font-extrabold text-[#153E40]">¿Eliminar esta actividad?</h2>
+            <p id="eliminar-texto" className="mt-1 text-sm text-[#245456]">«{deleting.title}» se quitará de tu día. Podrás deshacerlo durante unos segundos.</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setDeleting(null)} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F8F9FE] text-[15px] font-extrabold text-[#1B1F5E]">Cancelar</button>
+              <button type="button" onClick={() => setDeleting(null)} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F8F9FE] text-[15px] font-extrabold text-[#153E40]">Cancelar</button>
               <button type="button" onClick={() => { void removeActivity(deleting); }} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#D4536A] text-[15px] font-extrabold text-white">Eliminar</button>
             </div>
           </div>
         </div>
       )}
       {undo && (
-        <div className="fixed bottom-[184px] left-1/2 z-40 flex w-[min(440px,calc(100%-2rem))] -translate-x-1/2 items-center justify-between gap-3 rounded-full bg-[#1B1F5E] px-4 py-2 text-sm text-white" role="status">
+        <div className="fixed bottom-[184px] left-1/2 z-40 flex w-[min(440px,calc(100%-2rem))] -translate-x-1/2 items-center justify-between gap-3 rounded-full bg-[#153E40] px-4 py-2 text-sm text-white" role="status">
           <span>Eliminaste «{undo.activity.title}».</span>
-          <button type="button" onClick={() => { void restore(); }} className="flex h-11 cursor-pointer items-center font-extrabold text-[#F6E27F]">Deshacer</button>
+          <button type="button" onClick={() => { void restore(); }} className="flex h-11 cursor-pointer items-center font-extrabold text-[#FCE883]">Deshacer</button>
         </div>
       )}
       <CycliaTeAsiste
@@ -345,13 +353,13 @@ export default function OrganizaTuDia({
         onClose={() => setDifficultOpen(false)}
         onApply={applyReplan}
       />
-      <div className="pointer-events-none fixed bottom-[112px] left-1/2 z-30 flex w-full max-w-[480px] -translate-x-1/2 justify-end px-4">
+      <div className="app-shell pointer-events-none fixed bottom-[112px] left-1/2 z-30 flex -translate-x-1/2 justify-end px-4">
         <button
           type="button"
           onClick={() => openCreate()}
           aria-label="Nueva tarea"
           title="Nueva tarea"
-          className="pointer-events-auto flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-[#1B1F5E] shadow-[0_10px_28px_rgba(27,31,94,0.25)] transition-transform active:scale-95"
+          className="pointer-events-auto flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-[#FCE883] text-[#153E40] shadow-[0_10px_28px_rgba(27,31,94,0.25)] transition-transform active:scale-95"
         >
           <Plus size={32} strokeWidth={2.75} aria-hidden="true" />
         </button>

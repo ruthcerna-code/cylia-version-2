@@ -127,57 +127,57 @@ export default function CyclePrivacySettings({
         ? 'Si activas la opción, el navegador puede pedir permiso. Cyclia todavía no programa avisos.'
         : 'Este navegador no ofrece avisos. La preferencia se puede guardar, pero no hay envío.';
 
-  const fieldClass = 'h-12 rounded-xl border-[1.5px] border-[#C9D3EF] bg-[#F8F9FE] px-3 text-base font-semibold text-[#1B1F5E] outline-none';
+  const fieldClass = 'h-12 rounded-xl border-[1.5px] border-[#E7D3C6] bg-[#F8F9FE] px-3 text-base font-semibold text-[#153E40] outline-none';
 
   return (
     <div className="flex flex-col gap-4 pb-24 pt-2">
-      <button type="button" onClick={onBack} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Perfil</button>
-      <section className="rounded-[24px] border border-[#E7ECFB] bg-white p-5 shadow-[0_8px_24px_rgba(27,31,94,0.06)]">
-        <div className="flex items-center gap-3 text-[#3A44C4]">
+      <button type="button" onClick={onBack} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#069494]">← Perfil</button>
+      <section className="rounded-[24px] border border-[#F6DDD4] bg-[#FFF8EE] p-5 shadow-[0_8px_24px_rgba(27,31,94,0.06)]">
+        <div className="flex items-center gap-3 text-[#069494]">
           <GearIcon />
           <p className="m-0 text-[13px] font-extrabold uppercase tracking-wide">Configuración personal</p>
         </div>
-        <h1 className="m-0 mt-3 text-[26px] font-extrabold leading-tight text-[#1B1F5E]">Ajustes del ciclo y privacidad</h1>
+        <h1 className="m-0 mt-3 text-[26px] font-extrabold leading-tight text-[#153E40]">Ajustes del ciclo y privacidad</h1>
 
         <div className="mt-5 grid grid-cols-1 gap-4 min-[420px]:grid-cols-2">
-          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold text-[#1B1F5E]">
+          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold text-[#153E40]">
             Duración promedio del ciclo — días
             <input className={fieldClass} inputMode="numeric" aria-describedby="cycle-help" value={cycleLength} onChange={(event) => { setCycleLength(event.target.value); setStatus('idle'); }} />
-            <span id="cycle-help" className="text-[12px] font-semibold leading-snug text-[#4A4F7A]">De 21 a 45 días. Si no hay historial, la primera predicción usa 28.</span>
+            <span id="cycle-help" className="text-[12px] font-semibold leading-snug text-[#3E6466]">De 21 a 45 días. Si no hay historial, la primera predicción usa 28.</span>
           </label>
-          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold text-[#1B1F5E]">
+          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold text-[#153E40]">
             Duración promedio de la menstruación — días
             <input className={fieldClass} inputMode="numeric" aria-describedby="period-help" value={periodLength} onChange={(event) => { setPeriodLength(event.target.value); setStatus('idle'); }} />
-            <span id="period-help" className="text-[12px] font-semibold leading-snug text-[#4A4F7A]">De 1 a 10 días. Si no se sabe, la primera predicción usa 5.</span>
+            <span id="period-help" className="text-[12px] font-semibold leading-snug text-[#3E6466]">De 1 a 10 días. Si no se sabe, la primera predicción usa 5.</span>
           </label>
         </div>
         {fieldError && <p className="m-0 mt-3 text-sm font-semibold text-[#9A3B45]" role="alert">{fieldError}</p>}
 
         <fieldset className="mt-4 rounded-2xl bg-[#F8F9FE] p-3">
-          <legend className="px-1 text-[13px] font-extrabold text-[#1B1F5E]">Origen del valor</legend>
-          <p className="m-0 text-[12px] font-semibold leading-snug text-[#4A4F7A]">
+          <legend className="px-1 text-[13px] font-extrabold text-[#153E40]">Origen del valor</legend>
+          <p className="m-0 text-[12px] font-semibold leading-snug text-[#3E6466]">
             En uso: referencia manual de {profile.cycleLength} y {profile.periodLength} días. Cyclia guarda un solo inicio de referencia, así que todavía no hay un promedio calculado a partir de varios ciclos.
           </p>
-          <label className="mt-3 flex items-start gap-2 text-sm font-bold text-[#1B1F5E]">
+          <label className="mt-3 flex items-start gap-2 text-sm font-bold text-[#153E40]">
             <input type="radio" name="length-source" checked={lengthSource === 'manual'} onChange={() => { setLengthSource('manual'); setStatus('idle'); }} />
             Usar el valor que escribo
           </label>
-          <label className="mt-2 flex items-start gap-2 text-sm font-bold text-[#1B1F5E]">
+          <label className="mt-2 flex items-start gap-2 text-sm font-bold text-[#153E40]">
             <input type="radio" name="length-source" checked={lengthSource === 'records'} onChange={() => { setLengthSource('records'); setStatus('idle'); }} />
             Usar promedio de mis registros
           </label>
           {lengthSource === 'records' && (
-            <p className="m-0 mt-2 text-[12px] font-semibold leading-snug text-[#4A4F7A]">
+            <p className="m-0 mt-2 text-[12px] font-semibold leading-snug text-[#3E6466]">
               No hay historial suficiente. Al guardar, el valor escrito se conserva y las estimaciones siguen la referencia manual.
             </p>
           )}
         </fieldset>
 
-        <div className="mt-4 flex items-start justify-between gap-3 border-t border-[#E7ECFB] pt-4">
+        <div className="mt-4 flex items-start justify-between gap-3 border-t border-[#F6DDD4] pt-4">
           <div>
-            <h2 className="m-0 text-[15px] font-extrabold text-[#1B1F5E]">Recordatorios del ciclo</h2>
-            <p className="m-0 mt-1 text-[13px] leading-snug text-[#4A4F7A]">Recibe avisos sobre las fechas estimadas de tu ciclo.</p>
-            <p className="m-0 mt-1 text-[12px] font-semibold leading-snug text-[#4A4F7A]">{delivery}</p>
+            <h2 className="m-0 text-[15px] font-extrabold text-[#153E40]">Recordatorios del ciclo</h2>
+            <p className="m-0 mt-1 text-[13px] leading-snug text-[#3E6466]">Recibe avisos sobre las fechas estimadas de tu ciclo.</p>
+            <p className="m-0 mt-1 text-[12px] font-semibold leading-snug text-[#3E6466]">{delivery}</p>
           </div>
           <button
             type="button"
@@ -186,39 +186,39 @@ export default function CyclePrivacySettings({
             aria-checked={cycleReminders}
             onClick={toggleReminders}
             className="mt-1 h-7 w-12 shrink-0 cursor-pointer rounded-full p-1"
-            style={{ background: cycleReminders ? '#3A44C4' : '#C9D3EF' }}
+            style={{ background: cycleReminders ? '#069494' : '#E7D3C6' }}
           >
-            <span className="block h-5 w-5 rounded-full bg-white transition-transform" style={{ transform: cycleReminders ? 'translateX(20px)' : 'translateX(0)' }} />
+            <span className="block h-5 w-5 rounded-full bg-[#FFF8EE] transition-transform" style={{ transform: cycleReminders ? 'translateX(20px)' : 'translateX(0)' }} />
           </button>
         </div>
 
-        <div className="mt-4 flex items-start gap-3 border-t border-[#E7ECFB] pt-4">
-          <span className="mt-0.5 text-[#3A44C4]"><ShieldIcon /></span>
+        <div className="mt-4 flex items-start gap-3 border-t border-[#F6DDD4] pt-4">
+          <span className="mt-0.5 text-[#069494]"><ShieldIcon /></span>
           <div className="flex-1">
-            <h2 className="m-0 text-[15px] font-extrabold text-[#1B1F5E]">Privacidad y control de tus datos</h2>
-            <p className="m-0 mt-1 text-[13px] leading-snug text-[#4A4F7A]">Consulta cómo se utiliza tu información y administra tus permisos.</p>
-            <button type="button" onClick={onManagePrivacy} className="mt-2 cursor-pointer text-sm font-extrabold text-[#3A44C4]">Gestionar privacidad</button>
+            <h2 className="m-0 text-[15px] font-extrabold text-[#153E40]">Privacidad y control de tus datos</h2>
+            <p className="m-0 mt-1 text-[13px] leading-snug text-[#3E6466]">Consulta cómo se utiliza tu información y administra tus permisos.</p>
+            <button type="button" onClick={onManagePrivacy} className="mt-2 cursor-pointer text-sm font-extrabold text-[#069494]">Gestionar privacidad</button>
           </div>
         </div>
 
         {confirmExport && (
           <div className="mt-4 rounded-2xl bg-[#FFF6CF] p-3" role="dialog" aria-label="Confirmación de exportación">
-            <p className="m-0 text-sm font-semibold text-[#1B1F5E]">Este archivo contiene información personal y de salud. Guárdalo en un lugar de confianza.</p>
-            <p className="m-0 mt-2 text-[13px] text-[#4A4F7A]">Incluye lo que ya está guardado en tu cuenta. Los cambios de esta pantalla entran cuando usas Guardar ajustes.</p>
+            <p className="m-0 text-sm font-semibold text-[#153E40]">Este archivo contiene información personal y de salud. Guárdalo en un lugar de confianza.</p>
+            <p className="m-0 mt-2 text-[13px] text-[#3E6466]">Incluye lo que ya está guardado en tu cuenta. Los cambios de esta pantalla entran cuando usas Guardar ajustes.</p>
             <div className="mt-3 flex gap-2">
-              <button type="button" disabled={exporting} onClick={() => void exportFile()} className="h-10 flex-1 cursor-pointer rounded-full bg-[#1B1F5E] text-sm font-extrabold text-white disabled:opacity-60">{exporting ? 'Preparando…' : 'Descargar'}</button>
-              <button type="button" disabled={exporting} onClick={() => setConfirmExport(false)} className="h-10 flex-1 cursor-pointer rounded-full bg-white text-sm font-extrabold text-[#1B1F5E]">Cancelar</button>
+              <button type="button" disabled={exporting} onClick={() => void exportFile()} className="h-10 flex-1 cursor-pointer rounded-full bg-[#153E40] text-sm font-extrabold text-white disabled:opacity-60">{exporting ? 'Preparando…' : 'Descargar'}</button>
+              <button type="button" disabled={exporting} onClick={() => setConfirmExport(false)} className="h-10 flex-1 cursor-pointer rounded-full bg-[#FFF8EE] text-sm font-extrabold text-[#153E40]">Cancelar</button>
             </div>
           </div>
         )}
 
-        <p className="m-0 mt-4 min-h-5 text-sm font-semibold text-[#4A4F7A]" role="status">
+        <p className="m-0 mt-4 min-h-5 text-sm font-semibold text-[#3E6466]" role="status">
           {status === 'saving' ? 'Guardando ajustes…' : dirty && status !== 'error' ? 'Hay cambios sin guardar.' : message}
         </p>
 
         <div className="mt-2 flex flex-col-reverse gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
-          <button type="button" onClick={() => setConfirmExport(true)} className="h-12 cursor-pointer rounded-full bg-[#F4F6FD] px-4 text-sm font-extrabold text-[#1B1F5E]">Exportar mis datos en JSON</button>
-          <button type="button" disabled={!dirty || status === 'saving' || Boolean(fieldError)} onClick={() => void save()} className="h-12 cursor-pointer rounded-full bg-[#F49A9E] px-5 text-sm font-extrabold text-[#1B1F5E] disabled:opacity-50">Guardar ajustes</button>
+          <button type="button" onClick={() => setConfirmExport(true)} className="h-12 cursor-pointer rounded-full bg-[#F4F6FD] px-4 text-sm font-extrabold text-[#153E40]">Exportar mis datos en JSON</button>
+          <button type="button" disabled={!dirty || status === 'saving' || Boolean(fieldError)} onClick={() => void save()} className="h-12 cursor-pointer rounded-full bg-[#FF8243] px-5 text-sm font-extrabold text-[#153E40] disabled:opacity-50">Guardar ajustes</button>
         </div>
       </section>
     </div>

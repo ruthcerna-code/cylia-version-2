@@ -8,6 +8,8 @@ import DesignHome from './components/DesignHome';
 import DesignRegister from './components/DesignRegister';
 import { ActivityScreen, CycleDataScreen, GoalsScreen, PhaseScreen, PrivacyScreen } from './components/DesignScreens';
 import CalendarView from './components/CalendarView';
+import RecordCoverageNote from './components/RecordCoverageNote';
+import PhaseRing from './components/PhaseRing';
 import DailyCheckin from './components/DailyCheckin';
 import ChatPanel from './components/ChatPanel';
 import HealthProfileModal from './components/HealthProfileModal';
@@ -15,6 +17,7 @@ import SymptomChart from './components/SymptomChart';
 import CycleProjectionScreen from './components/CycleProjectionScreen';
 import PhaseKnowledge from './components/PhaseKnowledge';
 import PhaseGuide from './components/PhaseGuide';
+import Cira from './components/Cira';
 import { addCalendarDays, getCycleDay, getPhaseForDay, formatDateStr, formatFriendlyDate, PHASE_DETAILS } from './utils/cycle';
 import { analyzeCycle } from './utils/cycleModel';
 import { beginEntry, finishAccountSession, requestPasswordReset, type PendingEntry } from './accountApi';
@@ -32,6 +35,7 @@ import OwnPatternCard from './components/OwnPatternCard';
 import BehaviorReportCard from './components/BehaviorReportCard';
 import MovementCard from './components/MovementCard';
 import { behaviorMonthLabel, behaviorTimeline } from './utils/behavior';
+import { hasMoodAndBehavior } from './utils/dailyRecord';
 import { usePlusNotice } from './components/PlusNotice';
 import { buildAnalysisContext } from './utils/analysisContext';
 import { generateActivityForDay } from './utils/activity';
@@ -69,6 +73,12 @@ type MigrationResult = 'empty' | 'ok' | 'error';
 
 function listLogs(source: Record<string, DailyLog>): DailyLog[] {
   return Object.values(source) as DailyLog[];
+}
+
+function shortMonth(dateStr: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return 'sin fecha';
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return `${Number(dateStr.slice(8, 10))} ${months[Number(dateStr.slice(5, 7)) - 1] || ''}`;
 }
 
 function withoutAnalysis(log: DailyLog): DailyLog {
@@ -133,11 +143,26 @@ export default function App() {
   const [selectedDateStr, setSelectedDateStr] = useState<string>(formatDateStr(new Date()));
   const [isCheckinOpen, setIsCheckinOpen] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+  const analysisCloseRef = useRef<HTMLButtonElement>(null);
+  const analysisReturnRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!isAnalysisOpen) return;
+    analysisReturnRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    analysisCloseRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsAnalysisOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      analysisReturnRef.current?.focus();
+    };
+  }, [isAnalysisOpen]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
-  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil' | 'foco' | 'conocimiento' | 'bienestar'>('inicio');
+  const [appTab, setAppTab] = useState<'inicio' | 'calendario' | 'registro' | 'chat' | 'humor' | 'perfil' | 'foco' | 'conocimiento' | 'bienestar'>('foco');
   const requestPlus = usePlusNotice();
   // Chat Cyclia IA is a Plus feature: opening it shows the paid-option notice once.
   useEffect(() => {
@@ -150,8 +175,8 @@ export default function App() {
   const [planOpenToken, setPlanOpenToken] = useState(0);
   const [planRequest, setPlanRequest] = useState({ title: '', date: '' });
   const [homeSheet, setHomeSheet] = useState<null | 'fase' | 'actividad'>(null);
-  const [cycleSheet, setCycleSheet] = useState<null | 'dia' | 'evolucion' | 'proyeccion'>(null);
-  const [profileSheet, setProfileSheet] = useState<null | 'ajustes' | 'ciclo' | 'objetivos' | 'privacidad' | 'datos'>(null);
+  const [cycleSheet, setCycleSheet] = useState<null | 'dia'>(null);
+  const [profileSheet, setProfileSheet] = useState<null | 'ajustes' | 'ciclo' | 'objetivos' | 'privacidad' | 'datos' | 'evolucion' | 'proyeccion'>(null);
   const [privacyBack, setPrivacyBack] = useState<null | 'ajustes'>(null);
   const [consentStatus, setConsentStatus] = useState<ConsentStatus | null>(null);
   const geminiEnabledRef = useRef(false);
@@ -220,7 +245,7 @@ export default function App() {
     } catch {
       return;
     }
-    showNotice(`Ya cumpliste ${behaviorMonthLabel(completedMonths)} de registros. Tu patrón del mes está listo en la pestaña Ciclo.`);
+    showNotice(`Ya cumpliste ${behaviorMonthLabel(completedMonths)} de registros. Tu patrón del mes está listo en la pestaña Fase.`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, completedMonths]);
 
@@ -459,7 +484,7 @@ export default function App() {
         return next;
       });
       showNotice('No se pudo guardar el registro en Firebase.');
-      return;
+      return false;
     }
     
     const analyze = options?.analyze !== false;
@@ -467,13 +492,11 @@ export default function App() {
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 4000);
 
-    if (!analyze) return;
+    if (!analyze) return true;
 
-    // Trigger AI analysis with the cleared log
-    triggerAiAnalysis(logWithClearedAnalysis, updatedLogs);
-
-    // Automatically open the analysis modal to show the progress spinner
+    void triggerAiAnalysis(logWithClearedAnalysis, updatedLogs);
     setIsAnalysisOpen(true);
+    return true;
   };
 
   // Automatically trigger AI Analysis after check-in for deep insights
@@ -759,10 +782,11 @@ export default function App() {
 
   if (isLoadingAuth) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#2E37B0] p-6 text-center text-white">
-        <h2 className="font-serif text-4xl font-light tracking-[0.16em] text-[#F9C4C6]">CYCLIA</h2>
-        <p className="mt-3 text-sm text-[#D2DDF8]">Preparando tu espacio</p>
-        <button type="button" onClick={() => { void leaveForAccountLogin(); }} className="mt-6 cursor-pointer text-xs font-bold text-[#D2DDF8]">Entrar con otra cuenta</button>
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-transparent p-6 text-center text-[#153E40]">
+        <Cira size={80} />
+        <h2 className="m-0 mt-3 text-[36px] font-normal leading-[1.1]">Cyclia</h2>
+        <p className="mt-3 text-base">Preparando tu espacio</p>
+        <button type="button" onClick={() => { void leaveForAccountLogin(); }} className="mt-6 cursor-pointer text-sm font-semibold text-[#069494]">Entrar con otra cuenta</button>
       </div>
     );
   }
@@ -876,6 +900,7 @@ export default function App() {
 
   // Calculate current state metrics based on active selection date
   const cycleView = analyzeCycle(profile, periods, selectedDateStr, logs);
+  const todayCycle = analyzeCycle(profile, periods, formatDateStr(new Date()), logs);
   const showPerimenopauseOffer = cycleView.offerPerimenopause && periOfferUntil <= formatDateStr(new Date());
   const selectedCycleDay = cycleView.cycleDay;
   const selectedPhase: MenstrualPhase = cycleView.phase ?? 'Folicular';
@@ -909,8 +934,8 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-dvh text-[#1B1F5E] font-sans flex justify-center bg-transparent">
-    <div className="w-full max-w-[480px] min-h-dvh relative flex flex-col pb-28 bg-transparent">
+    <div className="min-h-dvh text-[#153E40] font-sans flex justify-center bg-transparent">
+    <div className="app-shell relative flex min-h-dvh min-w-0 flex-col bg-transparent pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
       
       {/* Toast Notification */}
       {showNotification && (
@@ -959,7 +984,7 @@ export default function App() {
             onChat={() => { setHomeSheet(null); setAppTab('chat'); }}
             onMood={() => { setHomeSheet(null); setAppTab('humor'); }}
             onActivity={() => setHomeSheet('actividad')}
-            onCalendar={() => { setHomeSheet(null); setAppTab('calendario'); }}
+            onCalendar={() => { setHomeSheet(null); setCycleSheet(null); setAppTab('conocimiento'); }}
             offerPerimenopause={showPerimenopauseOffer}
             onActivatePerimenopause={() => { void choosePerimenopause('on'); }}
             onDeclinePerimenopause={() => { void choosePerimenopause('offered'); }}
@@ -1018,7 +1043,9 @@ export default function App() {
           />
         )}
         {appTab === 'registro' && (
+          <div className="reading-column">
           <DesignRegister
+            key={selectedDateStr}
             dateStr={selectedDateStr}
             dateLabel={formatFriendlyDate(selectedDateStr)}
             phaseLabel={cycleView.showPhases ? `${phaseDetails.name}${cycleView.approximate ? ' aproximada' : ''}` : 'Según tu registro'}
@@ -1027,14 +1054,16 @@ export default function App() {
             existing={activeLog}
             suggestion={activitySuggestion}
             onSchedule={(title) => openAgenda(title, selectedDateStr)}
-            onSave={(log) => { void handleSaveLog(log, { analyze: false }); }}
-            onSaveAndAnalyze={(log) => { void handleSaveLog(log); }}
+            onBack={() => setAppTab('conocimiento')}
+            onSave={(log) => { void handleSaveLog(log, { analyze: false }).then((saved) => { if (saved) setAppTab('conocimiento'); }); }}
+            onSaveAndAnalyze={(log) => { void handleSaveLog(log).then((saved) => { if (saved) setAppTab('conocimiento'); }); }}
           />
+          </div>
         )}
         {appTab === 'humor' && (
           <MoodGrid
             current={activeLog?.mood}
-            onBack={() => setAppTab('inicio')}
+            onBack={() => setAppTab('foco')}
             onFull={() => setAppTab('registro')}
             onSave={(mood, tags) => {
               const previous = (activeLog?.additionalNotes || '').replace(/\n?Influye:.*$/s, '').trim();
@@ -1051,15 +1080,15 @@ export default function App() {
                 behavior: activeLog?.behavior || '',
                 aiAnalysis: activeLog?.aiAnalysis,
               }, { analyze: false });
-              setAppTab('inicio');
+              setAppTab('foco');
             }}
           />
         )}
         
         {/* Active Health Profile Badges */}
         {(profile.isCeliac || profile.hasDiabetes || profile.hasObesity || profile.hasDepression) && (
-          <div className={`${appTab === 'perfil' ? 'flex' : 'hidden'} bg-white rounded-[24px] p-4 border border-[#d7e6d4] flex-wrap items-center gap-2 text-xs shadow-2xs`}>
-            <span className="font-bold text-[#7A7A70] uppercase tracking-wider text-[10px]">Perfil de Salud Activo:</span>
+          <div className={`${appTab === 'perfil' ? 'flex' : 'hidden'} bg-[#FFF8EE] rounded-[24px] p-4 border border-[#d7e6d4] flex-wrap items-center gap-2 text-xs shadow-2xs`}>
+            <span className="font-bold text-[#5C7374] uppercase tracking-wider text-[10px]">Perfil de Salud Activo:</span>
             {profile.isCeliac && (
               <span className="bg-rose-50 border border-rose-100 text-rose-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">🌾 Celíaca</span>
             )}
@@ -1080,47 +1109,79 @@ export default function App() {
         <div className="flex flex-col gap-4">
           
           {/* Interactive Calendar widget */}
-          <div className={appTab === 'calendario' && !cycleSheet ? 'flex flex-col gap-3' : 'hidden'}>
-            <header className="px-1 pt-6">
-              <span className="font-serif text-[15px] tracking-[0.18em] text-[#3A44C4]">CYCLIA</span>
-              <h1 className="m-0 text-[28px] font-extrabold">Tu ciclo</h1>
+          <div className={appTab === 'conocimiento' && !cycleSheet ? 'flex flex-col gap-3' : 'hidden'}>
+            <header className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="m-0 text-sm font-semibold text-[#153E40]">Cyclia</p>
+                <h1 className="m-0 text-[36px] font-normal leading-[1.1] text-[#153E40]">Mi ciclo</h1>
+                <p className="m-0 mt-1 max-w-[32ch] text-base leading-snug text-[#153E40]">Sigue tu ciclo, registra tu periodo y descubre tus patrones.</p>
+              </div>
+              <Cira size={92} />
             </header>
-            <CalendarView
-              profile={profile}
-              selectedDateStr={selectedDateStr}
-              onSelectDate={setSelectedDateStr}
-              activityDates={activityDates}
-              showPhases={cycleView.showPhases}
-              cycleLength={cycleView.averageLength}
-              periodLength={cycleView.periodLength}
-            />
-            <section className="flex flex-col gap-1.5 rounded-[20px] bg-white p-4">
-              <span className="text-xs font-extrabold tracking-wide text-[#4A4F7A]">DÍA SELECCIONADO</span>
-              <h2 className="m-0 text-[17px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h2>
-              <p className="m-0 text-sm text-[#3B4070]">{cycleView.showPhases ? `Día ${selectedCycleDay} del ciclo · ${phaseDetails.name}${cycleView.approximate ? ' aproximada' : ''}` : cycleView.note} · {activeLog ? 'Con registro' : 'Sin registro'}</p>
-              {dayRecordNote(activeLog) && <p className="m-0 text-sm text-[#3B4070]">{dayRecordNote(activeLog)}</p>}
-              <button type="button" onClick={() => setCycleSheet('dia')} className="w-fit cursor-pointer py-2 text-[15px] font-extrabold text-[#3A44C4]">Ver detalle del día</button>
+            <div className="@container">
+              <div className="flex min-w-0 flex-col gap-3 @min-[700px]:grid @min-[700px]:grid-cols-2 @min-[700px]:items-start @min-[700px]:gap-4">
+                <div className="flex min-w-0 flex-col gap-3">
+                  <PhaseRing
+                    cycleDay={todayCycle.cycleDay}
+                    cycleLength={todayCycle.averageLength}
+                    periodLength={todayCycle.periodLength}
+                    phase={todayCycle.phase}
+                    showPhases={todayCycle.showPhases}
+                    approximate={todayCycle.approximate}
+                    note={todayCycle.note}
+                  />
+                  <div className="flex flex-wrap justify-center gap-2 text-sm text-[#153E40]">
+                    <span className="rounded-full bg-[#FFF8EE] px-3 py-1">Inicio: {shortMonth(profile.lastPeriodDate)}</span>
+                    <span className="rounded-full bg-[#FFF8EE] px-3 py-1">Duración: {todayCycle.periodLength} días</span>
+                    <span className="rounded-full bg-[#FFF8EE] px-3 py-1">Ciclo: {todayCycle.averageLength} días</span>
+                  </div>
+                  <CalendarView
+                    profile={profile}
+                    selectedDateStr={selectedDateStr}
+                    onSelectDate={setSelectedDateStr}
+                    onOpenRecord={(date) => { setSelectedDateStr(date); setCycleSheet(null); setAppTab('registro'); }}
+                    activityDates={activityDates}
+                    completeDates={Object.values(logs).filter(hasMoodAndBehavior).map((log) => log.date)}
+                    showPhases={cycleView.showPhases}
+                    cycleLength={cycleView.averageLength}
+                    periodLength={cycleView.periodLength}
+                  />
+                </div>
+            <section className="flex min-w-0 flex-col gap-3 rounded-[20px] bg-[#FFF8EE] p-4 @min-[700px]:sticky @min-[700px]:top-4">
+              <div className="flex items-center gap-3">
+                <Cira size={64} bounceKey={selectedDateStr} />
+                <div className="min-w-0">
+                  <h2 className="m-0 text-2xl font-normal leading-[1.2]">{formatFriendlyDate(selectedDateStr)}</h2>
+                  <p className="m-0 text-sm text-[#245456]">{activeLog ? 'Con registro' : 'Sin registro'}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => handleUpdatePeriodStart(formatDateStr(new Date()))} className="h-12 cursor-pointer rounded-full bg-[#FF8243] text-base font-semibold text-[#153E40]">Registrar inicio del periodo</button>
+              <p className="m-0 text-sm text-[#245456]">{cycleView.showPhases ? `Día ${selectedCycleDay} del ciclo · ${phaseDetails.name}${cycleView.approximate ? ' aproximada' : ''}` : cycleView.note}</p>
+              {dayRecordNote(activeLog) && <p className="m-0 text-sm text-[#245456]">{dayRecordNote(activeLog)}</p>}
+              <button type="button" onClick={() => setCycleSheet('dia')} className="w-fit cursor-pointer py-2 text-[15px] font-extrabold text-[#069494]">Ver detalle del día</button>
               {dayActivities.length > 0 && (
-                <ul className="m-0 list-none p-0 text-sm text-[#3B4070]">
+                <ul className="m-0 list-none p-0 text-sm text-[#245456]">
                   {dayActivities.map((activity) => (
-                    <li key={activity.id}><strong className="text-[#1B1F5E]">{activity.title}</strong> · {activity.startTime}–{activity.endTime}</li>
+                    <li key={activity.id}><strong className="text-[#153E40]">{activity.title}</strong> · {activity.startTime}–{activity.endTime}</li>
                   ))}
                 </ul>
               )}
               {activitySuggestion && (
                 <>
-                  <p className="m-0 text-sm text-[#3B4070]">Sugerencia opcional: <strong className="text-[#1B1F5E]">{activitySuggestion.title}</strong>. {activitySuggestion.note}</p>
-                  <button type="button" onClick={() => openAgenda(activitySuggestion.title, selectedDateStr)} className="mt-1 h-11 cursor-pointer rounded-full bg-[#F49A9E] px-4 text-sm font-extrabold text-[#1B1F5E]">Agendar una actividad para mí</button>
+                  <p className="m-0 text-sm text-[#245456]">Sugerencia opcional: <strong className="text-[#153E40]">{activitySuggestion.title}</strong>. {activitySuggestion.note}</p>
+                  <button type="button" onClick={() => openAgenda(activitySuggestion.title, selectedDateStr)} className="mt-1 h-11 cursor-pointer rounded-full bg-[#FF8243] px-4 text-sm font-extrabold text-[#153E40]">Agendar una actividad para mí</button>
                 </>
               )}
-              <div className="my-1 h-px bg-[#E1E5F5]" />
+              <div className="my-1 h-px bg-[#EAD9CE]" />
               <p className="m-0 text-sm"><strong>Próximo periodo estimado:</strong> {cycleView.nextPeriod ? formatFriendlyDate(cycleView.nextPeriod) : 'En pausa con los datos actuales.'}</p>
-              {cycleView.alerts[0] && <p className="m-0 text-sm text-[#3B4070]">{cycleView.alerts[0].message}</p>}
-              <div className="my-1 h-px bg-[#E1E5F5]" />
+              {cycleView.alerts[0] && <p className="m-0 text-sm text-[#245456]">{cycleView.alerts[0].message}</p>}
+              <div className="my-1 h-px bg-[#EAD9CE]" />
               <h3 className="m-0 text-sm font-extrabold">Tus registros y la proyección</h3>
-              {compareRecords(profile, periods, logs).map((line) => <p key={line} className="m-0 text-sm text-[#3B4070]">{line}</p>)}
-              <p className="m-0 text-xs text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
+              {compareRecords(profile, periods, logs).map((line) => <p key={line} className="m-0 text-sm text-[#245456]">{line}</p>)}
+              <p className="m-0 text-xs text-[#3E6466]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
             </section>
+              </div>
+            </div>
             <OwnPatternCard profile={profile} periods={periods} logs={logs} today={formatDateStr(new Date())} />
             <BehaviorReportCard
               userId={user.id}
@@ -1131,35 +1192,27 @@ export default function App() {
               assistantEnabled={consentStatus?.purposes.gemini_assistant === 'accept'}
               today={formatDateStr(new Date())}
             />
-            <button type="button" onClick={() => setCycleSheet('evolucion')}className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">↗</span>
-              <span><strong className="block text-base">Evolución de bienestar</strong><span className="text-[13px] text-[#3B4070]">Ánimo, estrés, dolor, sueño y cansancio</span></span>
-            </button>
-            <button type="button" onClick={() => setCycleSheet('proyeccion')} className="flex items-center gap-3 rounded-[20px] bg-[#A9C4F0] p-4 text-left text-[#1B1F5E]">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg">3</span>
-              <span><strong className="block text-base">Proyección de tu ciclo</strong><span className="text-[13px] text-[#3B4070]">Tres ciclos, fases y ovulación estimada</span></span>
-            </button>
-            <button type="button" onClick={() => handleUpdatePeriodStart(formatDateStr(new Date()))} className="h-[50px] cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Registrar inicio de periodo hoy</button>
-          </div>
-          {appTab === 'conocimiento' && (
             <PhaseKnowledge profile={profile} periods={periods} logs={logs} userId={user.id} />
-          )}
+          </div>
           {appTab === 'bienestar' && (
             <PhaseGuide profile={profile} periods={periods} userId={user.id} />
           )}
-          {appTab === 'calendario' && cycleSheet === 'dia' && (
-            <section className="flex flex-col gap-3 pt-4">
-              <button type="button" onClick={() => setCycleSheet(null)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Calendario</button>
-              <h1 className="m-0 text-[26px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h1>
+          {appTab === 'conocimiento' && cycleSheet === 'dia' && (
+            <section className="reading-column flex flex-col gap-3 pt-4">
+              <button type="button" onClick={() => setCycleSheet(null)} className="w-fit cursor-pointer text-base font-semibold text-[#069494]">← Mi ciclo</button>
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="m-0 min-w-0 text-[36px] font-normal leading-[1.1]">{formatFriendlyDate(selectedDateStr)}</h1>
+                <Cira size={64} bounceKey={selectedDateStr} />
+              </div>
               <div className="flex flex-wrap gap-2">
-                <span className="rounded-2xl px-3 py-1 text-[13px] font-extrabold text-[#1B1F5E]" style={{ background: phaseDetails.bgHex, color: phaseDetails.textHex }}>{phaseDetails.name}</span>
-                <span className="rounded-2xl border border-[#C9D3EF] bg-white px-3 py-1 text-[13px] font-bold">Día {selectedCycleDay} del ciclo</span>
+                <span className="rounded-2xl px-3 py-1 text-sm font-semibold text-[#153E40]" style={{ background: phaseDetails.cellHex, color: phaseDetails.textHex, boxShadow: `inset 0 0 0 2px ${phaseDetails.bgHex}` }}>{phaseDetails.name}</span>
+                <span className="rounded-2xl border border-[#E7D3C6] bg-[#FFF8EE] px-3 py-1 text-[13px] font-bold">Día {selectedCycleDay} del ciclo</span>
               </div>
               {activeLog ? (
                 <>
-                  <section className="rounded-[20px] bg-white p-4">
+                  <section className="rounded-[20px] bg-[#FFF8EE] p-4">
                     <h2 className="m-0 text-base font-extrabold">Cómo te sentiste</h2>
-                    {indicatorNote(activeLog) && <p className="m-0 mt-2 text-sm leading-relaxed text-[#3B4070]">{indicatorNote(activeLog)}</p>}
+                    {indicatorNote(activeLog) && <p className="m-0 mt-2 text-sm leading-relaxed text-[#245456]">{indicatorNote(activeLog)}</p>}
                     <div className="mt-3 grid grid-cols-2 gap-2.5">
                       {[
                         ['Cansancio', activeLog.fatigue],
@@ -1169,71 +1222,55 @@ export default function App() {
                         ['Dolor', activeLog.pain],
                       ].map(([label, value]) => (
                         <div key={String(label)} className="flex flex-col gap-1.5 rounded-[14px] bg-[#F3F5FC] p-3">
-                          <span className="text-[13px] font-bold text-[#4A4F7A]">{label}</span>
+                          <span className="text-[13px] font-bold text-[#3E6466]">{label}</span>
                           <span className="text-xl font-extrabold">{value} / 5</span>
-                          <div className="h-1.5 rounded-full bg-[#E1E5F5]"><div className="h-1.5 rounded-full bg-[#3A44C4]" style={{ width: `${Number(value) * 20}%` }} /></div>
+                          <div className="h-1.5 rounded-full bg-[#EAD9CE]"><div className="h-1.5 rounded-full bg-[#069494]" style={{ width: `${Number(value) * 20}%` }} /></div>
                         </div>
                       ))}
                     </div>
                   </section>
-                  <section className="rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#3B4070]">
-                    <h2 className="m-0 mb-2 text-base font-extrabold text-[#1B1F5E]">Sueño y hábitos</h2>
-                    <p className="m-0"><strong className="text-[#1B1F5E]">Sueño:</strong> {activeLog.sleepDetails || 'Sin detalle'}</p>
-                    <p className="m-0 mt-2"><strong className="text-[#1B1F5E]">Hábitos:</strong> {activeLog.behavior || 'Sin detalle'}</p>
-                    <p className="m-0 mt-2"><strong className="text-[#1B1F5E]">Notas:</strong> {activeLog.additionalNotes || 'Sin notas'}</p>
+                  <section className="rounded-[20px] bg-[#FFF8EE] p-4 text-sm leading-relaxed text-[#245456]">
+                    <h2 className="m-0 mb-2 text-base font-extrabold text-[#153E40]">Sueño y hábitos</h2>
+                    <p className="m-0"><strong className="text-[#153E40]">Sueño:</strong> {activeLog.sleepDetails || 'Sin detalle'}</p>
+                    <p className="m-0 mt-2"><strong className="text-[#153E40]">Hábitos:</strong> {activeLog.behavior || 'Sin detalle'}</p>
+                    <p className="m-0 mt-2"><strong className="text-[#153E40]">Notas:</strong> {activeLog.additionalNotes || 'Sin notas'}</p>
                   </section>
                 </>
               ) : (
-                <p className="rounded-[20px] bg-white p-4 text-sm">Este día todavía no tiene registro.</p>
+                <p className="rounded-[20px] bg-[#FFF8EE] p-4 text-sm">Este día todavía no tiene registro.</p>
               )}
               {dayActivities.length > 0 && (
-                <section className="rounded-[20px] bg-white p-4">
+                <section className="rounded-[20px] bg-[#FFF8EE] p-4">
                   <h2 className="m-0 text-base font-extrabold">Actividades de este día</h2>
-                  <ul className="m-0 mt-2 list-none p-0 text-sm text-[#3B4070]">
+                  <ul className="m-0 mt-2 list-none p-0 text-sm text-[#245456]">
                     {dayActivities.map((activity) => (
-                      <li key={activity.id} className="mt-1"><strong className="text-[#1B1F5E]">{activity.title}</strong> · {formatActivityWhen(activity)}</li>
+                      <li key={activity.id} className="mt-1"><strong className="text-[#153E40]">{activity.title}</strong> · {formatActivityWhen(activity)}</li>
                     ))}
                   </ul>
                 </section>
               )}
               {activitySuggestion && (
-                <section className="rounded-[20px] bg-white p-4">
+                <section className="rounded-[20px] bg-[#FFF8EE] p-4">
                   <h2 className="m-0 text-base font-extrabold">Agendar una actividad para mí</h2>
-                  <p className="m-0 mt-2 text-sm text-[#3B4070]">Sugerencia opcional: <strong className="text-[#1B1F5E]">{activitySuggestion.title}</strong>. {activitySuggestion.note}</p>
-                  <button type="button" onClick={() => openAgenda(activitySuggestion.title, selectedDateStr)} className="mt-3 h-11 cursor-pointer rounded-full bg-[#A9C4F0] px-4 text-[15px] font-extrabold text-[#1B1F5E]">Agendar una actividad para mí</button>
+                  <p className="m-0 mt-2 text-sm text-[#245456]">Sugerencia opcional: <strong className="text-[#153E40]">{activitySuggestion.title}</strong>. {activitySuggestion.note}</p>
+                  <button type="button" onClick={() => openAgenda(activitySuggestion.title, selectedDateStr)} className="mt-3 h-11 cursor-pointer rounded-full bg-[#FFD3BC] px-4 text-[15px] font-extrabold text-[#153E40]">Agendar una actividad para mí</button>
                 </section>
               )}
               <div className="flex gap-2.5">
-                <button type="button" onClick={() => activeLog ? setIsAnalysisOpen(true) : setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Ver análisis</button>
-                <button type="button" onClick={() => setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#F6E27F] text-[15px] font-extrabold text-[#1B1F5E]">Editar registro</button>
+                <button type="button" onClick={() => activeLog ? setIsAnalysisOpen(true) : setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#FF8243] text-[15px] font-extrabold text-[#153E40]">Ver análisis</button>
+                <button type="button" onClick={() => setAppTab('registro')} className="h-[50px] flex-1 cursor-pointer rounded-full bg-[#FCE883] text-[15px] font-extrabold text-[#153E40]">Editar registro</button>
               </div>
             </section>
           )}
-          {appTab === 'calendario' && cycleSheet === 'evolucion' && (
-            <div className="flex flex-col gap-3 pt-4">
-              <button type="button" onClick={() => setCycleSheet(null)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Calendario</button>
-              <h1 className="m-0 text-[26px] font-extrabold">Evolución de bienestar</h1>
-            </div>
-          )}
-          {appTab === 'calendario' && cycleSheet === 'proyeccion' && (
-            <CycleProjectionScreen
-              profile={profile}
-              periods={periods}
-              logs={logs}
-              userId={user.id}
-              onBack={() => setCycleSheet(null)}
-              onOpenCalendar={(date) => { setSelectedDateStr(date); setCycleSheet(null); }}
-            />
-          )}
 
           {/* Detailed Recommended Activity for Selected Day */}
-          <div className="hidden bg-white rounded-[32px] p-6 shadow-sm border border-[#EFEFEF] flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#EFEFEF]">
+          <div className="hidden bg-[#FFF8EE] rounded-[32px] p-6 shadow-sm border border-[#EAD9CE] flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EAD9CE]">
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🏃‍♀️</span>
                 <div>
                   <h3 className="font-serif font-semibold text-lg text-[#1E5631]">Actividad Recomendada</h3>
-                  <p className="text-[10px] uppercase tracking-widest text-[#9A9A90] font-bold">Personalizado para ti</p>
+                  <p className="text-[10px] uppercase tracking-widest text-[#6E8C8E] font-bold">Personalizado para ti</p>
                 </div>
               </div>
               <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-50 border border-rose-100 text-rose-700">
@@ -1251,7 +1288,7 @@ export default function App() {
             </div>
 
             <div className="bg-[#F5F6F8] p-4 rounded-2xl border border-[#d7e6d4]">
-              <h5 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest mb-1.5 flex items-center gap-1">
+              <h5 className="text-[10px] font-bold text-[#6E8C8E] uppercase tracking-widest mb-1.5 flex items-center gap-1">
                 <span>💡</span> ¿Por qué es adecuada para ti?
               </h5>
               <p className="text-xs text-[#1E5631] leading-relaxed">
@@ -1261,7 +1298,7 @@ export default function App() {
 
             {selectedActivity.illnessNotes.length > 0 && (
               <div className="mt-2 space-y-2">
-                <h5 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest flex items-center gap-1 text-amber-700">
+                <h5 className="text-[10px] font-bold text-[#6E8C8E] uppercase tracking-widest flex items-center gap-1 text-amber-700">
                   <span>⚠️</span> Adaptaciones para tus condiciones de salud:
                 </h5>
                 <div className="grid grid-cols-1 gap-2">
@@ -1301,9 +1338,9 @@ export default function App() {
             </div>
 
             {/* Wellness Checkin summary panel */}
-            <div className="hidden bg-[#EFEFEF] rounded-[32px] p-6 flex-col justify-between shadow-xs border border-[#d7e6d4]">
+            <div className="hidden bg-[#EAD9CE] rounded-[32px] p-6 flex-col justify-between shadow-xs border border-[#d7e6d4]">
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-widest text-[#9A9A90] mb-4 flex items-center gap-1.5">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-[#6E8C8E] mb-4 flex items-center gap-1.5">
                   ❤️ Registro de Bienestar
                 </h4>
                 
@@ -1311,19 +1348,19 @@ export default function App() {
                   <div className="space-y-3.5">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-semibold text-[#1E5631]">Sueño:</span>
-                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#d7e6d4]">
+                      <span className="text-xs font-bold text-[#3A3A35] bg-[#FFF8EE] px-2.5 py-1 rounded-full border border-[#d7e6d4]">
                         {SCALE_LABELS.sleep[activeLog.sleepQuality - 1]}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-semibold text-[#1E5631]">Estrés:</span>
-                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#d7e6d4]">
+                      <span className="text-xs font-bold text-[#3A3A35] bg-[#FFF8EE] px-2.5 py-1 rounded-full border border-[#d7e6d4]">
                         {SCALE_LABELS.stress[activeLog.stress - 1]}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-semibold text-[#1E5631]">Energía:</span>
-                      <span className="text-xs font-bold text-[#3A3A35] bg-white px-2.5 py-1 rounded-full border border-[#d7e6d4]">
+                      <span className="text-xs font-bold text-[#3A3A35] bg-[#FFF8EE] px-2.5 py-1 rounded-full border border-[#d7e6d4]">
                         {SCALE_LABELS.fatigue === undefined ? 'N/A' : (SCALE_LABELS.fatigue[activeLog.fatigue - 1] === 'Ninguna' ? 'Alta' : 'Moderada')}
                       </span>
                     </div>
@@ -1351,7 +1388,7 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="text-center py-6">
-                    <p className="text-xs text-[#9A9A90] font-medium leading-relaxed mb-1">No has completado tu registro diario hoy.</p>
+                    <p className="text-xs text-[#6E8C8E] font-medium leading-relaxed mb-1">No has completado tu registro diario hoy.</p>
                     <p className="text-[10px] text-[#1E5631] italic">Tu asistente espera tus datos para dar consejos inteligentes.</p>
                   </div>
                 )}
@@ -1360,7 +1397,7 @@ export default function App() {
               <div className="mt-6 space-y-2">
                 <button
                   onClick={() => setIsCheckinOpen(true)}
-                  className="w-full bg-white hover:bg-white/80 text-[#1E5631] text-xs font-bold py-3 rounded-full border border-[#d7e6d4] shadow-2xs transition-colors cursor-pointer text-center"
+                  className="w-full bg-[#FFF8EE] hover:bg-white/80 text-[#1E5631] text-xs font-bold py-3 rounded-full border border-[#d7e6d4] shadow-2xs transition-colors cursor-pointer text-center"
                 >
                   {activeLog ? '📝 Editar Registro Diario' : '➕ Registrar Bienestar Hoy'}
                 </button>
@@ -1383,23 +1420,23 @@ export default function App() {
         {/* Column 3: Collapsible Chat Panel Sidebar */}
         {appTab === 'chat' && chatHistoryOpen && (
           <div className="flex flex-col gap-3 pt-2">
-            <button type="button" onClick={() => setChatHistoryOpen(false)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Cyclia IA</button>
+            <button type="button" onClick={() => setChatHistoryOpen(false)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#069494]">← Cyclia IA</button>
             <h1 className="m-0 text-[26px] font-extrabold">Tus conversaciones</h1>
-            <button type="button" onClick={() => setChatHistoryOpen(false)} className="flex h-[50px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Nueva conversación</button>
-            {chatHistory.length === 0 && <p className="rounded-[18px] bg-white p-4 text-sm">Todavía no hay conversaciones.</p>}
+            <button type="button" onClick={() => setChatHistoryOpen(false)} className="flex h-[50px] cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-[15px] font-extrabold text-[#153E40]">Nueva conversación</button>
+            {chatHistory.length === 0 && <p className="rounded-[18px] bg-[#FFF8EE] p-4 text-sm">Todavía no hay conversaciones.</p>}
             {chatHistory.filter((message) => message.role === 'user').map((message) => (
-              <button key={message.id} type="button" onClick={() => setChatHistoryOpen(false)} className="flex flex-col gap-1 rounded-[18px] bg-white p-4 text-left">
+              <button key={message.id} type="button" onClick={() => setChatHistoryOpen(false)} className="flex flex-col gap-1 rounded-[18px] bg-[#FFF8EE] p-4 text-left">
                 <strong className="text-[15px]">{message.content.slice(0, 48)}</strong>
-                <span className="text-[13px] text-[#3B4070]">{message.timestamp}</span>
+                <span className="text-[13px] text-[#245456]">{message.timestamp}</span>
               </button>
             ))}
             {chatHistory.length > 0 && (
-              <button type="button" onClick={handleClearHistory} className="mx-auto mt-1 h-11 cursor-pointer rounded-full bg-[#F6E27F] px-5 text-sm font-extrabold text-[#1B1F5E]">Borrar historial</button>
+              <button type="button" onClick={handleClearHistory} className="mx-auto mt-1 h-11 cursor-pointer rounded-full bg-[#FCE883] px-5 text-sm font-extrabold text-[#153E40]">Borrar historial</button>
             )}
           </div>
         )}
         {appTab === 'chat' && !chatHistoryOpen && (
-          <div className="min-h-[70vh]">
+          <div className="reading-column min-h-[70vh]">
             <ChatPanel
               profile={profile}
               periods={periods}
@@ -1417,13 +1454,32 @@ export default function App() {
         )}
 
         {/* Full Width Symptom and Habit Evolution Graph */}
-        <div className={appTab === 'calendario' && cycleSheet === 'evolucion' ? 'mt-1' : 'hidden'}>
-          <SymptomChart
-            logs={logs}
+        {appTab === 'perfil' && profileSheet === 'evolucion' && (
+          <div className="mt-1 flex flex-col gap-3 pt-4">
+            <button type="button" onClick={() => setProfileSheet(null)} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#069494]">← Perfil</button>
+            <h1 className="m-0 text-[26px] font-extrabold">Evolución de bienestar</h1>
+            <SymptomChart
+              logs={logs}
+              profile={profile}
+              onLoadDemoData={handleLoadDemoData}
+            />
+          </div>
+        )}
+        {appTab === 'perfil' && profileSheet === 'proyeccion' && (
+          <CycleProjectionScreen
             profile={profile}
-            onLoadDemoData={handleLoadDemoData}
+            periods={periods}
+            logs={logs}
+            userId={user.id}
+            onBack={() => setProfileSheet(null)}
+            onOpenCalendar={(date) => {
+              setSelectedDateStr(date);
+              setProfileSheet(null);
+              setCycleSheet(null);
+              setAppTab('conocimiento');
+            }}
           />
-        </div>
+        )}
 
         {appTab === 'perfil' && profileSheet === 'ciclo' && (
           <CycleDataScreen
@@ -1484,13 +1540,21 @@ export default function App() {
           />
         )}
         {appTab === 'perfil' && !profileSheet && (
-          <div className="flex flex-col">
-            <header className="-mx-4 flex flex-col items-center gap-2 bg-[#3A44C4] px-5 pb-7 pt-12 text-center text-white">
-              <span className="flex h-[84px] w-[84px] items-center justify-center rounded-full border-[3px] border-white bg-[#F9C4C6] font-serif text-4xl text-[#3A44C4]">{profile.name.slice(0, 1).toUpperCase()}</span>
-              <h1 className="m-0 text-2xl font-extrabold">{profile.name}</h1>
-              <span className="text-sm text-[#DCE5FA]">Ciclo de {profile.cycleLength} días · Periodo de {profile.periodLength} días</span>
+          <div className="reading-column flex flex-col">
+            <header className="mb-2 flex flex-col items-center gap-2 rounded-[20px] bg-[#FFF8EE] px-5 py-8 text-center text-[#153E40]">
+              <span className="flex h-[84px] w-[84px] items-center justify-center rounded-full border-[3px] border-[#153E40] bg-[#FFC0CB] font-serif text-4xl text-[#153E40]">{profile.name.slice(0, 1).toUpperCase()}</span>
+              <h1 className="m-0 text-[36px] font-normal leading-[1.1]">{profile.name}</h1>
+              <span className="text-sm text-[#3E6466]">Ciclo de {profile.cycleLength} días · Periodo de {profile.periodLength} días</span>
             </header>
             <nav className="flex flex-col gap-2.5 py-4">
+              <button type="button" onClick={() => setProfileSheet('evolucion')} className="flex items-center gap-3 rounded-[20px] bg-[#FCE883] p-4 text-left text-[#153E40]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF8EE] text-lg">↗</span>
+                <span><strong className="block text-base">Evolución de bienestar</strong><span className="text-[13px] text-[#245456]">Ánimo, estrés, dolor, sueño y cansancio</span></span>
+              </button>
+              <button type="button" onClick={() => setProfileSheet('proyeccion')} className="flex items-center gap-3 rounded-[20px] bg-[#FFD3BC] p-4 text-left text-[#153E40]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF8EE] text-lg">3</span>
+                <span><strong className="block text-base">Proyección de tu ciclo</strong><span className="text-[13px] text-[#245456]">Tres ciclos, fases y ovulación estimada</span></span>
+              </button>
               {([
                 { title: 'Ajustes del ciclo y privacidad', subtitle: 'Referencia, avisos y exportación', action: () => setProfileSheet('ajustes') },
                 { title: 'Datos del ciclo y salud', subtitle: 'Fechas, duración, condiciones', action: () => setProfileSheet('ciclo') },
@@ -1499,15 +1563,15 @@ export default function App() {
                 { title: 'Objetivos', subtitle: 'Elige tu foco', action: () => setProfileSheet('objetivos') },
                 { title: 'Ayuda y soporte', subtitle: 'Preguntas frecuentes, contacto', action: () => setAppTab('chat') },
               ] satisfies { title: string; subtitle: string; action: () => void }[]).map((item) => (
-                <button key={item.title} type="button" onClick={item.action} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-left">
+                <button key={item.title} type="button" onClick={item.action} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-[#FFF8EE] px-4 py-3.5 text-left">
                   <span className="flex-1">
                     <strong className="block text-[15px]">{item.title}</strong>
-                    <span className="text-[13px] text-[#4A4F7A]">{item.subtitle}</span>
+                    <span className="text-[13px] text-[#3E6466]">{item.subtitle}</span>
                   </span>
-                  <span className="text-[#3A44C4]">›</span>
+                  <span className="text-[#069494]">›</span>
                 </button>
               ))}
-              <button type="button" onClick={handleResetAppData} className="cursor-pointer rounded-[18px] bg-white px-4 py-3.5 text-left text-sm font-extrabold text-[#3A44C4]">Restaurar datos de esta cuenta</button>
+              <button type="button" onClick={handleResetAppData} className="cursor-pointer rounded-[18px] bg-[#FFF8EE] px-4 py-3.5 text-left text-sm font-extrabold text-[#069494]">Restaurar datos de esta cuenta</button>
               <button
                 type="button"
                 onClick={async () => {
@@ -1515,7 +1579,7 @@ export default function App() {
                     await signOut();
                   }
                 }}
-                className="mx-auto mt-2 flex h-12 cursor-pointer items-center rounded-full bg-[#F49A9E] px-7 text-[15px] font-extrabold text-[#1B1F5E]"
+                className="mx-auto mt-2 flex h-12 cursor-pointer items-center rounded-full bg-[#FF8243] px-7 text-[15px] font-extrabold text-[#153E40]"
               >
                 Cerrar sesión
               </button>
@@ -1526,14 +1590,11 @@ export default function App() {
 
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 z-40 grid h-[96px] w-full max-w-[480px] -translate-x-1/2 grid-cols-7 border-t border-[#E7ECFB] bg-white" aria-label="Principal">
+      <nav className="app-shell fixed bottom-0 left-1/2 z-40 grid h-[calc(96px+env(safe-area-inset-bottom))] -translate-x-1/2 grid-cols-4 border-t border-[#E7D3C6] bg-[#FFF8EE] pb-[env(safe-area-inset-bottom)]" aria-label="Principal">
         {([
-          ['inicio', 'Inicio', '⌂'],
-          ['calendario', 'Ciclo', '▦'],
-          ['conocimiento', 'Conocimiento de la fase', '◐'],
-          ['bienestar', 'Bienestar', '♡'],
-          ['registro', 'Registro', '+'],
           ['foco', 'Bandeja de entrada', '◎'],
+          ['conocimiento', 'Mi ciclo', '◐'],
+          ['bienestar', 'Bienestar', '♡'],
           ['perfil', 'Perfil', '•'],
         ] as const).map(([id, label, icon]) => (
           <button
@@ -1546,11 +1607,11 @@ export default function App() {
               setChatHistoryOpen(false);
               setAppTab(id);
             }}
-            aria-label={id === 'conocimiento' ? 'Conocimiento de la fase' : label}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-extrabold leading-tight ${appTab === id ? 'text-[#3A44C4]' : 'text-[#8B90B8]'}`}
+            aria-label={label}
+            className={`flex min-w-0 cursor-pointer flex-col items-center justify-center gap-1 px-1 text-sm font-semibold leading-tight ${appTab === id ? 'text-[#153E40]' : 'text-[#5E7273]'}`}
           >
-            <span className={`flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none ${appTab === id ? 'bg-[#E3F1FB]' : ''}`}>{icon}</span>
-            {id === 'foco' ? <span className="text-center">Bandeja<br />de entrada</span> : id === 'conocimiento' ? <span className="text-center">Fases</span> : id === 'bienestar' ? <span className="text-center">Bienestar</span> : label}
+            <span className={`flex h-9 w-9 items-center justify-center rounded-full text-lg leading-none ${appTab === id ? 'bg-[#F7C6D4]' : ''}`}>{icon}</span>
+            {id === 'foco' ? <span className="text-center">Bandeja<br />de entrada</span> : label}
           </button>
         ))}
       </nav>
@@ -1567,22 +1628,23 @@ export default function App() {
 
       {/* AI Analysis View Modal */}
       {isAnalysisOpen && (
-        <div className="fixed inset-0 z-50 flex justify-center bg-[#E3F1FB]">
-          <div className="flex w-full max-w-[390px] flex-col max-h-[100dvh] overflow-y-auto bg-[#E3F1FB] pb-8">
-            <div className="bg-[#3A44C4] px-5 pb-6 pt-10 text-white">
+        <div className="fixed inset-0 z-50 flex justify-center bg-[#FFE4E9]" role="dialog" aria-modal="true" aria-labelledby="analysis-title">
+          <div className="reading-column flex max-h-[100dvh] flex-col overflow-y-auto bg-transparent pb-8">
+            <div className="bg-[#FFF8EE] px-5 pb-6 pt-10 text-[#153E40]">
               <div>
-                <button type="button" onClick={() => setIsAnalysisOpen(false)} className="cursor-pointer text-[15px] font-extrabold">← Registro</button>
-                <p className="mt-2 text-xs font-extrabold tracking-widest text-[#F9C4C6]">ANÁLISIS DE CYCLIA</p>
-                <h3 className="m-0 text-[26px] font-extrabold">{formatFriendlyDate(selectedDateStr)}</h3>
+                <button ref={analysisCloseRef} type="button" onClick={() => setIsAnalysisOpen(false)} className="cursor-pointer text-base font-semibold text-[#069494]">← Registro</button>
+                <p className="mt-2 text-xs font-extrabold tracking-widest text-[#FFC0CB]">ANÁLISIS DE CYCLIA</p>
+                <h3 id="analysis-title" className="m-0 text-2xl font-normal leading-[1.2]">{formatFriendlyDate(selectedDateStr)}</h3>
               </div>
             </div>
 
             <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+              <RecordCoverageNote logs={logs} today={formatDateStr(new Date())} />
               <DayMatch care={suggestCare(profile, periods, logs, selectedDateStr)} />
               {isAnalyzing ? (
-                <div className="rounded-[20px] bg-white py-8 text-center">
-                  <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#E7EAF8] border-t-[#3A44C4]"></div>
-                  <p className="mt-3 text-sm font-extrabold text-[#1B1F5E]">Cyclia está leyendo tu registro.</p>
+                <div className="rounded-[20px] bg-[#FFF8EE] py-8 text-center">
+                  <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#FFF1E8] border-t-[#069494]"></div>
+                  <p className="mt-3 text-sm font-extrabold text-[#153E40]">Cyclia está leyendo tu registro.</p>
                 </div>
               ) : analysisError ? (
                 <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -1595,12 +1657,12 @@ export default function App() {
                   </button>
                 </div>
               ) : activeLog?.aiAnalysis ? (
-                <div className="whitespace-pre-wrap rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#3B4070]">
+                <div className="whitespace-pre-wrap rounded-[20px] bg-[#FFF8EE] p-4 text-sm leading-relaxed text-[#245456]">
                   {activeLog.aiAnalysis}
                 </div>
               ) : (
-                <div className="rounded-[20px] bg-white p-4 text-center">
-                  <p className="text-sm text-[#3B4070]">La gráfica de arriba ya compara tu registro con la propuesta. El texto de la asistente es aparte.</p>
+                <div className="rounded-[20px] bg-[#FFF8EE] p-4 text-center">
+                  <p className="text-sm text-[#245456]">La gráfica de arriba ya compara tu registro con la propuesta. El texto de la asistente es aparte.</p>
                   <button
                     onClick={handleRequestAnalysisManually}
                     className="mt-4 bg-[#1E5631] hover:bg-[#1B4D3E] text-white font-semibold py-2.5 px-6 rounded-full text-xs uppercase tracking-wide cursor-pointer"

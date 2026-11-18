@@ -74,6 +74,20 @@ describe('Datos que se envían a la IA (src/utils/analysisContext.ts)', () => {
     expect(context.cycleDay).toBe(15);
   });
 
+  it('el análisis recibe el patrón guardado hasta el día pedido, sin días posteriores', () => {
+    const context = buildAnalysisContext(profile, [], {
+      ...logs,
+      '2026-11-16': makeLog('2026-11-16', { sleepState: 'mal', feltState: 'Sensible', symptoms: ['colicos'], behavior: 'Caminé poco' }),
+    }, '2026-11-17');
+    expect(context.pattern.map((day) => day.date)).toEqual(['2026-11-10', '2026-11-15', '2026-11-16', '2026-11-17']);
+    expect(context.pattern.find((day) => day.date === '2026-11-16')).toMatchObject({
+      morning: 'mal',
+      felt: 'Sensible',
+      symptoms: ['colicos'],
+      behavior: 'Caminé poco',
+    });
+  });
+
   it('los "días recientes" son anteriores al día analizado, como máximo 4', () => {
     const context = buildAnalysisContext(profile, [], logs, '2026-11-17');
     expect(context.recent.map((log) => log.date)).toEqual(['2026-11-10', '2026-11-15', '2026-11-16']);

@@ -91,7 +91,7 @@ export default function SymptomChart({ logs, onLoadDemoData }: SymptomChartProps
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="m-0 text-sm text-[#4A4F7A]">Promedio de tus registros de los últimos 7 días. 1 es mejor y 5 es más difícil.</p>
+      <p className="m-0 text-sm text-[#3E6466]">Promedio de tus registros de los últimos 7 días. 1 es mejor y 5 es más difícil.</p>
       <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Indicador">
         {METRICS.map((metric) => {
           const on = metric.key === selected;
@@ -102,8 +102,8 @@ export default function SymptomChart({ logs, onLoadDemoData }: SymptomChartProps
               role="tab"
               aria-selected={on}
               onClick={() => setSelected(metric.key)}
-              className="min-h-10 shrink-0 cursor-pointer rounded-full px-3.5 text-[13px] font-extrabold text-[#1B1F5E]"
-              style={{ background: on ? '#F49A9E' : '#FFF6CF', border: `1.5px solid ${on ? '#E57F86' : '#F6E27F'}` }}
+              className="min-h-10 shrink-0 cursor-pointer rounded-full px-3.5 text-[13px] font-extrabold text-[#153E40]"
+              style={{ background: on ? '#FF8243' : '#FFF6CF', border: `1.5px solid ${on ? '#E56B28' : '#FCE883'}` }}
             >
               {metric.label}
             </button>
@@ -112,15 +112,15 @@ export default function SymptomChart({ logs, onLoadDemoData }: SymptomChartProps
       </div>
 
       {logged.length === 0 ? (
-        <section className="rounded-[20px] bg-white p-5 text-center">
+        <section className="rounded-[20px] bg-[#FFF8EE] p-5 text-center">
           <h2 className="m-0 text-base font-extrabold">Esta semana todavía no tiene registros</h2>
-          <p className="mb-4 mt-2 text-sm leading-relaxed text-[#4A4F7A]">La gráfica usa solo los últimos 7 días. Guarda un registro para ver el promedio de tu comportamiento.</p>
-          <button type="button" onClick={onLoadDemoData} className="h-11 cursor-pointer rounded-full bg-[#F6E27F] px-5 text-sm font-extrabold text-[#1B1F5E]">Cargar una semana de ejemplo</button>
+          <p className="mb-4 mt-2 text-sm leading-relaxed text-[#3E6466]">La gráfica usa solo los últimos 7 días. Guarda un registro para ver el promedio de tu comportamiento.</p>
+          <button type="button" onClick={onLoadDemoData} className="h-11 cursor-pointer rounded-full bg-[#FCE883] px-5 text-sm font-extrabold text-[#153E40]">Cargar una semana de ejemplo</button>
         </section>
       ) : (
         <>
-          <section className="rounded-[20px] bg-white p-3.5">
-            <div className="mb-1 flex justify-between text-xs font-bold text-[#4A4F7A]">
+          <section className="rounded-[20px] bg-[#FFF8EE] p-3.5">
+            <div className="mb-1 flex justify-between text-xs font-bold text-[#3E6466]">
               <span>Arriba: mejor (1)</span>
               <span>Abajo: peor (5)</span>
             </div>
@@ -130,34 +130,34 @@ export default function SymptomChart({ logs, onLoadDemoData }: SymptomChartProps
                 return <line key={step} x1={left} y1={y} x2={width - right} y2={y} stroke="#D5DCF2" strokeWidth="1" />;
               })}
               {[1, 3, 5].map((mark) => (
-                <text key={mark} x={left - 6} y={top + ((mark - 1) / 4) * plotHeight + 3} textAnchor="end" fill="#4A4F7A" fontSize="10" fontWeight="700">{mark}</text>
+                <text key={mark} x={left - 6} y={top + ((mark - 1) / 4) * plotHeight + 3} textAnchor="end" fill="#3E6466" fontSize="10" fontWeight="700">{mark}</text>
               ))}
-              {line && <path d={line} fill="none" stroke="#3A44C4" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
+              {line && <path d={line} fill="none" stroke="#069494" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
               {points.map((point, index) => point && (
-                <circle key={week[index].dateStr} cx={point.x} cy={point.y} r="4.5" fill="#3A44C4" stroke="#FFFFFF" strokeWidth="2" />
+                <circle key={week[index].dateStr} cx={point.x} cy={point.y} r="4.5" fill="#069494" stroke="#FFFFFF" strokeWidth="2" />
               ))}
               {week.map((day, index) => (
-                <text key={day.dateStr} x={left + (index / 6) * plotWidth} y={height - 6} textAnchor="middle" fill="#4A4F7A" fontSize="10" fontWeight="700">{day.day}</text>
+                <text key={day.dateStr} x={left + (index / 6) * plotWidth} y={height - 6} textAnchor="middle" fill="#3E6466" fontSize="10" fontWeight="700">{day.day}</text>
               ))}
             </svg>
           </section>
 
           <section className="grid grid-cols-3 gap-2">
-            <div className="rounded-2xl bg-white p-3">
-              <span className="block text-xs font-bold text-[#4A4F7A]">Días</span>
+            <div className="rounded-2xl bg-[#FFF8EE] p-3">
+              <span className="block text-xs font-bold text-[#3E6466]">Días</span>
               <span className="text-[22px] font-extrabold">{logged.length}</span>
             </div>
-            <div className="rounded-2xl bg-white p-3">
-              <span className="block text-xs font-bold text-[#4A4F7A]">Promedio</span>
+            <div className="rounded-2xl bg-[#FFF8EE] p-3">
+              <span className="block text-xs font-bold text-[#3E6466]">Promedio</span>
               <span className="text-[22px] font-extrabold">{average === null ? '—' : formatAverage(average)}</span>
             </div>
-            <div className="rounded-2xl bg-white p-3">
-              <span className="block text-xs font-bold text-[#4A4F7A]">Mejor día</span>
+            <div className="rounded-2xl bg-[#FFF8EE] p-3">
+              <span className="block text-xs font-bold text-[#3E6466]">Mejor día</span>
               <span className="text-base font-extrabold capitalize">{best?.label ?? '—'}</span>
             </div>
           </section>
 
-          <section className="rounded-[18px] bg-white p-4">
+          <section className="rounded-[18px] bg-[#FFF8EE] p-4">
             <h2 className="m-0 text-[15px] font-extrabold">Promedio de la semana</h2>
             <ul className="mb-0 mt-2 flex flex-col gap-1.5 text-sm">
               {metricAverages.map((metric) => (
@@ -169,7 +169,7 @@ export default function SymptomChart({ logs, onLoadDemoData }: SymptomChartProps
             </ul>
           </section>
 
-          <section className="rounded-[18px] bg-[#F6E27F] p-4">
+          <section className="rounded-[18px] bg-[#FCE883] p-4">
             <h2 className="m-0 text-[15px] font-extrabold">Comportamiento</h2>
             <p className="mb-0 mt-1.5 text-sm leading-relaxed">
               {average === null

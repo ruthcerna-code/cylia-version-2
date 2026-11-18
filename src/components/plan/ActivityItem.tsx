@@ -17,10 +17,10 @@ function durationLabel(activity: ScheduledActivity): string {
 }
 
 const STATUS_STYLE: Record<TaskStatus, { background: string; color: string }> = {
-  pendiente: { background: '#EEF1FD', color: '#3A44C4' },
-  en_curso: { background: '#FFF6CF', color: '#1B1F5E' },
+  pendiente: { background: '#EEF1FD', color: '#069494' },
+  en_curso: { background: '#FFF6CF', color: '#153E40' },
   vencida: { background: '#FDECEF', color: '#D4536A' },
-  hecha: { background: '#3A44C4', color: '#FFFFFF' },
+  hecha: { background: '#069494', color: '#FFFFFF' },
   no_realizada: { background: '#F1F2F8', color: '#6B7097' },
 };
 
@@ -58,7 +58,7 @@ export default function ActivityItem({
 
   return (
     <article
-      className={`relative flex items-center gap-2 overflow-hidden rounded-[18px] bg-white py-3 pl-4 pr-2 shadow-[0_6px_18px_rgba(27,31,94,0.06)] ${justDone ? 'motion-safe:animate-pulse' : ''}`}
+      className={`relative flex items-center gap-2 overflow-hidden rounded-[18px] bg-[#FFF8EE] py-3 pl-4 pr-2 shadow-[0_6px_18px_rgba(27,31,94,0.06)] ${justDone ? 'motion-safe:animate-pulse' : ''}`}
     >
       <span className="absolute inset-y-0 left-0 w-[6px]" style={{ background: stripe }} aria-hidden="true" />
       <button
@@ -68,16 +68,16 @@ export default function ActivityItem({
         aria-label={`Abrir ${activity.title}`}
         className={`min-w-0 flex-1 cursor-pointer bg-transparent p-0 text-left ${done ? 'opacity-60' : ''}`}
       >
-        <span className="block text-[12px] font-bold text-[#4A4F7A]">
+        <span className="block text-[12px] font-bold text-[#3E6466]">
           {activity.startTime || '—'}{activity.endTime ? `–${activity.endTime}` : ''}
           {duration ? ` · ${duration}` : ''}
           {icon ? ` · ${icon}` : ''}
         </span>
-        <span className={`block text-[15px] font-extrabold text-[#1B1F5E] ${done ? 'line-through decoration-2 decoration-[#3A44C4]' : ''}`}>{activity.title}</span>
+        <span className={`block text-[15px] font-extrabold text-[#153E40] ${done ? 'line-through decoration-2 decoration-[#069494]' : ''}`}>{activity.title}</span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={STATUS_STYLE[status]}>{TASK_STATUS_LABEL[status]}</span>
           {progress.total > 0 && (
-            <span className="flex items-center gap-1 rounded-full bg-[#F8F9FE] px-2 py-0.5 text-[11px] font-extrabold text-[#1B1F5E]" aria-label={`${progress.done} de ${progress.total} subtareas`}>
+            <span className="flex items-center gap-1 rounded-full bg-[#F8F9FE] px-2 py-0.5 text-[11px] font-extrabold text-[#153E40]" aria-label={`${progress.done} de ${progress.total} subtareas`}>
               <ListChecks size={13} aria-hidden="true" /> {progress.done}/{progress.total}
             </span>
           )}
@@ -85,7 +85,7 @@ export default function ActivityItem({
         {past && <span className="mt-1 block text-[12px] font-bold text-[#D4536A]">Pasó la hora. ¿La hiciste?</span>}
       </button>
       {skipped && (
-        <button type="button" onClick={onReschedule} className="flex h-11 shrink-0 cursor-pointer items-center rounded-full bg-[#F8F9FE] px-3 text-sm font-extrabold text-[#3A44C4]">
+        <button type="button" onClick={onReschedule} className="flex h-11 shrink-0 cursor-pointer items-center rounded-full bg-[#F8F9FE] px-3 text-sm font-extrabold text-[#069494]">
           Reprogramar
         </button>
       )}
@@ -97,7 +97,7 @@ export default function ActivityItem({
           aria-pressed={done}
           aria-label={doneLabel}
           title={done ? 'Quitar tachado' : 'Tachar: la hice'}
-          className={`${ICON_BUTTON} ${done ? 'bg-[#3A44C4] text-white' : past ? 'bg-[#FDECEF] text-[#D4536A]' : 'bg-[#EEF1FD] text-[#3A44C4]'}`}
+          className={`${ICON_BUTTON} ${done ? 'bg-[#C5EBEB] text-[#153E40]' : past ? 'bg-[#FDECEC] text-[#8E2F2F]' : 'bg-[#FFF8EE] text-[#069494]'}`}
         >
           {done ? <CircleCheckBig size={22} strokeWidth={2.5} aria-hidden="true" /> : <Circle size={22} strokeWidth={2.5} aria-hidden="true" />}
         </button>
@@ -107,7 +107,7 @@ export default function ActivityItem({
           onClick={onEdit}
           aria-label={`Editar ${activity.title}`}
           title="Editar"
-          className={`${ICON_BUTTON} bg-[#FFF6CF] text-[#1B1F5E]`}
+          className={`${ICON_BUTTON} bg-[#FFF6CF] text-[#153E40]`}
         >
           <PencilLine size={20} strokeWidth={2.25} aria-hidden="true" />
         </button>

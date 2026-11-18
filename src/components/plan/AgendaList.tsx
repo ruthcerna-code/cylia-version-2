@@ -38,11 +38,11 @@ export default function AgendaList({
   return (
     <section aria-labelledby="agenda-titulo" className="mx-4 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="agenda-titulo" className="m-0 text-base font-extrabold text-[#1B1F5E]">
+        <h2 id="agenda-titulo" className="m-0 text-base font-extrabold text-[#153E40]">
           {range === 'proximas' ? 'Próximas actividades' : 'Todas las actividades'}
-          <span className="ml-2 text-sm font-bold text-[#4A4F7A]">{total}</span>
+          <span className="ml-2 text-sm font-bold text-[#3E6466]">{total}</span>
         </h2>
-        <div className="flex rounded-full bg-white p-1" role="group" aria-label="Qué actividades mostrar">
+        <div className="flex rounded-full bg-[#FFF8EE] p-1" role="group" aria-label="Qué actividades mostrar">
           {(['proximas', 'todas'] as const).map((option) => (
             <button
               key={option}
@@ -50,7 +50,7 @@ export default function AgendaList({
               aria-pressed={range === option}
               onClick={() => onRange(option)}
               className="flex h-9 cursor-pointer items-center rounded-full px-3 text-xs font-extrabold"
-              style={{ background: range === option ? '#3A44C4' : 'transparent', color: range === option ? '#FFFFFF' : '#3A44C4' }}
+              style={{ background: range === option ? '#069494' : 'transparent', color: range === option ? '#FFFFFF' : '#069494' }}
             >
               {option === 'proximas' ? 'Próximas' : 'Todas'}
             </button>
@@ -59,7 +59,7 @@ export default function AgendaList({
       </div>
 
       {days.length === 0 ? (
-        <p className="m-0 rounded-[20px] bg-white px-4 py-8 text-center text-sm leading-relaxed text-[#3B4070]">
+        <p className="m-0 rounded-[20px] bg-[#FFF8EE] px-4 py-8 text-center text-sm leading-relaxed text-[#245456]">
           {range === 'proximas' ? 'No tienes actividades programadas desde hoy. ¿Planificamos una?' : 'Todavía no tienes actividades.'}
         </p>
       ) : (
@@ -68,13 +68,13 @@ export default function AgendaList({
           return (
             <div key={day.date} className={`flex flex-col gap-2 ${past ? 'opacity-80' : ''}`}>
               <div className="flex items-center justify-between gap-2">
-                <h3 className="m-0 text-sm font-extrabold text-[#3A44C4]">
+                <h3 className="m-0 text-sm font-extrabold text-[#069494]">
                   {day.label}
                   {day.label === 'Hoy' || day.label === 'Mañana' || day.label === 'Ayer'
-                    ? <span className="ml-1 font-bold text-[#4A4F7A]">· {new Date(`${day.date}T12:00:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })}</span>
+                    ? <span className="ml-1 font-bold text-[#3E6466]">· {new Date(`${day.date}T12:00:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })}</span>
                     : null}
                 </h3>
-                <button type="button" onClick={() => onOpenDay(day.date)} className="flex h-9 cursor-pointer items-center text-xs font-extrabold text-[#3A44C4]">
+                <button type="button" onClick={() => onOpenDay(day.date)} className="flex h-9 cursor-pointer items-center text-xs font-extrabold text-[#069494]">
                   Ver día
                 </button>
               </div>

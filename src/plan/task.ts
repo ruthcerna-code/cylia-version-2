@@ -3,20 +3,20 @@ import { clockMinutes, formatClock } from './proposal';
 
 /** Colors she can give an activity. They are soft so the cards stay mostly white. */
 export const ACTIVITY_COLORS: Record<ActivityColor, { label: string; hex: string }> = {
-  coral: { label: 'Rosa coral', hex: '#F49A9E' },
+  coral: { label: 'Rosa coral', hex: '#FF8243' },
   naranjo: { label: 'Naranja suave', hex: '#F7B27A' },
-  amarillo: { label: 'Amarillo', hex: '#F6E27F' },
+  amarillo: { label: 'Amarillo', hex: '#FCE883' },
   verde: { label: 'Verde pastel', hex: '#9FD3B0' },
   azulgris: { label: 'Azul grisáceo', hex: '#8FA3BF' },
   lavanda: { label: 'Lavanda', hex: '#B9A9E8' },
   burdeo: { label: 'Burdeos', hex: '#9E3B5B' },
-  azul: { label: 'Azul oscuro', hex: '#3A44C4' },
+  azul: { label: 'Azul oscuro', hex: '#069494' },
 };
 
 export const ACTIVITY_COLOR_KEYS = Object.keys(ACTIVITY_COLORS) as ActivityColor[];
 
 /** Default stripe when she did not choose a color: Cyclia's lavender blue. */
-export const DEFAULT_STRIPE = '#A9C4F0';
+export const DEFAULT_STRIPE = '#FFD3BC';
 
 export const ALERT_OPTIONS: Record<AlertKey, string> = {
   inicio: 'Al inicio de la tarea',

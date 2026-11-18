@@ -14,7 +14,7 @@ import {
 } from '../../plan/difficultDay';
 
 const GROUPS: Array<{ id: ReplanGroup; title: string; empty: string; color: string }> = [
-  { id: 'mantener', title: 'Se mantiene', empty: 'Nada queda igual.', color: '#3A44C4' },
+  { id: 'mantener', title: 'Se mantiene', empty: 'Nada queda igual.', color: '#069494' },
   { id: 'acortar', title: 'Se acorta', empty: 'Nada se acorta.', color: '#B8860B' },
   { id: 'esperar', title: 'Puede esperar', empty: 'Nada se mueve a otro día.', color: '#D4536A' },
 ];
@@ -29,16 +29,16 @@ function Item({ item, onMove }: { item: ReplanItem; onMove: (group: ReplanGroup)
   const { activity } = item;
   return (
     <li className="rounded-2xl bg-[#F8F9FE] p-3">
-      <p className="m-0 text-[12px] font-bold text-[#4A4F7A]">
+      <p className="m-0 text-[12px] font-bold text-[#3E6466]">
         {activity.startTime || '—'}{activity.endTime ? `–${activity.endTime}` : ''} · {activityMinutes(activity)} min
       </p>
-      <strong className="block text-[15px] text-[#1B1F5E]">{activity.title}</strong>
-      <span className="block text-sm text-[#3B4070]">{item.reason}</span>
+      <strong className="block text-[15px] text-[#153E40]">{activity.title}</strong>
+      <span className="block text-sm text-[#245456]">{item.reason}</span>
       {item.group === 'acortar' && item.newEndTime && (
-        <span className="mt-1 block text-sm font-bold text-[#1B1F5E]">Nuevo horario: {activity.startTime}–{item.newEndTime}</span>
+        <span className="mt-1 block text-sm font-bold text-[#153E40]">Nuevo horario: {activity.startTime}–{item.newEndTime}</span>
       )}
       {item.group === 'esperar' && item.proposedDate && (
-        <span className="mt-1 block text-sm font-bold text-[#1B1F5E]">
+        <span className="mt-1 block text-sm font-bold text-[#153E40]">
           Fecha propuesta: {formatFriendlyDate(item.proposedDate)}{activity.startTime ? `, ${activity.startTime}` : ''}
         </span>
       )}
@@ -48,7 +48,7 @@ function Item({ item, onMove }: { item: ReplanItem; onMove: (group: ReplanGroup)
             key={group}
             type="button"
             onClick={() => onMove(group)}
-            className="flex h-11 cursor-pointer items-center rounded-full bg-white px-4 text-sm font-extrabold text-[#3A44C4]"
+            className="flex h-11 cursor-pointer items-center rounded-full bg-[#FFF8EE] px-4 text-sm font-extrabold text-[#069494]"
           >
             {MOVE_LABEL[group]}
           </button>
@@ -101,20 +101,20 @@ export default function DifficultDaySheet({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B1F5E]/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#153E40]/40" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="dia-dificil"
-        className="max-h-[90vh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-white px-4 pb-8 pt-5"
+        className="max-h-[90vh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-[#FFF8EE] px-4 pb-8 pt-5"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="dia-dificil" className="m-0 text-lg font-extrabold text-[#1B1F5E]">Hoy es un día difícil</h2>
+        <h2 id="dia-dificil" className="m-0 text-lg font-extrabold text-[#153E40]">Hoy es un día difícil</h2>
         {plan.items.length === 0 ? (
-          <p className="mt-2 text-sm text-[#3B4070]">Hoy no quedan actividades pendientes. No hay nada que mover.</p>
+          <p className="mt-2 text-sm text-[#245456]">Hoy no quedan actividades pendientes. No hay nada que mover.</p>
         ) : (
           <>
-            <p className="mt-1 text-sm text-[#3B4070]">
+            <p className="mt-1 text-sm text-[#245456]">
               Esta es una propuesta. No se mueve nada hasta que la apruebes, y después puedes deshacerla.
               {plan.savedMinutes > 0 ? ` Liberas unos ${plan.savedMinutes} min hoy.` : ''}
             </p>
@@ -126,7 +126,7 @@ export default function DifficultDaySheet({
                     {group.title.toUpperCase()} · {list.length}
                   </h3>
                   {list.length === 0 ? (
-                    <p className="m-0 mt-1 text-sm text-[#4A4F7A]">{group.empty}</p>
+                    <p className="m-0 mt-1 text-sm text-[#3E6466]">{group.empty}</p>
                   ) : (
                     <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
                       {list.map((item) => (
@@ -148,7 +148,7 @@ export default function DifficultDaySheet({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F8F9FE] text-[15px] font-extrabold text-[#1B1F5E]"
+            className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F8F9FE] text-[15px] font-extrabold text-[#153E40]"
           >
             Cancelar
           </button>
@@ -156,7 +156,7 @@ export default function DifficultDaySheet({
             type="button"
             disabled={saving || changes.length === 0}
             onClick={() => { void apply(); }}
-            className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-[15px] font-extrabold text-[#153E40] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? 'Guardando…' : changes.length === 0 ? 'Sin cambios' : `Aprobar ${changes.length} ${changes.length === 1 ? 'cambio' : 'cambios'}`}
           </button>

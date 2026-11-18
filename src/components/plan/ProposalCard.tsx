@@ -32,32 +32,32 @@ export default function ProposalCard({
   const end = endClock(start, proposal.duracion_min);
   return (
     <section className="flex flex-col gap-3 rounded-[20px] bg-[#F8F9FE] p-4" aria-live="polite" aria-label="Propuesta de Cyclia">
-      <p className="m-0 text-[12px] font-extrabold tracking-wide text-[#3A44C4]">PROPUESTA DE CYCLIA</p>
-      <p className="m-0 text-[20px] font-extrabold text-[#1B1F5E]">{durationLabel(proposal.duracion_min)}</p>
-      <p className="m-0 text-sm font-bold text-[#1B1F5E]">{start}–{end}</p>
-      <p className="m-0 text-sm leading-relaxed text-[#3B4070]">{proposal.motivo}</p>
+      <p className="m-0 text-[12px] font-extrabold tracking-wide text-[#069494]">PROPUESTA DE CYCLIA</p>
+      <p className="m-0 text-[20px] font-extrabold text-[#153E40]">{durationLabel(proposal.duracion_min)}</p>
+      <p className="m-0 text-sm font-bold text-[#153E40]">{start}–{end}</p>
+      <p className="m-0 text-sm leading-relaxed text-[#245456]">{proposal.motivo}</p>
       {proposal.pasos.length > 0 && (
-        <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-sm text-[#1B1F5E]">
+        <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-sm text-[#153E40]">
           {proposal.pasos.map((step) => <li key={step}>{step}</li>)}
         </ol>
       )}
-      {proposal.aviso && <p className="m-0 text-sm text-[#3B4070]">{proposal.aviso}</p>}
+      {proposal.aviso && <p className="m-0 text-sm text-[#245456]">{proposal.aviso}</p>}
       {proposal.dividir_en_bloques && (
-        <p className="m-0 text-sm text-[#3B4070]">Puedes partirla en bloques cortos, con una pausa entre medio.</p>
+        <p className="m-0 text-sm text-[#245456]">Puedes partirla en bloques cortos, con una pausa entre medio.</p>
       )}
-      <button type="button" disabled={busy} onClick={onAccept} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E] disabled:opacity-60">
+      <button type="button" disabled={busy} onClick={onAccept} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-[15px] font-extrabold text-[#153E40] disabled:opacity-60">
         Sí, la acepto
       </button>
       <div className="grid grid-cols-1 gap-2">
         {anotherLeft && (
-          <button type="button" disabled={busy} onClick={onAnother} className="flex h-11 cursor-pointer items-center justify-center rounded-full border border-[#C9D3EF] bg-white text-sm font-extrabold text-[#1B1F5E] disabled:opacity-60">
+          <button type="button" disabled={busy} onClick={onAnother} className="flex h-11 cursor-pointer items-center justify-center rounded-full border border-[#E7D3C6] bg-[#FFF8EE] text-sm font-extrabold text-[#153E40] disabled:opacity-60">
             Otra propuesta
           </button>
         )}
-        <button type="button" disabled={busy} onClick={onAdjust} className="flex h-11 cursor-pointer items-center justify-center rounded-full border border-[#C9D3EF] bg-white text-sm font-extrabold text-[#1B1F5E] disabled:opacity-60">
+        <button type="button" disabled={busy} onClick={onAdjust} className="flex h-11 cursor-pointer items-center justify-center rounded-full border border-[#E7D3C6] bg-[#FFF8EE] text-sm font-extrabold text-[#153E40] disabled:opacity-60">
           Ajustar yo
         </button>
-        <button type="button" disabled={busy} onClick={onDiscard} className="flex h-11 cursor-pointer items-center justify-center rounded-full border border-[#C9D3EF] bg-white text-sm font-extrabold text-[#3A44C4] disabled:opacity-60">
+        <button type="button" disabled={busy} onClick={onDiscard} className="flex h-11 cursor-pointer items-center justify-center rounded-full border border-[#E7D3C6] bg-[#FFF8EE] text-sm font-extrabold text-[#069494] disabled:opacity-60">
           Descartar
         </button>
       </div>

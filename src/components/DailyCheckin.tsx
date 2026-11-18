@@ -65,7 +65,7 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
     labels: string[],
     colorScheme: 'sage' | 'amber' | 'coral'
   ) => {
-    let activeBorderColor = 'border-[#F49A9E] bg-[#FFF6CF] text-[#1B1F5E]';
+    let activeBorderColor = 'border-[#FF8243] bg-[#FFF6CF] text-[#153E40]';
     let hoverColor = 'hover:bg-[#F5F6F8]';
     
     if (colorScheme === 'amber') {
@@ -85,7 +85,7 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
               key={optionVal}
               onClick={() => setVal(optionVal)}
               className={`py-4 px-5 rounded-2xl border text-sm font-semibold transition-all text-left cursor-pointer flex justify-between items-center ${
-                isActive ? activeBorderColor : `border-[#d7e6d4] bg-white text-[#3A3A35] ${hoverColor}`
+                isActive ? activeBorderColor : `border-[#d7e6d4] bg-[#FFF8EE] text-[#3A3A35] ${hoverColor}`
               }`}
             >
               <span>{label}</span>
@@ -111,20 +111,20 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
     }
   };
 
-  const fieldClass = 'w-full h-44 rounded-2xl border-2 border-[#C9D3EF] bg-[#F8F9FE] px-5 py-5 text-lg font-medium leading-relaxed text-[#1B1F5E] outline-none focus:ring-4 focus:ring-[#3A44C4]/15';
+  const fieldClass = 'w-full h-44 rounded-2xl border-2 border-[#E7D3C6] bg-[#F8F9FE] px-5 py-5 text-lg font-medium leading-relaxed text-[#153E40] outline-none focus:ring-4 focus:ring-[#069494]/15';
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center bg-[#F5F6F8]">
       <div className="channel-frame !min-h-0 flex h-dvh flex-col">
         <header className="shrink-0 bg-[#F5F6F8]">
-          <div className="h-1.5 w-full bg-[#EFEFEF]">
-            <div className="h-full bg-[#F49A9E] transition-all duration-300" style={{ width: `${(step / 8) * 100}%` }} />
+          <div className="h-1.5 w-full bg-[#EAD9CE]">
+            <div className="h-full bg-[#FF8243] transition-all duration-300" style={{ width: `${(step / 8) * 100}%` }} />
           </div>
           <div className="flex h-14 items-center justify-between px-5">
             <button
               type="button"
               onClick={step === 1 ? onClose : handlePrev}
-              className="cursor-pointer text-sm font-semibold text-[#3A44C4]"
+              className="cursor-pointer text-sm font-semibold text-[#069494]"
             >
               ← Atrás
             </button>
@@ -133,7 +133,7 @@ export default function DailyCheckin({ dateStr, existingLog, onSave, onClose }: 
         </header>
 
         <main className="flex-1 overflow-y-auto px-5 pb-4 pt-6">
-          <h2 className="mb-8 font-serif text-3xl leading-tight text-[#1B1F5E]">{getStepHeader()}</h2>
+          <h2 className="mb-8 font-serif text-3xl leading-tight text-[#153E40]">{getStepHeader()}</h2>
           {step === 1 && renderScaleButtons(sleepQuality, setSleepQuality, SCALE_LABELS.sleep, 'sage')}
           {step === 2 && renderScaleButtons(fatigue, setFatigue, SCALE_LABELS.fatigue, 'amber')}
           {step === 3 && renderScaleButtons(pain, setPain, SCALE_LABELS.pain, 'coral')}

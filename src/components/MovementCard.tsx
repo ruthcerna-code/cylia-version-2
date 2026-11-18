@@ -9,7 +9,7 @@ import { readSleep } from '../utils/recordCompare';
 import { fetchMovementDays, saveMovementDay, type MovementDay } from '../firebase';
 
 const INTENSITY_LABEL = { suave: 'Suave', moderada: 'Moderada', alta: 'Alta' } as const;
-const INTENSITY_COLOR = { suave: '#A9C4F0', moderada: '#F6E27F', alta: '#F49A9E' } as const;
+const INTENSITY_COLOR = { suave: '#FFD3BC', moderada: '#FCE883', alta: '#FF8243' } as const;
 
 function sameIds(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((id, index) => id === b[index]);
@@ -105,14 +105,14 @@ export default function MovementCard({
   const hasCondition = Boolean(profile.isCeliac || profile.hasDiabetes || profile.hasObesity || profile.hasDepression);
 
   return (
-    <section aria-labelledby="movimiento-hoy" className="rounded-[20px] bg-white p-4">
+    <section aria-labelledby="movimiento-hoy" className="rounded-[20px] bg-[#FFF8EE] p-4">
       <h2 id="movimiento-hoy" className="m-0 text-base font-extrabold">Tu movimiento de hoy</h2>
       {result.blocked ? (
-        <p className="m-0 mt-2 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold leading-relaxed text-[#1B1F5E]" role="status">{result.blocked}</p>
+        <p className="m-0 mt-2 rounded-2xl bg-[#FFF6CF] px-3 py-3 text-sm font-semibold leading-relaxed text-[#153E40]" role="status">{result.blocked}</p>
       ) : days === null ? (
-        <p className="m-0 mt-2 text-sm text-[#3B4070]">Preparando tus propuestas…</p>
+        <p className="m-0 mt-2 text-sm text-[#245456]">Preparando tus propuestas…</p>
       ) : result.items.length === 0 ? (
-        <p className="m-0 mt-2 text-sm text-[#3B4070]">Hoy no encontré actividades que calcen con tu energía y cómo te sientes. Descansar también cuenta.</p>
+        <p className="m-0 mt-2 text-sm text-[#245456]">Hoy no encontré actividades que calcen con tu energía y cómo te sientes. Descansar también cuenta.</p>
       ) : (
         <ol className="m-0 mt-3 flex list-none flex-col gap-3 p-0">
           {result.items.map(({ activity, reason }) => {
@@ -120,18 +120,18 @@ export default function MovementCard({
             return (
               <li key={activity.id} className="rounded-2xl bg-[#F8F9FE] p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <strong className={`text-[15px] text-[#1B1F5E] ${isDone ? 'line-through decoration-2' : ''}`}>{activity.name}</strong>
+                  <strong className={`text-[15px] text-[#153E40] ${isDone ? 'line-through decoration-2' : ''}`}>{activity.name}</strong>
                 </div>
-                <p className="m-0 mt-1 flex flex-wrap items-center gap-1.5 text-xs font-bold text-[#4A4F7A]">
+                <p className="m-0 mt-1 flex flex-wrap items-center gap-1.5 text-xs font-bold text-[#3E6466]">
                   <span>{activity.minutes} min</span>
                   <span aria-hidden="true">·</span>
-                  <span className="rounded-full px-2 py-0.5 text-[#1B1F5E]" style={{ background: INTENSITY_COLOR[activity.intensity] }}>{INTENSITY_LABEL[activity.intensity]}</span>
+                  <span className="rounded-full px-2 py-0.5 text-[#153E40]" style={{ background: INTENSITY_COLOR[activity.intensity] }}>{INTENSITY_LABEL[activity.intensity]}</span>
                   <span aria-hidden="true">·</span>
                   <span>{MOVEMENT_TYPE_LABELS[activity.type]}</span>
                   <span aria-hidden="true">·</span>
                   <span>{activity.place}</span>
                 </p>
-                <p className="m-0 mt-2 text-sm leading-relaxed text-[#3B4070]">{reason}</p>
+                <p className="m-0 mt-2 text-sm leading-relaxed text-[#245456]">{reason}</p>
                 {activity.caution && <p className="m-0 mt-1 text-xs font-bold text-[#D4536A]">Cuidado: {activity.caution}</p>}
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <button
@@ -139,7 +139,7 @@ export default function MovementCard({
                     aria-pressed={isDone}
                     onClick={() => update({ doneIds: isDone ? [...done].filter((id) => id !== activity.id) : [...done, activity.id] })}
                     className="flex h-11 cursor-pointer items-center justify-center rounded-full text-sm font-extrabold"
-                    style={{ background: isDone ? '#3A44C4' : '#F49A9E', color: isDone ? '#FFFFFF' : '#1B1F5E' }}
+                    style={{ background: isDone ? '#069494' : '#FF8243', color: isDone ? '#FFFFFF' : '#153E40' }}
                   >
                     {isDone ? '✓ La hice' : 'La hice'}
                   </button>
@@ -147,7 +147,7 @@ export default function MovementCard({
                     type="button"
                     disabled={isDone}
                     onClick={() => update({ dislikedIds: [...new Set([...(todayDay?.dislikedIds ?? []), activity.id])] })}
-                    className="flex h-11 cursor-pointer items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#3A44C4] ring-1 ring-[#C9D3EF] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-11 cursor-pointer items-center justify-center rounded-full bg-[#FFF8EE] text-sm font-extrabold text-[#069494] ring-1 ring-[#E7D3C6] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     No me gusta
                   </button>
@@ -157,9 +157,9 @@ export default function MovementCard({
           })}
         </ol>
       )}
-      {!result.blocked && hasCondition && <p className="m-0 mt-3 text-xs leading-relaxed text-[#4A4F7A]">{CONDITION_MESSAGE}</p>}
-      {note && <p className="m-0 mt-2 text-xs text-[#4A4F7A]" role="status">{note}</p>}
-      <p className="m-0 mt-2 text-[12px] leading-relaxed text-[#4A4F7A]">Cyclia es educativa: estas ideas no reemplazan la indicación de un profesional.</p>
+      {!result.blocked && hasCondition && <p className="m-0 mt-3 text-xs leading-relaxed text-[#3E6466]">{CONDITION_MESSAGE}</p>}
+      {note && <p className="m-0 mt-2 text-xs text-[#3E6466]" role="status">{note}</p>}
+      <p className="m-0 mt-2 text-[12px] leading-relaxed text-[#3E6466]">Cyclia es educativa: estas ideas no reemplazan la indicación de un profesional.</p>
     </section>
   );
 }

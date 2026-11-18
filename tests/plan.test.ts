@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { alignProposal, draftProposal, extractJson, isPastSlot, mondayOf, roundDuration, type PlanRequest } from '../src/plan/proposal';
 import { aiKeyLooksUsable, alignAssist, assistConversation, assistUserText, draftAssist } from '../src/plan/assist';
-import { overlappingActivity, resolveSchedule, suggestOpenSlot, validateAssistSchedule } from '../src/utils/activities';
+import { availableStarts, overlappingActivity, resolveSchedule, suggestOpenSlot, validateAssistSchedule } from '../src/utils/activities';
 import { findOwnPattern } from '../src/utils/ownPattern';
 import { draftsFor, regroup, replanDifficultDay } from '../src/plan/difficultDay';
+import { activityMinutes, buildDayFocus, freeTimeLine } from '../src/plan/dayFocus';
 import { dailyLogs, makeActivity, makeProfile } from './helpers';
 
 const planInput = (patch: Partial<PlanRequest> = {}): PlanRequest => ({
@@ -169,6 +170,21 @@ describe('Horarios de actividades (src/utils/activities.ts)', () => {
     expect(validateAssistSchedule({ title: 'X', date: '2026-11-17', startTime: '12:00', durationMinutes: 30, now })).toBeNull();
   });
 
+  it('ofrece solo inicios que caben sin cruzar otra actividad', () => {
+    const now = new Date('2026-11-18T08:00:00');
+    const items = [makeActivity({ id: 'a', title: 'Reunión', date: '2026-11-18', startTime: '10:00', endTime: '11:00' })];
+    const starts = availableStarts(items, '2026-11-18', 60, { now });
+    expect(starts[0]).toBe('08:00');
+    expect(starts).toContain('09:00');
+    expect(starts).not.toContain('09:30');
+    expect(starts).not.toContain('10:00');
+    expect(starts).toContain('11:00');
+    expect(starts).toContain('20:00');
+    expect(starts).not.toContain('20:30');
+    expect(overlappingActivity(items, { date: '2026-11-18', startTime: '11:00', endTime: '12:00', durationMinutes: 60 })).toBeNull();
+    expect(overlappingActivity(items, { date: '2026-11-18', startTime: '09:30', endTime: '10:30', durationMinutes: 60 })).not.toBeNull();
+  });
+
   it('busca el primer hueco libre del día', () => {
     const now = new Date('2026-11-17T09:02:00');
     const items = [makeActivity({ id: 'a', title: 'Ocupado', date: '2026-11-17', startTime: '09:05', endTime: '10:00' })];
@@ -282,5 +298,78 @@ describe('Hoy es un día difícil (src/plan/difficultDay.ts)', () => {
 
   it('sin actividades pendientes no propone nada', () => {
     expect(replanDifficultDay([], date).items).toEqual([]);
+  });
+});
+
+describe('Tu foco de hoy (src/plan/dayFocus.ts)', () => {
+  const day = '2026-11-18';
+  const at = (hour: number, minute = 0) => hour * 60 + minute;
+  const slot = (id: string, start: string, end: string, patch: Partial<ReturnType<typeof makeActivity>> = {}) =>
+    makeActivity({ id, title: id, date: day, startTime: start, endTime: end, ...patch });
+
+  it('calcula los minutos por la hora, luego por la estimación', () => {
+    expect(activityMinutes(slot('a', '10:00', '11:30'))).toBe(90);
+    expect(activityMinutes(makeActivity({ id: 'b', title: 'b', date: day, estimateMinutes: 45 }))).toBe(45);
+    expect(activityMinutes(makeActivity({ id: 'c', title: 'c', date: day }))).toBe(30);
+  });
+
+  it('pone primero lo que vence hoy y luego lo más importante', () => {
+    const plan = buildDayFocus([
+      slot('normal', '09:00', '09:30'),
+      slot('importante', '11:00', '11:30', { importance: 'alta' }),
+      slot('vence', '15:00', '15:30', { deadline: day }),
+    ], day, 'con_energia', at(8));
+    expect(plan.focus.map((item) => item.activity.id)).toEqual(['vence', 'importante', 'normal']);
+    expect(plan.focus[0].reason).toBe('Vence hoy.');
+    expect(plan.focus[1].reason).toBe('La marcaste como muy importante.');
+  });
+
+  it('deja como máximo 3 en el foco y el resto después', () => {
+    const plan = buildDayFocus(['a', 'b', 'c', 'd'].map((id, index) => slot(id, `1${index}:00`, `1${index}:30`)), day, null, at(8));
+    expect(plan.focus).toHaveLength(3);
+    expect(plan.later.map((item) => item.activity.id)).toEqual(['d']);
+  });
+
+  it('con poca energía sube lo liviano y deja esperar lo poco importante', () => {
+    const plan = buildDayFocus([
+      slot('larga', '10:00', '12:00'),
+      slot('corta', '14:00', '14:20'),
+      slot('menor', '16:00', '16:30', { importance: 'baja' }),
+    ], day, 'sin_energia', at(8));
+    expect(plan.focus.map((item) => item.activity.id)).toEqual(['corta', 'larga']);
+    expect(plan.waiting.map((item) => item.activity.id)).toEqual(['menor']);
+  });
+
+  it('manda a Puede esperar lo que no cabe con el margen, salvo lo que vence hoy', () => {
+    // A las 19:00 quedan 120 min hasta las 21:00; con 30 de margen caben 90.
+    const plan = buildDayFocus([
+      slot('vence', '19:00', '20:00', { deadline: day }),
+      slot('extra', '20:00', '21:00'),
+    ], day, 'con_energia', at(19));
+    expect(plan.focus.map((item) => item.activity.id)).toEqual(['vence']);
+    expect(plan.waiting.map((item) => item.activity.id)).toEqual(['extra']);
+    expect(plan.freeMinutes).toBe(30);
+  });
+
+  it('no cuenta lo hecho y separa lo que ya pasó sin hacerse', () => {
+    const plan = buildDayFocus([
+      slot('hecha', '09:00', '10:00', { planStatus: 'hecha' }),
+      slot('pasada', '10:00', '11:00'),
+      slot('otro-dia', '12:00', '13:00', { date: '2026-11-19' }),
+      slot('tarde', '15:00', '16:00'),
+    ], day, null, at(12));
+    expect(plan.focus.map((item) => item.activity.id)).toEqual(['tarde']);
+    expect(plan.waiting.map((item) => item.activity.id)).toEqual(['pasada']);
+  });
+
+  it('cuenta solo lo que queda de una actividad en curso', () => {
+    const plan = buildDayFocus([slot('ahora', '12:00', '13:00')], day, null, at(12, 30));
+    expect(plan.plannedMinutes).toBe(30);
+    expect(plan.focus[0].minutes).toBe(30);
+  });
+
+  it('describe el tiempo libre en una línea', () => {
+    expect(freeTimeLine(buildDayFocus([], day, null, at(18)))).toBe('Te quedan 2 h 30 min libres hasta las 21:00, con 30 min de margen.');
+    expect(freeTimeLine(buildDayFocus([], day, null, at(22)))).toBe('Tu día ya pasó de las 21:00.');
   });
 });

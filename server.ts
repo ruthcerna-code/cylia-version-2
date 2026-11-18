@@ -142,6 +142,13 @@ ${JSON.stringify(context.log || null)}
 Otros días recientes, con los mismos campos:
 ${JSON.stringify(context.recent || [])}
 
+Patrón guardado de sus registros, del más antiguo al más reciente. Cada fila es un día que quedó guardado: morning es cómo amaneció, felt es el ánimo elegido, mood y pain son escalas, symptoms es la salud marcada y behavior es el comportamiento. Basa el análisis en este patrón. No inventes días que no estén aquí.
+${JSON.stringify(context.pattern || [])}
+
+Días con ánimo y comportamiento registrados: ${Number.isFinite(Number(context.registeredDays)) ? context.registeredDays : "no informado"}.
+Racha seguida más larga: ${Number.isFinite(Number(context.continuousDays)) ? context.continuousDays : "no informado"} días.
+${context.continuous30 === true ? "Hay al menos 30 días seguidos con ánimo y comportamiento." : "No hay 30 días seguidos con ánimo y comportamiento. Di la cantidad de días registrados y que, sin un registro continuo de 30 días, el análisis puede tener errores."}
+
 Si no hay fase, omite la sección de fase. Si la hay, dilo como estimación. Máximo 300 palabras.
 `;
 }

@@ -294,18 +294,18 @@ export default function ChatPanel({
 
   return (
     <div className="-mx-4 -mt-4 flex min-h-[560px] flex-col">
-      <div className="flex items-center gap-3 bg-[#3A44C4] px-4 pb-4 pt-8 text-white">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F9C4C6] font-serif text-[22px] text-[#3A44C4]">C</div>
+      <div className="flex items-center gap-3 rounded-[20px] bg-[#FFF8EE] px-4 py-4 text-[#153E40]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFC0CB] font-serif text-[22px] text-[#153E40]">C</div>
         <div className="flex-1">
-          <h4 className="text-[19px] font-extrabold">Cyclia IA</h4>
-          <p className="text-[13px] text-[#DCE5FA]">Tu asistente de ciclo y bienestar</p>
+          <h4 className="m-0 text-2xl font-normal leading-[1.2]">Cyclia IA</h4>
+          <p className="m-0 text-sm text-[#3E6466]">Tu asistente de ciclo y bienestar</p>
         </div>
         
         {onOpenHistory && (
           <button
             type="button"
             onClick={onOpenHistory}
-            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-lg font-extrabold text-[#1B1F5E]"
+            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#FCE883] text-lg font-extrabold text-[#153E40]"
             title="Historial de conversaciones"
           >
             ◷
@@ -315,24 +315,24 @@ export default function ChatPanel({
 
       {/* Message History */}
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4 min-h-[260px] max-h-[460px]">
-        {blockedNotice && <p className="rounded-[16px] bg-[#FFF6CF] p-3 text-sm text-[#1B1F5E]" role="status">{blockedNotice}</p>}
+        {blockedNotice && <p className="rounded-[16px] bg-[#FFF6CF] p-3 text-sm text-[#153E40]" role="status">{blockedNotice}</p>}
         {!assistantEnabled && !blockedNotice && (
-          <p className="rounded-[16px] bg-[#FFF6CF] p-3 text-sm text-[#1B1F5E]">Cyclia IA permanece desactivada hasta que autorices ese tratamiento en Privacidad y datos. El seguimiento del ciclo no depende de esta opción.</p>
+          <p className="rounded-[16px] bg-[#FFF6CF] p-3 text-sm text-[#153E40]">Cyclia IA permanece desactivada hasta que autorices ese tratamiento en Privacidad y datos. El seguimiento del ciclo no depende de esta opción.</p>
         )}
         {chatHistory.length === 0 ? (
           <div className="text-center py-8 px-4 space-y-4">
-            <p className="text-[#7A7A70] text-sm max-w-xs mx-auto leading-relaxed">
+            <p className="text-[#5C7374] text-sm max-w-xs mx-auto leading-relaxed">
               Hola, <strong className="font-semibold text-[#3A3A35]">{profile.name}</strong>. Estoy aquí para acompañar tu día. ¿Qué te gustaría consultar hoy acerca de tu ciclo, energía o productividad?
             </p>
             
             {/* Quick Suggestions */}
             <div className="grid grid-cols-1 gap-2 pt-2 text-left max-w-sm mx-auto">
-              <p className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest mb-1 text-center">Temas sugeridos</p>
+              <p className="text-[10px] font-bold text-[#6E8C8E] uppercase tracking-widest mb-1 text-center">Temas sugeridos</p>
               {QUICK_PROMPTS.map((prompt, index) => (
                 <button
                   key={index}
                   onClick={() => handleSend(prompt.text)}
-                  className="min-h-10 cursor-pointer rounded-full bg-[#F6E27F] px-4 py-2 text-left text-[13px] font-bold text-[#1B1F5E]"
+                  className="min-h-10 cursor-pointer rounded-full bg-[#FCE883] px-4 py-2 text-left text-[13px] font-bold text-[#153E40]"
                 >
                   <span>{prompt.label}</span>
                 </button>
@@ -350,8 +350,8 @@ export default function ChatPanel({
                 <div
                   className={`max-w-[85%] rounded-[24px] p-4 text-sm shadow-2xs ${
                     isUser
-                      ? 'bg-[#3A44C4] text-white rounded-br-md'
-                      : 'bg-white text-[#1B1F5E] rounded-bl-md'
+                      ? 'bg-[#C5EBEB] text-[#153E40] rounded-br-md'
+                      : 'bg-[#FFF8EE] text-[#153E40] rounded-bl-md'
                   }`}
                 >
                   {isUser ? (
@@ -371,7 +371,7 @@ export default function ChatPanel({
         {/* Typing loading state */}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-[#F5F6F8] border border-[#d7e6d4] rounded-[24px] rounded-bl-none p-4 text-xs text-[#7A7A70] flex items-center gap-2">
+            <div className="bg-[#F5F6F8] border border-[#d7e6d4] rounded-[24px] rounded-bl-none p-4 text-xs text-[#5C7374] flex items-center gap-2">
               <span className="flex gap-1">
                 <span className="w-1.5 h-1.5 bg-[#1E5631] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
                 <span className="w-1.5 h-1.5 bg-[#1E5631] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
@@ -401,13 +401,13 @@ export default function ChatPanel({
             onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend(input)}
             placeholder="Pregúntale a Cyclia…"
             disabled={isLoading}
-            className="h-12 flex-1 rounded-full border-[1.5px] border-[#C9D3EF] bg-white px-4 text-[15px] text-[#1B1F5E] outline-none"
+            className="h-12 flex-1 rounded-full border-[1.5px] border-[#E7D3C6] bg-[#FFF8EE] px-4 text-[15px] text-[#153E40] outline-none"
           />
           <button
             onClick={() => handleSend(input)}
             disabled={isLoading || !input.trim()}
             aria-label="Enviar"
-            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-lg font-extrabold text-[#1B1F5E] disabled:opacity-50"
+            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-lg font-extrabold text-[#153E40] disabled:opacity-50"
           >
             →
           </button>

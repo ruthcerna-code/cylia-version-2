@@ -9,10 +9,10 @@ const PHASE_API: Record<MenstrualPhase, PlanPhase> = {
 };
 
 export const PHASE_DOT: Record<MenstrualPhase, string> = {
-  Menstrual: '#F49A9E',
-  Folicular: '#A9C4F0',
-  Ovulacion: '#F6E27F',
-  Lutea: '#3A44C4',
+  Menstrual: '#FF8243',
+  Folicular: '#FFD3BC',
+  Ovulacion: '#FCE883',
+  Lutea: '#069494',
 };
 
 export const PHASE_LABEL: Record<MenstrualPhase, string> = {

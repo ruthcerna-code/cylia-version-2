@@ -4,10 +4,10 @@ import { formatDateStr, getCycleDay, getPhaseForDay } from '../utils/cycle';
 import { PrivacyClauses } from './DesignScreens';
 
 const PHASE_COLOR: Record<MenstrualPhase, string> = {
-  Menstrual: '#F49A9E',
-  Folicular: '#A9C4F0',
-  Ovulacion: '#F6E27F',
-  Lutea: '#3A44C4',
+  Menstrual: '#FF8243',
+  Folicular: '#FFD3BC',
+  Ovulacion: '#FCE883',
+  Lutea: '#069494',
 };
 
 const ENERGY: Record<MenstrualPhase, { title: string; text: string }> = {
@@ -107,7 +107,7 @@ export default function DesignHome({
     const dateStr = formatDateStr(date);
     const dayOfCycle = getCycleDay(dateStr, lastPeriodDate, cycleLength);
     const dayPhase = getPhaseForDay(dayOfCycle, periodLength, cycleLength);
-    return { label: names[date.getDay()], day: date.getDate(), today: index === 0, color: showPhases ? PHASE_COLOR[dayPhase] : '#E7EAF8' };
+    return { label: names[date.getDay()], day: date.getDate(), today: index === 0, color: showPhases ? PHASE_COLOR[dayPhase] : '#FFF1E8' };
   });
   let ovulationNote = '';
   if (showPhases) for (let index = 0; index < cycleLength; index += 1) {
@@ -124,12 +124,12 @@ export default function DesignHome({
 
   return (
     <div className="flex flex-col">
-      <header className="relative overflow-hidden bg-[#3A44C4] px-6 pb-20 pt-14 text-white">
-        <span className="relative font-serif text-[15px] tracking-[0.18em] text-[#F9C4C6]">CYCLIA</span>
-        <h1 className="relative mt-2 text-[28px] font-extrabold">Hola, {name}</h1>
-        <p className="relative text-[15px] text-[#DCE5FA]">{dateLabel}</p>
+      <header className="relative overflow-hidden rounded-[20px] bg-[#FFF8EE] px-6 py-6 text-[#153E40]">
+        <span className="relative font-serif text-sm tracking-[0.14em] text-[#069494]">CYCLIA</span>
+        <h1 className="relative mt-2 text-[36px] font-normal leading-[1.1]">Hola, {name}</h1>
+        <p className="relative text-base text-[#3E6466]">{dateLabel}</p>
       </header>
-      <section className="relative z-10 -mt-16 mx-[18px] flex flex-col items-center gap-3 rounded-3xl bg-white px-5 py-5 shadow-[0_10px_28px_rgba(27,31,94,0.12)]">
+      <section className="relative z-10 mx-[18px] mt-4 flex flex-col items-center gap-3 rounded-[20px] bg-[#FFF8EE] px-5 py-5">
         <div className="relative aspect-square w-[min(190px,62vw)]">
           <svg viewBox="0 0 200 200" className="h-full w-full" aria-label={`Día ${cycleDay} de ${cycleLength}`}>
             <g transform="rotate(-90 100 100)" fill="none" strokeWidth="16">
@@ -137,84 +137,84 @@ export default function DesignHome({
                 <circle key={arc.phase} cx="100" cy="100" r="70" stroke={arc.color} strokeDasharray={arc.dash} strokeDashoffset={arc.offset} />
               ))}
             </g>
-            <circle cx={markerX} cy={markerY} r="11" fill="#FFFFFF" stroke="#1B1F5E" strokeWidth="3" />
+            <circle cx={markerX} cy={markerY} r="11" fill="#FFFFFF" stroke="#153E40" strokeWidth="3" />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[13px] font-bold text-[#4A4F7A]">Día</span>
-            <span className="font-serif text-[52px] leading-none text-[#3A44C4]">{cycleDay}</span>
-            <span className="text-[13px] font-bold text-[#4A4F7A]">de {cycleLength}</span>
+            <span className="text-[13px] font-bold text-[#3E6466]">Día</span>
+            <span className="font-serif text-[52px] leading-none text-[#069494]">{cycleDay}</span>
+            <span className="text-[13px] font-bold text-[#3E6466]">de {cycleLength}</span>
           </div>
         </div>
-        <span className="rounded-full px-4 py-1.5 text-sm font-extrabold text-[#1B1F5E]" style={{ background: showPhases ? PHASE_COLOR[phase] : '#E7EAF8' }}>
+        <span className="rounded-full px-4 py-1.5 text-sm font-extrabold text-[#153E40]" style={{ background: showPhases ? PHASE_COLOR[phase] : '#FFF1E8' }}>
           {showPhases
             ? `${phase === 'Folicular' ? 'Fase folicular' : phase === 'Ovulacion' ? 'Ovulación' : phase === 'Lutea' ? 'Fase lútea' : 'Menstruación'}${approximate ? ' aproximada' : ''}`
             : 'Según tu registro'}
         </span>
         <h2 className="m-0 text-center text-lg font-extrabold">{energy.title}</h2>
-        <p className="m-0 text-center text-sm leading-relaxed text-[#4A4F7A]">{energy.text}</p>
-        {showPhases && <button type="button" onClick={onOpenPhase} className="cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">Ver tu fase en detalle</button>}
+        <p className="m-0 text-center text-sm leading-relaxed text-[#3E6466]">{energy.text}</p>
+        {showPhases && <button type="button" onClick={onOpenPhase} className="cursor-pointer text-[15px] font-extrabold text-[#069494]">Ver tu fase en detalle</button>}
       </section>
       <section className="flex flex-col gap-3 px-[18px] py-5">
         {offerPerimenopause && (
-          <section className="rounded-[20px] bg-white p-4">
-            <p className="m-0 text-sm font-semibold leading-relaxed text-[#1B1F5E]">Tus ciclos están variando. Desde los 40 es esperable. ¿Quieres que Cyclia siga tu registro diario en vez del calendario?</p>
-            <button type="button" onClick={onActivatePerimenopause} className="mt-3 flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Activar</button>
-            <button type="button" onClick={onDeclinePerimenopause} className="mt-1 flex h-11 w-full cursor-pointer items-center justify-center text-sm font-extrabold text-[#3A44C4]">Ahora no</button>
+          <section className="rounded-[20px] bg-[#FFF8EE] p-4">
+            <p className="m-0 text-sm font-semibold leading-relaxed text-[#153E40]">Tus ciclos están variando. Desde los 40 es esperable. ¿Quieres que Cyclia siga tu registro diario en vez del calendario?</p>
+            <button type="button" onClick={onActivatePerimenopause} className="mt-3 flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-[15px] font-extrabold text-[#153E40]">Activar</button>
+            <button type="button" onClick={onDeclinePerimenopause} className="mt-1 flex h-11 w-full cursor-pointer items-center justify-center text-sm font-extrabold text-[#069494]">Ahora no</button>
           </section>
         )}
         {care && (
-          <section className="rounded-[20px] bg-white p-4">
+          <section className="rounded-[20px] bg-[#FFF8EE] p-4">
             <h2 className="m-0 text-base font-extrabold">Alimentación y bienestar</h2>
-            <p className="m-0 mt-2 text-[13px] font-extrabold text-[#1B1F5E]">3 nutrientes</p>
-            <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#3B4070]">
+            <p className="m-0 mt-2 text-[13px] font-extrabold text-[#153E40]">3 nutrientes</p>
+            <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#245456]">
               {care.foods.map((item) => <li key={item}>{item}</li>)}
             </ol>
             {!movement && (
               <>
-                <p className="m-0 mt-3 text-[13px] font-extrabold text-[#1B1F5E]">3 ejercicios</p>
-                <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#3B4070]">
+                <p className="m-0 mt-3 text-[13px] font-extrabold text-[#153E40]">3 ejercicios</p>
+                <ol className="m-0 mt-1 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-[#245456]">
                   {care.exercises.map((item) => <li key={item}>{item}</li>)}
                 </ol>
               </>
             )}
-            <p className="m-0 mt-2 text-[12px] leading-relaxed text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
+            <p className="m-0 mt-2 text-[12px] leading-relaxed text-[#3E6466]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
           </section>
         )}
         {movement}
-        <button type="button" onClick={onRegister} className="flex items-center gap-3 rounded-[20px] bg-[#F6E27F] p-4 text-left text-[#1B1F5E]">
-          <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-[#1B1F5E] text-2xl text-[#F6E27F]">+</span>
+        <button type="button" onClick={onRegister} className="flex items-center gap-3 rounded-[20px] bg-[#FCE883] p-4 text-left text-[#153E40]">
+          <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-[#153E40] text-2xl text-[#FCE883]">+</span>
           <span><strong className="block text-base">Registro de hoy</strong><span className="text-[13px]">Toma menos de un minuto</span></span>
         </button>
-        <button type="button" onClick={onChat} className="flex items-center gap-3 rounded-[20px] bg-[#F49A9E] p-4 text-left text-[#1B1F5E]">
-          <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-white text-xl text-[#3A44C4]">💬</span>
+        <button type="button" onClick={onChat} className="flex items-center gap-3 rounded-[20px] bg-[#FF8243] p-4 text-left text-[#153E40]">
+          <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-[#FFF8EE] text-xl text-[#069494]">💬</span>
           <span><strong className="block text-base">Pregúntale a Cyclia</strong><span className="text-[13px]">Energía, rutina, alimentación</span></span>
         </button>
         <div className="grid grid-cols-2 gap-3">
-          <button type="button" onClick={onMood} className="rounded-[20px] bg-white p-4 text-left">
-            <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#F6E27F] text-xl">☺</span>
+          <button type="button" onClick={onMood} className="rounded-[20px] bg-[#FFF8EE] p-4 text-left">
+            <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#FCE883] text-xl">☺</span>
             <strong className="block text-[15px]">¿Cómo te sientes?</strong>
-            <span className="text-[13px] text-[#3B4070]">Registra tu humor en un toque</span>
+            <span className="text-[13px] text-[#245456]">Registra tu humor en un toque</span>
           </button>
-          <button type="button" onClick={onActivity} className="rounded-[20px] bg-white p-4 text-left">
-            <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#A9C4F0] text-lg">🏃</span>
+          <button type="button" onClick={onActivity} className="rounded-[20px] bg-[#FFF8EE] p-4 text-left">
+            <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#FFD3BC] text-lg">🏃</span>
             <strong className="block text-[15px]">Actividad de hoy</strong>
-            <span className="text-[13px] text-[#3B4070]">{activityTitle}</span>
+            <span className="text-[13px] text-[#245456]">{activityTitle}</span>
           </button>
         </div>
-        <div className="rounded-[20px] bg-white p-4">
+        <div className="rounded-[20px] bg-[#FFF8EE] p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="m-0 text-base font-extrabold">Próximos días</h2>
-            <button type="button" onClick={onCalendar} className="cursor-pointer text-sm font-extrabold text-[#3A44C4]">Calendario</button>
+            <button type="button" onClick={onCalendar} className="cursor-pointer text-sm font-extrabold text-[#069494]">Calendario</button>
           </div>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-[#4A4F7A]">
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-[#3E6466]">
             {days.map((item) => (
               <span key={`${item.label}-${item.day}`} className="flex flex-col gap-1">
                 {item.label}
-                <span className="flex h-[34px] items-center justify-center rounded-full text-[#1B1F5E]" style={{ background: item.color, boxShadow: item.today ? 'inset 0 0 0 2px #1B1F5E' : undefined }}>{item.day}</span>
+                <span className="flex h-[34px] items-center justify-center rounded-full text-[#153E40]" style={{ background: item.color, boxShadow: item.today ? 'inset 0 0 0 2px #153E40' : undefined }}>{item.day}</span>
               </span>
             ))}
           </div>
-          {ovulationNote && <p className="mb-0 mt-3 text-[13px] text-[#4A4F7A]">{ovulationNote}</p>}
+          {ovulationNote && <p className="mb-0 mt-3 text-[13px] text-[#3E6466]">{ovulationNote}</p>}
         </div>
         <PrivacyClauses />
       </section>

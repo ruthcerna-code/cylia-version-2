@@ -76,17 +76,17 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
 
   return (
     <div className="fixed inset-0 bg-[#3A3A35]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[32px] border border-[#d7e6d4] shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+      <div className="bg-[#FFF8EE] rounded-[32px] border border-[#d7e6d4] shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}
         <div className="flex justify-between items-center p-6 md:p-8 pb-4 border-b border-[#d7e6d4]">
           <div>
             <h3 className="font-serif font-semibold text-xl text-[#1E5631]">Ficha de Salud y Perfil</h3>
-            <p className="text-xs text-[#9A9A90] font-medium">Modifica los datos iniciales y tu estado de salud</p>
+            <p className="text-xs text-[#6E8C8E] font-medium">Modifica los datos iniciales y tu estado de salud</p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full border border-[#d7e6d4] text-[#9A9A90] hover:text-[#1E5631] flex items-center justify-center transition-colors cursor-pointer text-sm"
+            className="w-8 h-8 rounded-full border border-[#d7e6d4] text-[#6E8C8E] hover:text-[#1E5631] flex items-center justify-center transition-colors cursor-pointer text-sm"
           >
             ✕
           </button>
@@ -100,7 +100,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             className={`py-3 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
               activeTab === 'personal'
                 ? 'border-[#1E5631] text-[#1E5631]'
-                : 'border-transparent text-[#9A9A90] hover:text-[#1E5631]'
+                : 'border-transparent text-[#6E8C8E] hover:text-[#1E5631]'
             }`}
           >
             👤 Datos Personales
@@ -111,7 +111,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             className={`py-3 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
               activeTab === 'cycle'
                 ? 'border-[#1E5631] text-[#1E5631]'
-                : 'border-transparent text-[#9A9A90] hover:text-[#1E5631]'
+                : 'border-transparent text-[#6E8C8E] hover:text-[#1E5631]'
             }`}
           >
             🌸 Salud Femenina
@@ -122,7 +122,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             className={`py-3 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
               activeTab === 'conditions'
                 ? 'border-[#1E5631] text-[#1E5631]'
-                : 'border-transparent text-[#9A9A90] hover:text-[#1E5631]'
+                : 'border-transparent text-[#6E8C8E] hover:text-[#1E5631]'
             }`}
           >
             ⚠️ Salud General
@@ -173,7 +173,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     readOnly
                     className="w-full bg-[#F5F6F8] border border-[#d7e6d4] rounded-2xl px-4 py-3 text-sm"
                   />
-                  <p className="mt-1 text-[10px] text-[#9A9A90]">Número calculado con la fecha de nacimiento.</p>
+                  <p className="mt-1 text-[10px] text-[#6E8C8E]">Número calculado con la fecha de nacimiento.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -221,7 +221,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-[#1E5631] uppercase tracking-wider mb-1.5">Última Fecha de Menstruación</label>
-                  <p className="text-[10px] text-[#9A9A90] mb-1">Indica el primer día de tu último período para recalcular tus fases.</p>
+                  <p className="text-[10px] text-[#6E8C8E] mb-1">Indica el primer día de tu último período para recalcular tus fases.</p>
                   <input
                     type="date"
                     value={lastPeriodDate}
@@ -286,7 +286,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             {/* TAB 3: General Health Conditions */}
             {activeTab === 'conditions' && (
               <div className="space-y-4">
-                <p className="text-xs text-[#7A7A70] mb-2">Marca si posees alguna de estas condiciones diagnosticadas. Las sugerencias de ejercicio diario, nutrición y los análisis de la IA se adaptarán a tus necesidades:</p>
+                <p className="text-xs text-[#5C7374] mb-2">Marca si posees alguna de estas condiciones diagnosticadas. Las sugerencias de ejercicio diario, nutrición y los análisis de la IA se adaptarán a tus necesidades:</p>
                 
                 <div className="grid grid-cols-1 gap-3">
                   <button
@@ -295,7 +295,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     className={`py-3.5 px-5 rounded-2xl border text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                       isCeliac
                         ? 'border-[#1E5631] bg-[#F5F6F8] text-[#1E5631] font-bold ring-2 ring-[#1E5631]'
-                        : 'border-[#d7e6d4] bg-white text-[#3A3A35] hover:bg-[#F5F6F8]'
+                        : 'border-[#d7e6d4] bg-[#FFF8EE] text-[#3A3A35] hover:bg-[#F5F6F8]'
                     }`}
                   >
                     <span>🌾 Celiaquía / Sensibilidad al gluten</span>
@@ -308,7 +308,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     className={`py-3.5 px-5 rounded-2xl border text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                       hasDiabetes
                         ? 'border-[#1E5631] bg-[#F5F6F8] text-[#1E5631] font-bold ring-2 ring-[#1E5631]'
-                        : 'border-[#d7e6d4] bg-white text-[#3A3A35] hover:bg-[#F5F6F8]'
+                        : 'border-[#d7e6d4] bg-[#FFF8EE] text-[#3A3A35] hover:bg-[#F5F6F8]'
                     }`}
                   >
                     <span>🩸 Diabetes / Resistencia a la insulina</span>
@@ -321,7 +321,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     className={`py-3.5 px-5 rounded-2xl border text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                       hasObesity
                         ? 'border-[#1E5631] bg-[#F5F6F8] text-[#1E5631] font-bold ring-2 ring-[#1E5631]'
-                        : 'border-[#d7e6d4] bg-white text-[#3A3A35] hover:bg-[#F5F6F8]'
+                        : 'border-[#d7e6d4] bg-[#FFF8EE] text-[#3A3A35] hover:bg-[#F5F6F8]'
                     }`}
                   >
                     <span>⚖️ Obesidad</span>
@@ -334,7 +334,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
                     className={`py-3.5 px-5 rounded-2xl border text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                       hasDepression
                         ? 'border-[#1E5631] bg-[#F5F6F8] text-[#1E5631] font-bold ring-2 ring-[#1E5631]'
-                        : 'border-[#d7e6d4] bg-white text-[#3A3A35] hover:bg-[#F5F6F8]'
+                        : 'border-[#d7e6d4] bg-[#FFF8EE] text-[#3A3A35] hover:bg-[#F5F6F8]'
                     }`}
                   >
                     <span>🧠 Depresión / Ansiedad persistente</span>
@@ -351,7 +351,7 @@ export default function HealthProfileModal({ profile, onSave, onClose }: HealthP
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 rounded-full border border-[#d7e6d4] text-xs font-bold uppercase tracking-wider text-[#7A7A70] hover:bg-white transition-all cursor-pointer"
+              className="px-6 py-3 rounded-full border border-[#d7e6d4] text-xs font-bold uppercase tracking-wider text-[#5C7374] hover:bg-white transition-all cursor-pointer"
             >
               Cancelar
             </button>

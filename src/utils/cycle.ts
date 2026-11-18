@@ -5,9 +5,10 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   Menstrual: {
     name: "Menstruación",
     badge: "Menstrual",
-    colorClass: "bg-[#F49A9E] text-[#1B1F5E]",
-    bgHex: "#F49A9E",
-    textHex: "#1B1F5E",
+    colorClass: "bg-[#FFC0CB] text-[#153E40]",
+    bgHex: "#FFC0CB",
+    cellHex: "#FFC0CB",
+    textHex: "#153E40",
     description: "El día 1 es el inicio de la regla. Muchas mujeres reportan más ganas de ir más lento. Tu energía es la que marques en el registro.",
     hormones: "Cyclia no mide hormonas. Algunas descripciones de estos días hablan de estrógeno y progesterona más bajos.",
     stats: {
@@ -31,9 +32,10 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   Folicular: {
     name: "Fase Folicular",
     badge: "Folicular",
-    colorClass: "bg-[#A9C4F0] text-[#1B1F5E]",
-    bgHex: "#A9C4F0",
-    textHex: "#1B1F5E",
+    colorClass: "bg-[#FF8243] text-[#153E40]",
+    bgHex: "#FF8243",
+    cellHex: "#FF8243",
+    textHex: "#153E40",
     description: "Muchas mujeres reportan más foco y más ganas de empezar cosas. Si tu registro dice otra cosa, manda el registro.",
     hormones: "Cyclia no mide hormonas. Algunas descripciones de estos días hablan de un ascenso del estrógeno.",
     stats: {
@@ -57,9 +59,10 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   Ovulacion: {
     name: "Ovulación",
     badge: "Ovulación",
-    colorClass: "bg-[#F6E27F] text-[#1B1F5E]",
-    bgHex: "#F6E27F",
-    textHex: "#1B1F5E",
+    colorClass: "bg-[#FCE883] text-[#153E40]",
+    bgHex: "#FCE883",
+    cellHex: "#FCE883",
+    textHex: "#153E40",
     description: "Muchas mujeres reportan un ánimo más abierto. Esta fase no calcula fertilidad ni mide hormonas.",
     hormones: "Cyclia no mide hormonas. Algunas descripciones de estos días hablan de un pico de estrógeno. No es un cálculo de fertilidad.",
     stats: {
@@ -83,9 +86,10 @@ export const PHASE_DETAILS: Record<MenstrualPhase, PhaseInfo> = {
   Lutea: {
     name: "Fase Lútea",
     badge: "Fase Lútea",
-    colorClass: "bg-[#3A44C4] text-white",
-    bgHex: "#3A44C4",
-    textHex: "#ffffff",
+    colorClass: "bg-[#069494] text-[#FFF8EE]",
+    bgHex: "#069494",
+    cellHex: "#069494",
+    textHex: "#FFF8EE",
     description: "Muchas mujeres reportan un ritmo más reflexivo y, a ratos, más sensibilidad. Tu ánimo es el que marques en el registro.",
     hormones: "Cyclia no mide hormonas. Algunas descripciones de estos días hablan de la progesterona.",
     stats: {

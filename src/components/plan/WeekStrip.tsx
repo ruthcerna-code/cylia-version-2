@@ -4,7 +4,7 @@ import { PHASE_DOT } from '../../plan/dayContext';
 import { shiftDate } from '../../plan/proposal';
 
 const LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-const NAVY = '#1B1F5E';
+const NAVY = '#153E40';
 
 /** Week of the Bandeja de entrada: lavender days, the chosen one in coral with a navy border, today always marked. */
 export default function WeekStrip({
@@ -29,7 +29,7 @@ export default function WeekStrip({
 
   return (
     <section
-      className="mx-4 rounded-[20px] bg-white p-3 shadow-[0_8px_24px_rgba(27,31,94,0.06)]"
+      className="mx-4 rounded-[20px] bg-[#FFF8EE] p-3 shadow-[0_8px_24px_rgba(27,31,94,0.06)]"
       aria-label="Semana"
       onTouchStart={(event) => { swipe.current = { x: event.changedTouches[0].clientX }; }}
       onTouchEnd={(event) => {
@@ -41,9 +41,9 @@ export default function WeekStrip({
       }}
     >
       <div className="mb-2 flex items-center justify-between">
-        <button type="button" onClick={() => onShift(-7)} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-lg font-extrabold text-[#3A44C4]" aria-label="Semana anterior">‹</button>
-        <p className="m-0 text-[12px] font-bold text-[#4A4F7A]">Desliza para cambiar de semana</p>
-        <button type="button" onClick={() => onShift(7)} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-lg font-extrabold text-[#3A44C4]" aria-label="Semana siguiente">›</button>
+        <button type="button" onClick={() => onShift(-7)} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-lg font-extrabold text-[#069494]" aria-label="Semana anterior">‹</button>
+        <p className="m-0 text-[12px] font-bold text-[#3E6466]">Desliza para cambiar de semana</p>
+        <button type="button" onClick={() => onShift(7)} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-lg font-extrabold text-[#069494]" aria-label="Semana siguiente">›</button>
       </div>
       <div className="grid grid-cols-7 gap-1">
         {days.map((date, index) => {
@@ -62,7 +62,7 @@ export default function WeekStrip({
               aria-label={`${isToday ? 'Hoy, ' : ''}${LETTERS[index]} ${dayNumber}, ${count.done} de ${count.total}`}
               className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl px-0.5 py-1.5 transition-colors"
               style={{
-                background: active ? '#F49A9E' : '#A9C4F0',
+                background: active ? '#FF8243' : '#FFD3BC',
                 color: NAVY,
                 boxShadow: active ? `inset 0 0 0 2.5px ${NAVY}` : 'none',
               }}

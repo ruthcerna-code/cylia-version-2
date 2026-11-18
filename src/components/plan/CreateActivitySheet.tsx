@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import type { ActivityDraft } from '../../firebase';
 import type { DailyLog, PeriodRecord, ScheduledActivity, UserProfile } from '../../types';
 import { analyzeCycle } from '../../utils/cycleModel';
-import { overlappingActivity } from '../../utils/activities';
+import { availableStarts, formatDuration, overlappingActivity } from '../../utils/activities';
+import AvailableStarts from './AvailableStarts';
 import { authBearer } from '../../consentApi';
 import { PHASE_LABEL, energyBandFromLog, phaseApi } from '../../plan/dayContext';
 import {
   type ActivityProposal,
   type EnergyBand,
   endClock,
-  isPastSlot,
   localDate,
   roundDuration,
 } from '../../plan/proposal';
@@ -85,7 +85,6 @@ export default function CreateActivitySheet({
   const [error, setError] = useState('');
   const [manual, setManual] = useState(false);
   const [manualMinutes, setManualMinutes] = useState(30);
-  const [clash, setClash] = useState<{ name: string; time: string; duration: number; source: 'cyclia' | 'manual' } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -100,7 +99,6 @@ export default function CreateActivitySheet({
     setError('');
     setManual(false);
     setManualMinutes(30);
-    setClash(null);
   }, [open, token, initialTitle, initialDate, today]);
 
   if (!open) return null;
@@ -110,8 +108,10 @@ export default function CreateActivitySheet({
   const hasPeriod = Boolean(profile.lastPeriodDate);
   const storedBand = energyBandFromLog(logs[date]);
   const band = storedBand || askedBand || null;
-  const ready = Boolean(title.trim() && date && start && !isPastSlot(date, start));
-  const past = Boolean(date && start && isPastSlot(date, start));
+  const plannedMinutes = proposal && !manual ? proposal.duracion_min : manualMinutes;
+  const starts = availableStarts(activities, date, plannedMinutes);
+  const startIsFree = starts.includes(start);
+  const ready = Boolean(title.trim() && date && startIsFree);
 
   const requestProposal = async (previous: number | null) => {
     if (!ready || !band) return;
@@ -152,9 +152,9 @@ export default function CreateActivitySheet({
   const save = async (duration: number, source: 'cyclia' | 'manual', steps: string[]) => {
     const next = draftFromProposal({ title, notes, date, start, duration, source, steps });
     const hit = overlappingActivity(activities, { date, startTime: start, endTime: next.endTime, durationMinutes: duration });
-    if (hit && !clash) {
-      const hitEnd = hit.endTime || start;
-      setClash({ name: hit.title, time: hitEnd, duration, source });
+    if (hit || !availableStarts(activities, date, duration).includes(start)) {
+      setError(hit ? `Ese horario se cruza con «${hit.title}». Elige otra hora disponible.` : 'Elige una hora de inicio disponible.');
+      setStart('');
       return;
     }
     setBusy(true);
@@ -171,56 +171,65 @@ export default function CreateActivitySheet({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B1F5E]/40" role="presentation" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#153E40]/40" role="presentation" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="crear-actividad-titulo"
-        className="max-h-[92dvh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-[#E3F1FB] px-4 pb-8 pt-3"
+        className="max-h-[92dvh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-[#FFE4E9] px-4 pb-8 pt-3"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[#C9D3EF]" />
+        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[#E7D3C6]" />
         <div className="mb-3 flex items-center justify-between">
-          <h2 id="crear-actividad-titulo" className="m-0 text-xl font-extrabold text-[#1B1F5E]">Crear actividad</h2>
-          <button type="button" onClick={onClose} className="flex h-11 cursor-pointer items-center px-2 text-sm font-extrabold text-[#3A44C4]">Cerrar</button>
+          <h2 id="crear-actividad-titulo" className="m-0 text-xl font-extrabold text-[#153E40]">Crear actividad</h2>
+          <button type="button" onClick={onClose} className="flex h-11 cursor-pointer items-center px-2 text-sm font-extrabold text-[#069494]">Cerrar</button>
         </div>
         <form className="flex flex-col gap-3" onSubmit={(event) => event.preventDefault()}>
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
+          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#153E40]">
             ¿Qué quieres hacer?
-            <input value={title} onChange={(event) => setTitle(event.target.value)} required className="h-12 rounded-2xl border-[1.5px] border-[#C9D3EF] bg-white px-3 text-base font-semibold outline-none" />
+            <input value={title} onChange={(event) => setTitle(event.target.value)} required className="h-12 rounded-2xl border-[1.5px] border-[#E7D3C6] bg-[#FFF8EE] px-3 text-base font-semibold outline-none" />
           </label>
-          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
+          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#153E40]">
             Nota, si quieres
-            <textarea value={notes} rows={2} onChange={(event) => setNotes(event.target.value)} className="resize-none rounded-2xl border-[1.5px] border-[#C9D3EF] bg-white px-3 py-2 text-base font-semibold outline-none" />
+            <textarea value={notes} rows={2} onChange={(event) => setNotes(event.target.value)} className="resize-none rounded-2xl border-[1.5px] border-[#E7D3C6] bg-[#FFF8EE] px-3 py-2 text-base font-semibold outline-none" />
           </label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-              Día
-              <input type="date" required min={today} value={date} onChange={(event) => setDate(event.target.value)} className="h-12 rounded-2xl border-[1.5px] border-[#C9D3EF] bg-white px-3 text-base font-semibold outline-none" />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#1B1F5E]">
-              Hora de inicio
-              <input type="time" required value={start} onChange={(event) => { setStart(event.target.value); setClash(null); }} className="h-12 rounded-2xl border-[1.5px] border-[#C9D3EF] bg-white px-3 text-base font-semibold outline-none" />
-            </label>
-          </div>
-          {past && <p className="m-0 text-sm text-[#3B4070]">Elige hoy o un día que viene, con una hora que todavía no pasó.</p>}
+          <label className="flex flex-col gap-1.5 text-sm font-extrabold text-[#153E40]">
+            Día
+            <input
+              type="date"
+              required
+              min={today}
+              value={date}
+              onChange={(event) => {
+                const nextDate = event.target.value;
+                setDate(nextDate);
+                if (!availableStarts(activities, nextDate, plannedMinutes).includes(start)) setStart('');
+              }}
+              className="h-12 rounded-2xl border-[1.5px] border-[#E7D3C6] bg-[#FFF8EE] px-3 text-base font-semibold outline-none"
+            />
+          </label>
+          <p className="m-0 text-base text-[#153E40]">
+            {proposal && !manual ? `Tiempo estimado: ${formatDuration(plannedMinutes)}.` : `Duración: ${formatDuration(plannedMinutes)}.`}{' '}
+            {startIsFree ? `De ${start} a ${endClock(start, plannedMinutes)}.` : 'Elige una hora de inicio disponible. El término se calcula con ese tiempo.'}
+          </p>
+          <AvailableStarts starts={starts} value={start} onChange={setStart} />
           {phase ? (
-            <p className="m-0 rounded-2xl bg-white px-3 py-3 text-sm font-bold text-[#1B1F5E]">
+            <p className="m-0 rounded-2xl bg-[#FFF8EE] px-3 py-3 text-sm font-bold text-[#153E40]">
               Día {view.cycleDay} de {view.averageLength} · {PHASE_LABEL[phase]}
             </p>
           ) : hasPeriod ? (
-            <p className="m-0 rounded-2xl bg-white px-3 py-3 text-sm leading-relaxed text-[#3B4070]">Cyclia no estima una fase para este día. Puedes planificar igual.</p>
+            <p className="m-0 rounded-2xl bg-[#FFF8EE] px-3 py-3 text-sm leading-relaxed text-[#245456]">Cyclia no estima una fase para este día. Puedes planificar igual.</p>
           ) : (
-            <p className="m-0 rounded-2xl bg-white px-3 py-3 text-sm leading-relaxed text-[#3B4070]">
+            <p className="m-0 rounded-2xl bg-[#FFF8EE] px-3 py-3 text-sm leading-relaxed text-[#245456]">
               {PERIOD_NOTICE}{' '}
-              <button type="button" onClick={onOpenRegister} className="cursor-pointer font-extrabold text-[#3A44C4] underline">Registro Salud</button>
+              <button type="button" onClick={onOpenRegister} className="cursor-pointer font-extrabold text-[#069494] underline">Registro Salud</button>
             </p>
           )}
           {storedBand ? (
-            <p className="m-0 text-sm text-[#3B4070]">Energía de este día: {storedBand === 'con_energia' ? 'con energía' : 'sin energía'}.</p>
+            <p className="m-0 text-sm text-[#245456]">Energía de este día: {storedBand === 'con_energia' ? 'con energía' : 'sin energía'}.</p>
           ) : (
             <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-              <legend className="p-0 text-sm font-extrabold text-[#1B1F5E]">¿Cómo está tu energía ese día?</legend>
+              <legend className="p-0 text-sm font-extrabold text-[#153E40]">¿Cómo está tu energía ese día?</legend>
               <div className="grid grid-cols-2 gap-2">
                 {(['con_energia', 'sin_energia'] as const).map((item) => (
                   <button
@@ -231,8 +240,8 @@ export default function CreateActivitySheet({
                       setAskedBand(item);
                       void onSaveEnergy(date, item);
                     }}
-                    className="flex h-12 cursor-pointer items-center justify-center rounded-full text-sm font-extrabold text-[#1B1F5E]"
-                    style={{ background: askedBand === item ? '#F49A9E' : '#FFFFFF' }}
+                    className="flex h-12 cursor-pointer items-center justify-center rounded-full text-sm font-extrabold text-[#153E40]"
+                    style={{ background: askedBand === item ? '#FF8243' : '#FFFFFF' }}
                   >
                     {item === 'con_energia' ? 'Con energía' : 'Sin energía'}
                   </button>
@@ -241,17 +250,17 @@ export default function CreateActivitySheet({
             </fieldset>
           )}
           {!assistantEnabled && (
-            <p className="m-0 text-sm leading-relaxed text-[#3B4070]">Pedir una propuesta queda en pausa hasta que autorices a Cyclia en Privacidad y datos. Puedes elegir la duración tú.</p>
+            <p className="m-0 text-sm leading-relaxed text-[#245456]">Pedir una propuesta queda en pausa hasta que autorices a Cyclia en Privacidad y datos. Puedes elegir la duración tú.</p>
           )}
           <button
             type="button"
             disabled={!ready || !band || busy || !assistantEnabled}
             onClick={() => { void requestProposal(null); }}
-            className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#3A44C4] text-[15px] font-extrabold text-white disabled:opacity-50"
+            className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-base font-semibold text-[#153E40] disabled:opacity-50"
           >
             {busy ? 'Cyclia está mirando el día…' : 'Pedir propuesta a Cyclia'}
           </button>
-          {error && <p className="m-0 text-sm text-[#3B4070]" role="alert">{error}</p>}
+          {error && <p className="m-0 text-sm text-[#245456]" role="alert">{error}</p>}
           {proposal && !manual && (
             <ProposalCard
               proposal={proposal}
@@ -265,7 +274,7 @@ export default function CreateActivitySheet({
             />
           )}
           {(manual || !assistantEnabled || Boolean(error)) && (
-            <label className="flex flex-col gap-1.5 rounded-[20px] bg-white p-4 text-sm font-extrabold text-[#1B1F5E]">
+            <label className="flex flex-col gap-1.5 rounded-[20px] bg-[#FFF8EE] p-4 text-sm font-extrabold text-[#153E40]">
               Duración, de 10 a 240 minutos
               <input
                 type="number"
@@ -274,28 +283,13 @@ export default function CreateActivitySheet({
                 step={5}
                 value={manualMinutes}
                 onChange={(event) => setManualMinutes(roundDuration(Number(event.target.value) || 10))}
-                className="h-12 rounded-2xl border-[1.5px] border-[#C9D3EF] bg-[#F8F9FE] px-3 text-base outline-none"
+                className="h-12 rounded-2xl border-[1.5px] border-[#E7D3C6] bg-[#F8F9FE] px-3 text-base outline-none"
               />
-              <span className="font-semibold text-[#4A4F7A]">Termina a las {start ? endClock(start, manualMinutes) : '—'}</span>
-              <button type="button" disabled={!ready || busy} onClick={() => { void save(manualMinutes, 'manual', []); }} className="mt-1 flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E] disabled:opacity-50">
+              <span className="font-semibold text-[#3E6466]">Termina a las {start ? endClock(start, manualMinutes) : '—'}</span>
+              <button type="button" disabled={!ready || busy} onClick={() => { void save(manualMinutes, 'manual', []); }} className="mt-1 flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-[15px] font-extrabold text-[#153E40] disabled:opacity-50">
                 Guardar con esta duración
               </button>
             </label>
-          )}
-          {clash && (
-            <div className="flex flex-col gap-2 rounded-[20px] bg-white p-4" role="alert">
-              <p className="m-0 text-sm leading-relaxed text-[#1B1F5E]">Se cruza con «{clash.name}». Puedes moverla a las {clash.time} o dejar la hora que elegiste.</p>
-              <button type="button" className="flex h-11 cursor-pointer items-center justify-center rounded-full bg-[#3A44C4] text-sm font-extrabold text-white" onClick={() => { setStart(clash.time); setClash(null); }}>
-                Usar las {clash.time}
-              </button>
-              <button
-                type="button"
-                className="flex h-11 cursor-pointer items-center justify-center rounded-full bg-[#F8F9FE] text-sm font-extrabold text-[#1B1F5E]"
-                onClick={() => { void save(clash.duration, clash.source, proposal?.pasos || []); }}
-              >
-                Dejar mi hora
-              </button>
-            </div>
           )}
         </form>
       </div>

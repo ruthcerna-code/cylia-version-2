@@ -61,7 +61,7 @@ export default function PrivacyDataScreen({
   if (view !== 'home') {
     return (
       <div className="flex flex-col gap-3 pt-2">
-        <button type="button" onClick={() => setView('home')} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Privacidad y datos</button>
+        <button type="button" onClick={() => setView('home')} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#069494]">← Privacidad y datos</button>
         {view === 'policy' ? <PrivacyDraft /> : <TermsDraft />}
       </div>
     );
@@ -69,15 +69,15 @@ export default function PrivacyDataScreen({
 
   return (
     <div className="flex flex-col gap-3 pt-2">
-      <button type="button" onClick={onBack} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← {backLabel}</button>
+      <button type="button" onClick={onBack} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#069494]">← {backLabel}</button>
       <h1 className="m-0 text-[26px] font-extrabold">Privacidad y datos</h1>
-      <p className="m-0 text-sm text-[#3B4070]">Las decisiones vigentes corresponden a la versión {status.version}. Este flujo está en revisión y no declara cumplimiento jurídico.</p>
+      <p className="m-0 text-sm text-[#245456]">Las decisiones vigentes corresponden a la versión {status.version}. Este flujo está en revisión y no declara cumplimiento jurídico.</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setView('policy')} className="min-h-11 cursor-pointer rounded-full bg-white px-4 text-sm font-extrabold text-[#3A44C4]">Política de privacidad</button>
-        <button type="button" onClick={() => setView('terms')} className="min-h-11 cursor-pointer rounded-full bg-white px-4 text-sm font-extrabold text-[#3A44C4]">Términos de uso</button>
+        <button type="button" onClick={() => setView('policy')} className="min-h-11 cursor-pointer rounded-full bg-[#FFF8EE] px-4 text-sm font-extrabold text-[#069494]">Política de privacidad</button>
+        <button type="button" onClick={() => setView('terms')} className="min-h-11 cursor-pointer rounded-full bg-[#FFF8EE] px-4 text-sm font-extrabold text-[#069494]">Términos de uso</button>
       </div>
-      {error && <p className="m-0 rounded-[16px] bg-white p-3 text-sm font-bold text-[#9C3B45]" role="alert">{error}</p>}
-      <section className="rounded-[20px] bg-white p-4">
+      {error && <p className="m-0 rounded-[16px] bg-[#FFF8EE] p-3 text-sm font-bold text-[#9C3B45]" role="alert">{error}</p>}
+      <section className="rounded-[20px] bg-[#FFF8EE] p-4">
         <h2 className="m-0 text-base font-extrabold">Decisiones vigentes</h2>
         <ul className="mb-0 mt-2 list-none space-y-2 p-0 text-sm">
           {(['terms', 'privacy_notice', 'health_cycle', 'gemini_assistant'] as const).map((purpose) => (
@@ -88,26 +88,26 @@ export default function PrivacyDataScreen({
         </ul>
       </section>
       {(['health_cycle', 'gemini_assistant'] as const).map((purpose) => (
-        <section key={purpose} className="rounded-[20px] bg-white p-4 text-sm">
+        <section key={purpose} className="rounded-[20px] bg-[#FFF8EE] p-4 text-sm">
           <h2 className="m-0 text-base font-extrabold">{PURPOSE_LABEL[purpose]}</h2>
           <p>{CONSENT_STATEMENTS[purpose]}</p>
           {status.purposes[purpose] === 'accept' ? (
             <>
               {pendingWithdraw === purpose && <p className="font-bold">{WITHDRAW_EFFECT[purpose]}</p>}
               {pendingWithdraw === purpose ? (
-                <button type="button" disabled={busy} onClick={() => { void decide(purpose, 'withdraw'); }} className="min-h-11 cursor-pointer rounded-full bg-[#F49A9E] px-4 font-extrabold text-[#1B1F5E] disabled:opacity-60">Confirmar retiro</button>
+                <button type="button" disabled={busy} onClick={() => { void decide(purpose, 'withdraw'); }} className="min-h-11 cursor-pointer rounded-full bg-[#FF8243] px-4 font-extrabold text-[#153E40] disabled:opacity-60">Confirmar retiro</button>
               ) : (
-                <button type="button" onClick={() => setPendingWithdraw(purpose)} className="min-h-11 cursor-pointer rounded-full bg-[#F6E27F] px-4 font-extrabold text-[#1B1F5E]">Retirar autorización</button>
+                <button type="button" onClick={() => setPendingWithdraw(purpose)} className="min-h-11 cursor-pointer rounded-full bg-[#FCE883] px-4 font-extrabold text-[#153E40]">Retirar autorización</button>
               )}
             </>
           ) : (
-            <button type="button" disabled={busy} onClick={() => { void decide(purpose, 'accept'); }} className="min-h-11 cursor-pointer rounded-full bg-[#A9C4F0] px-4 font-extrabold text-[#1B1F5E] disabled:opacity-60">Autorizar esta opción</button>
+            <button type="button" disabled={busy} onClick={() => { void decide(purpose, 'accept'); }} className="min-h-11 cursor-pointer rounded-full bg-[#FFD3BC] px-4 font-extrabold text-[#153E40] disabled:opacity-60">Autorizar esta opción</button>
           )}
         </section>
       ))}
       <DataRequestForm />
       {events.length > 0 && (
-        <section className="rounded-[20px] bg-white p-4 text-sm">
+        <section className="rounded-[20px] bg-[#FFF8EE] p-4 text-sm">
           <h2 className="m-0 text-base font-extrabold">Historial de decisiones</h2>
           <ul className="mb-0 mt-2 list-none space-y-2 p-0">
             {[...events].reverse().map((event) => (

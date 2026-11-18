@@ -169,7 +169,10 @@ export interface PhaseInfo {
   name: string;
   badge: string;
   colorClass: string;
+  /** Tono principal de la fase: anillo, leyenda y gráficos. */
   bgHex: string;
+  /** Versión clara para celdas y tarjetas con texto. */
+  cellHex: string;
   textHex: string;
   description: string;
   hormones: string;

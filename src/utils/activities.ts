@@ -211,6 +211,46 @@ function busyOnDate(items: ScheduledActivity[], date: string): MinuteRange[] {
   }));
 }
 
+/** Horas de inicio en las que cabe la duración sin cruzar otra actividad, entre las 8:00 y las 21:00. */
+export function availableStarts(
+  items: ScheduledActivity[],
+  date: string,
+  durationMinutes: number,
+  options: { now?: Date; ignoreId?: string } = {},
+): string[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+  const duration = Math.max(5, Math.round(durationMinutes));
+  if (duration > DAY_CLOSE - DAY_OPEN) return [];
+  const now = options.now ?? new Date();
+  const today = localToday(now);
+  if (date < today) return [];
+  const earliest = date === today ? Math.max(DAY_OPEN, roundUpFive(now.getHours() * 60 + now.getMinutes())) : DAY_OPEN;
+  if (earliest + duration > DAY_CLOSE) return [];
+  const busy = busyOnDate(items.filter((item) => item.id !== options.ignoreId), date);
+  const starts: number[] = [];
+  const collect = (from: number, until: number) => {
+    const open = Math.max(from, earliest);
+    const close = Math.min(until, DAY_CLOSE);
+    if (open + duration > close) return;
+    starts.push(open);
+    let step = Math.ceil(open / 30) * 30;
+    if (step <= open) step += 30;
+    while (step + duration <= close) {
+      starts.push(step);
+      step += 30;
+    }
+  };
+  let cursor = earliest;
+  for (const block of busy) {
+    if (block.end <= cursor) continue;
+    if (block.start > cursor) collect(cursor, block.start);
+    cursor = Math.max(cursor, block.end);
+    if (cursor >= DAY_CLOSE) break;
+  }
+  if (cursor < DAY_CLOSE) collect(cursor, DAY_CLOSE);
+  return [...new Set(starts)].sort((left, right) => left - right).map(formatMinutes);
+}
+
 export function suggestOpenSlot(
   items: ScheduledActivity[],
   durationMinutes: number,

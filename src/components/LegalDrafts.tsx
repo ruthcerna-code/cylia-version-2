@@ -3,7 +3,7 @@ import { rememberPrivacyAcceptance } from '../consentCopy';
 
 export function DraftBanner() {
   return (
-    <p className="m-0 rounded-[16px] bg-[#FFF6CF] p-3 text-sm leading-relaxed text-[#1B1F5E]" role="note">
+    <p className="m-0 rounded-[16px] bg-[#FFF6CF] p-3 text-sm leading-relaxed text-[#153E40]" role="note">
       Borrador en revisión. No es un documento publicado ni acredita cumplimiento de la Ley N.º 19.628 ni de la Ley N.º 21.719. La aplicación de las reglas especiales sobre datos de salud, en particular los artículos 16 y 16 bis del régimen reformado, queda pendiente de revisión jurídica.
     </p>
   );
@@ -31,8 +31,8 @@ const SUMMARY = [
 export function PrivacySummary({ tone = 'app' }: { tone?: 'app' | 'auth' }) {
   const card = tone === 'auth'
     ? { background: 'var(--card)', color: 'var(--emeraude)', border: '1px solid var(--line)' }
-    : { background: '#FFFFFF', color: '#1B1F5E' };
-  const muted = tone === 'auth' ? 'var(--emeraude-deep)' : '#3B4070';
+    : { background: '#FFFFFF', color: '#153E40' };
+  const muted = tone === 'auth' ? 'var(--emeraude-deep)' : '#245456';
   return (
     <div className="grid grid-cols-1 gap-3">
       {SUMMARY.map((item) => (
@@ -49,8 +49,8 @@ export function PrivacySummary({ tone = 'app' }: { tone?: 'app' | 'auth' }) {
 
 export function PrivacyDetails() {
   return (
-    <div className="flex flex-col gap-3 text-sm leading-relaxed text-[#1B1F5E]">
-      <section className="rounded-[20px] bg-white p-4">
+    <div className="flex flex-col gap-3 text-sm leading-relaxed text-[#153E40]">
+      <section className="rounded-[20px] bg-[#FFF8EE] p-4">
         <h2 className="m-0 text-base font-extrabold">Detalle de los datos</h2>
         <ul className="mb-0 mt-2 list-disc space-y-1 pl-4">
           <li>Cuenta: sesión anónima o usuario creado por la administración.</li>
@@ -59,7 +59,7 @@ export function PrivacyDetails() {
           <li>Actividades: título, fecha, horario y notas. Se guardan en la base de Cyclia.</li>
         </ul>
       </section>
-      <section className="rounded-[20px] bg-white p-4">
+      <section className="rounded-[20px] bg-[#FFF8EE] p-4">
         <h2 className="m-0 text-base font-extrabold">Servicios</h2>
         <ul className="mb-0 mt-2 list-disc space-y-1 pl-4">
           <li>Firebase guarda el acceso y los datos. Cada sesión lee solo lo suyo.</li>
@@ -82,7 +82,7 @@ export function PrivacyDetails() {
 
 export function PrivacyDraft() {
   return (
-    <article className="flex flex-col gap-3 text-sm leading-relaxed text-[#1B1F5E]">
+    <article className="flex flex-col gap-3 text-sm leading-relaxed text-[#153E40]">
       <DraftBanner />
       <h1 className="m-0 text-[26px] font-extrabold">Política de privacidad</h1>
       <p className="m-0">Este texto describe lo que la aplicación hace hoy. La revisión jurídica todavía no está cerrada.</p>
@@ -142,10 +142,10 @@ export function PrivacyAcceptance({
 
 export function TermsDraft() {
   return (
-    <article className="flex flex-col gap-3 text-sm leading-relaxed text-[#1B1F5E]">
+    <article className="flex flex-col gap-3 text-sm leading-relaxed text-[#153E40]">
       <DraftBanner />
       <h1 className="m-0 text-[26px] font-extrabold">Términos de uso (borrador)</h1>
-      <section className="rounded-[20px] bg-white p-4">
+      <section className="rounded-[20px] bg-[#FFF8EE] p-4">
         <p className="m-0">Cyclia es una aplicación educativa de bienestar. Calcula una estimación del ciclo a partir de los datos que registra la persona. No diagnostica, no receta y no reemplaza a un profesional de salud.</p>
         <p className="mb-0 mt-2">La cuenta puede ser anónima o un usuario creado por la administración. Las funciones de salud permanecen cerradas hasta que se registren las decisiones obligatorias de la versión vigente.</p>
         <p className="mb-0 mt-2">Rechazar el asistente no quita el seguimiento del ciclo. Las actividades quedan en la base de Cyclia. Retirar la autorización de salud cierra ese seguimiento y no borra por sí solo el historial.</p>

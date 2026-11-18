@@ -58,18 +58,18 @@ export default function ConsentScreen({
   if (view !== 'form') {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col gap-4 px-4 py-6">
-        <button type="button" onClick={() => setView('form')} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Volver a mis decisiones</button>
+        <button type="button" onClick={() => setView('form')} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#069494]">← Volver a mis decisiones</button>
         {view === 'policy' && <PrivacyDraft />}
         {view === 'terms' && <TermsDraft />}
         {view === 'support' && (
-          <section className="rounded-[20px] bg-white p-4 text-sm leading-relaxed">
+          <section className="rounded-[20px] bg-[#FFF8EE] p-4 text-sm leading-relaxed">
             <h1 className="m-0 text-[26px] font-extrabold">Soporte</h1>
             <p>Cyclia IA no está disponible mientras falte su autorización. El contacto de privacidad y el canal de soporte todavía no están definidos.</p>
             <p className="mb-0">[PENDIENTE: correo de contacto para privacidad]</p>
           </section>
         )}
         {view === 'rights' && (
-          <section className="rounded-[20px] bg-white p-4 text-sm leading-relaxed">
+          <section className="rounded-[20px] bg-[#FFF8EE] p-4 text-sm leading-relaxed">
             <h1 className="m-0 text-[26px] font-extrabold">Solicitudes sobre tus datos</h1>
             <p>Puedes pedir acceso, corrección o eliminación sin tener que aceptar el seguimiento. Enviar la solicitud no borra la cuenta ni el historial.</p>
             <p>El procedimiento de respuesta está pendiente de definición. Enviar una solicitud no exige aceptar el seguimiento ni borra la cuenta.</p>
@@ -87,12 +87,12 @@ export default function ConsentScreen({
       {variant === 'existing' && (
         <p className="m-0 text-sm font-bold leading-relaxed">Antes de continuar, revisa la información sobre el tratamiento de tus datos y registra tus decisiones.</p>
       )}
-      <p className="m-0 text-sm leading-relaxed text-[#3B4070]">El asistente queda aparte y puedes autorizarlo después, en Privacidad y datos.</p>
-      {formError && <p className="m-0 rounded-[16px] bg-white p-3 text-sm font-bold text-[#9C3B45]" role="alert">{formError}</p>}
-      <label className="flex items-start gap-3 rounded-[20px] bg-[#FFF6CF] p-4 text-sm leading-relaxed text-[#1B1F5E]">
+      <p className="m-0 text-sm leading-relaxed text-[#245456]">El asistente queda aparte y puedes autorizarlo después, en Privacidad y datos.</p>
+      {formError && <p className="m-0 rounded-[16px] bg-[#FFF8EE] p-3 text-sm font-bold text-[#9C3B45]" role="alert">{formError}</p>}
+      <label className="flex items-start gap-3 rounded-[20px] bg-[#FFF6CF] p-4 text-sm leading-relaxed text-[#153E40]">
         <input
           type="checkbox"
-          className="mt-1 h-5 w-5 shrink-0 accent-[#3A44C4]"
+          className="mt-1 h-5 w-5 shrink-0 accent-[#069494]"
           checked={accepted}
           aria-invalid={Boolean(formError) && !accepted}
           onChange={(event) => {
@@ -102,19 +102,19 @@ export default function ConsentScreen({
         />
         <span>
           Acepto los{' '}
-          <button type="button" className="cursor-pointer font-extrabold text-[#3A44C4] underline" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setView('terms'); }}>Términos de uso</button>
+          <button type="button" className="cursor-pointer font-extrabold text-[#069494] underline" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setView('terms'); }}>Términos de uso</button>
           {' '}y la{' '}
-          <button type="button" className="cursor-pointer font-extrabold text-[#3A44C4] underline" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setView('policy'); }}>Política de privacidad</button>
+          <button type="button" className="cursor-pointer font-extrabold text-[#069494] underline" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setView('policy'); }}>Política de privacidad</button>
           , incluido el uso de los datos de mi ciclo para el seguimiento.
         </span>
       </label>
-      <button type="button" disabled={saving} onClick={() => { void continueWithDecisions(); }} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-base font-extrabold text-[#1B1F5E] disabled:opacity-60">
+      <button type="button" disabled={saving} onClick={() => { void continueWithDecisions(); }} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-base font-extrabold text-[#153E40] disabled:opacity-60">
         {saving ? 'Guardando…' : 'Guardar mis decisiones y continuar'}
       </button>
-      <button type="button" disabled={saving} onClick={() => { void declineAndExit(); }} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-white text-[15px] font-extrabold text-[#1B1F5E] disabled:opacity-60">
+      <button type="button" disabled={saving} onClick={() => { void declineAndExit(); }} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#FFF8EE] text-[15px] font-extrabold text-[#153E40] disabled:opacity-60">
         No aceptar y salir
       </button>
-      <button type="button" onClick={onExit} className="mx-auto cursor-pointer text-sm font-extrabold text-[#3A44C4]">Cerrar sesión</button>
+      <button type="button" onClick={onExit} className="mx-auto cursor-pointer text-sm font-extrabold text-[#069494]">Cerrar sesión</button>
     </main>
   );
 }

@@ -26,7 +26,7 @@ export default function DayActivityList({
   const ordered = [...activities].sort((a, b) => (clockMinutes(a.startTime) ?? 0) - (clockMinutes(b.startTime) ?? 0));
   if (ordered.length === 0) {
     return (
-      <p className="mx-4 rounded-[20px] bg-white px-4 py-8 text-center text-sm leading-relaxed text-[#3B4070]">
+      <p className="mx-4 rounded-[20px] bg-[#FFF8EE] px-4 py-8 text-center text-sm leading-relaxed text-[#245456]">
         Aún no tienes actividades este día. ¿Planificamos una?
       </p>
     );

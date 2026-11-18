@@ -7,26 +7,26 @@ const PHASE_STYLE: Record<MenstrualPhase, { title: string; text: string; dot: st
   Menstrual: {
     title: 'Fase menstrual',
     text: 'Inicio proyectado de la menstruación. Muchas mujeres reportan preferir un ritmo más lento.',
-    dot: '#F49A9E',
-    border: '#F49A9E',
+    dot: '#FF8243',
+    border: '#FF8243',
   },
   Folicular: {
     title: 'Fase folicular',
     text: 'Muchas mujeres reportan más energía para empezar cosas y concentrarse.',
     dot: '#7FA8E8',
-    border: '#A9C4F0',
+    border: '#FFD3BC',
   },
   Ovulacion: {
     title: 'Ovulación',
     text: 'Días alrededor de la ovulación estimada. No calcula fertilidad.',
     dot: '#E2C24A',
-    border: '#F6E27F',
+    border: '#FCE883',
   },
   Lutea: {
     title: 'Fase lútea',
     text: 'Muchas mujeres reportan un ritmo más tranquilo para cerrar pendientes.',
-    dot: '#3A44C4',
-    border: '#3A44C4',
+    dot: '#069494',
+    border: '#069494',
   },
 };
 
@@ -47,7 +47,7 @@ function CycleCard({ cycle, selected, onSelect }: { cycle: ForecastCycle; select
       type="button"
       onClick={onSelect}
       className="flex w-[240px] shrink-0 cursor-pointer flex-col rounded-[22px] p-4 text-left"
-      style={{ background: selected ? '#1B1F5E' : '#FFFFFF', color: selected ? '#FFFFFF' : '#1B1F5E', border: selected ? 'none' : '1px solid #E1E5F5' }}
+      style={{ background: selected ? '#153E40' : '#FFFFFF', color: selected ? '#FFFFFF' : '#153E40', border: selected ? 'none' : '1px solid #EAD9CE' }}
     >
       <span className="flex items-center justify-between gap-2 text-[11px] font-extrabold uppercase tracking-wide">
         <span>Ciclo {cycle.number} · +{cycle.offset}</span>
@@ -95,11 +95,11 @@ export default function CycleProjectionScreen({
 
   return (
     <section className="flex flex-col gap-4 pt-4">
-      <button type="button" onClick={onBack} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Calendario</button>
-      <p className="m-0 text-[13px] font-extrabold text-[#3A44C4]">Proyección del ciclo · {history}</p>
+      <button type="button" onClick={onBack} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#069494]">← Perfil</button>
+      <p className="m-0 text-[13px] font-extrabold text-[#069494]">Proyección del ciclo · {history}</p>
       <div className="flex flex-col gap-2">
         <h1 className="m-0 text-[26px] font-extrabold leading-tight">Proyección de los próximos 3 ciclos</h1>
-        <p className="m-0 text-sm text-[#3B4070]">
+        <p className="m-0 text-sm text-[#245456]">
           Duración media: {board.meanDays == null ? board.projectedLength : board.meanDays} días
           {board.meanDays != null && board.meanDays !== board.projectedLength ? ` · el calendario usa ${board.projectedLength}` : ''}
           {board.deviationDays == null ? ' · sin desviación todavía' : ` · desviación ±${board.deviationDays} días`}
@@ -107,7 +107,7 @@ export default function CycleProjectionScreen({
       </div>
 
       {board.predictionsPaused ? (
-        <p className="m-0 rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#3B4070]">{board.note}</p>
+        <p className="m-0 rounded-[20px] bg-[#FFF8EE] p-4 text-sm leading-relaxed text-[#245456]">{board.note}</p>
       ) : (
         <>
           <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
@@ -118,10 +118,10 @@ export default function CycleProjectionScreen({
 
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="m-0 text-[13px] font-extrabold text-[#4A4F7A]">Detalle del ciclo {selected.number} · {selected.length} días{board.deviationDays != null && board.deviationDays <= 1 ? ' · margen estimado ±1 día' : ''}</p>
+              <p className="m-0 text-[13px] font-extrabold text-[#3E6466]">Detalle del ciclo {selected.number} · {selected.length} días{board.deviationDays != null && board.deviationDays <= 1 ? ' · margen estimado ±1 día' : ''}</p>
               <h2 className="m-0 mt-1 text-[18px] font-extrabold">Del {shortDate(selected.start)} al {shortDate(selected.end)}</h2>
             </div>
-            <button type="button" onClick={() => onOpenCalendar(selected.start)} className="shrink-0 cursor-pointer rounded-full bg-[#F6E27F] px-3 py-2 text-[12px] font-extrabold text-[#1B1F5E]">Ver en el calendario</button>
+            <button type="button" onClick={() => onOpenCalendar(selected.start)} className="shrink-0 cursor-pointer rounded-full bg-[#FCE883] px-3 py-2 text-[12px] font-extrabold text-[#153E40]">Ver en el calendario</button>
           </div>
 
           {board.showPhases ? (
@@ -129,26 +129,26 @@ export default function CycleProjectionScreen({
               {selected.phases.map((phase) => {
                 const style = PHASE_STYLE[phase.phase];
                 return (
-                  <article key={phase.phase} className="rounded-[18px] bg-white p-3.5" style={{ border: `1.5px solid ${style.border}` }}>
+                  <article key={phase.phase} className="rounded-[18px] bg-[#FFF8EE] p-3.5" style={{ border: `1.5px solid ${style.border}` }}>
                     <div className="flex items-center justify-between gap-2">
                       <strong className="flex items-center gap-2 text-[14px]"><span className="h-2.5 w-2.5 rounded-full" style={{ background: style.dot }} />{style.title}</strong>
-                      <span className="text-[12px] font-bold text-[#4A4F7A]">Días {phase.fromDay}–{phase.toDay}</span>
+                      <span className="text-[12px] font-bold text-[#3E6466]">Días {phase.fromDay}–{phase.toDay}</span>
                     </div>
                     <p className="m-0 mt-2 text-[13px] font-extrabold">{shortDate(phase.start)} – {shortDate(phase.end)}</p>
-                    <p className="m-0 mt-1 text-[13px] leading-relaxed text-[#3B4070]">{style.text}</p>
+                    <p className="m-0 mt-1 text-[13px] leading-relaxed text-[#245456]">{style.text}</p>
                     {phase.phase === 'Ovulacion' && selected.ovulationDate && (
-                      <p className="m-0 mt-2 text-[13px] font-extrabold text-[#1B1F5E]">Ovulación estimada: {shortDate(selected.ovulationDate)}</p>
+                      <p className="m-0 mt-2 text-[13px] font-extrabold text-[#153E40]">Ovulación estimada: {shortDate(selected.ovulationDate)}</p>
                     )}
                   </article>
                 );
               })}
             </div>
           ) : (
-            <p className="m-0 rounded-[20px] bg-white p-4 text-sm leading-relaxed text-[#3B4070]">{board.note}</p>
+            <p className="m-0 rounded-[20px] bg-[#FFF8EE] p-4 text-sm leading-relaxed text-[#245456]">{board.note}</p>
           )}
 
           <PhaseKnowledge profile={profile} periods={periods} logs={logs} userId={userId} embedded />
-          <p className="m-0 text-[12px] leading-relaxed text-[#4A4F7A]">
+          <p className="m-0 text-[12px] leading-relaxed text-[#3E6466]">
             {board.sample >= 3
               ? `Calculada con ${board.sample} ciclos de 21 a 45 días. `
               : 'Mientras no haya tres ciclos en ese rango, la primera predicción usa la duración de tu perfil. '}

@@ -30,7 +30,7 @@ const MOODS: Array<{ value: FeltState; label: string }> = [
 ];
 
 const STEP_COPY = [
-  'Elige el ánimo que más se parece a este día.',
+  'Cuenta cómo amaneciste y el ánimo de este día. Después sigue la salud.',
   'La energía que elijas mueve el número de más abajo.',
   'Toca lo que notes. Ninguno también es una respuesta.',
   'Ahora los números. En energía, 5 es mucha. En cansancio y dolor, 5 es peor.',
@@ -75,6 +75,7 @@ export default function DesignRegister({
   existing,
   onSave,
   onSaveAndAnalyze,
+  onBack,
   suggestion,
   onSchedule,
 }: {
@@ -86,6 +87,7 @@ export default function DesignRegister({
   existing?: DailyLog;
   onSave: (log: DailyLog) => void;
   onSaveAndAnalyze: (log: DailyLog) => void;
+  onBack?: () => void;
   suggestion?: ActivitySuggestion | null;
   onSchedule?: (title: string) => void;
 }) {
@@ -101,6 +103,7 @@ export default function DesignRegister({
   const [symptoms, setSymptoms] = useState<string[]>(() => SYMPTOMS.filter((item) => item.code && existing?.symptoms?.includes(item.code)).map((item) => item.label));
   const [fluid, setFluid] = useState<CervicalFluid | ''>(existing?.cervicalFluid || '');
   const [felt, setFelt] = useState<FeltState | ''>(existing?.feltState || '');
+  const [morning, setMorning] = useState<SleepState | ''>(existing?.sleepState || '');
   const [energyFeel, setEnergyFeel] = useState<EnergyFeel | ''>(existing?.energyFeel || '');
   const [energyBand, setEnergyBand] = useState<EnergyBand | ''>(energyBandFromLog(existing) || '');
   const levelFrom = (key: (typeof BODY)[number]['key'], code: CycleSymptom): BodyLevel => existing?.[key] || (existing?.symptoms?.includes(code) ? 'leve' : 'ninguno');
@@ -119,7 +122,7 @@ export default function DesignRegister({
   const buildLog = (): DailyLog => {
     const symptomLine = symptoms.length ? `Síntomas: ${symptoms.join(', ')}` : '';
     const extra = [notes.trim(), symptomLine].filter(Boolean).join('\n');
-    const sleepState: SleepState = values.sleepQuality <= 2 ? 'bien' : values.sleepQuality === 3 ? 'regular' : 'mal';
+    const sleepState: SleepState = morning || (values.sleepQuality <= 2 ? 'bien' : values.sleepQuality === 3 ? 'regular' : 'mal');
     const codes = SYMPTOMS.flatMap((item) => item.code && symptoms.includes(item.label) ? [item.code] : []);
     BODY.forEach((item) => {
       if (body[item.key] !== 'ninguno') codes.push(item.code);
@@ -166,25 +169,46 @@ export default function DesignRegister({
   return (
     <div className="flex flex-col gap-3 pb-4">
       <header className="flex flex-col gap-1 px-1 pt-6">
-        <span className="font-serif text-[15px] tracking-[0.18em] text-[#3A44C4]">CYCLIA</span>
-        <h1 className="m-0 text-[28px] font-extrabold text-[#1B1F5E]">¿Cómo estás hoy?</h1>
-        <p className="m-0 text-sm text-[#4A4F7A]">{dateLabel} · Día {cycleDay} · {phaseLabel}</p>
+        {onBack && <button type="button" onClick={onBack} className="mb-1 w-fit cursor-pointer py-2 text-sm font-semibold text-[#069494]">← Mi ciclo</button>}
+        <span className="font-serif text-[15px] tracking-[0.18em] text-[#069494]">CYCLIA</span>
+        <h1 className="m-0 text-[28px] font-extrabold text-[#153E40]">¿Cómo estás hoy?</h1>
+        <p className="m-0 text-sm text-[#3E6466]">{dateLabel} · Día {cycleDay} · {phaseLabel}</p>
         <div className="mt-2 flex gap-1" aria-hidden="true">
           {STEP_COPY.map((_, index) => (
-            <span key={index} className="h-2 flex-1 rounded-full" style={{ background: index <= step ? '#F49A9E' : '#E1E5F5' }} />
+            <span key={index} className="h-2 flex-1 rounded-full" style={{ background: index <= step ? '#FF8243' : '#EAD9CE' }} />
           ))}
         </div>
-        <p className="m-0 text-[13px] font-extrabold text-[#3A44C4]">Paso {step + 1} de {STEP_COPY.length}. {STEP_COPY[step]}</p>
+        <p className="m-0 text-[13px] font-extrabold text-[#069494]">Paso {step + 1} de {STEP_COPY.length}. {STEP_COPY[step]}</p>
       </header>
-      {step === 0 && <section className="flex flex-col gap-4 rounded-[20px] bg-white p-4">
-        <h2 className="m-0 text-base font-extrabold">Estado anímico</h2>
+      {step === 0 && <section className="flex flex-col gap-4 rounded-[20px] bg-[#FFF8EE] p-4">
+        <h2 className="m-0 text-base font-extrabold">¿Cómo amaneciste?</h2>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            ['bien', 'Bien', 1],
+            ['regular', 'Regular', 3],
+            ['mal', 'Mal', 5],
+          ] as const).map(([value, label, score]) => (
+            <Choice
+              key={value}
+              selected={morning === value}
+              onClick={() => {
+                const next = morning === value ? '' : value;
+                setMorning(next);
+                if (next) setValues((current) => ({ ...current, sleepQuality: score }));
+              }}
+            >
+              {label}
+            </Choice>
+          ))}
+        </div>
+        <h2 className="m-0 text-base font-extrabold">Estado de ánimo</h2>
         <div className="flex flex-col gap-2">
           {MOODS.map((item) => (
             <Choice key={item.value} selected={felt === item.value} onClick={() => setFelt((current) => current === item.value ? '' : item.value)}>{item.label}</Choice>
           ))}
         </div>
       </section>}
-      {step === 1 && <section className="flex flex-col gap-4 rounded-[20px] bg-white p-4">
+      {step === 1 && <section className="flex flex-col gap-4 rounded-[20px] bg-[#FFF8EE] p-4">
         <h2 className="m-0 text-base font-extrabold">Nivel de energía</h2>
         <div className="grid grid-cols-2 gap-2">
           {([
@@ -229,9 +253,9 @@ export default function DesignRegister({
             </Choice>
           ))}
         </div>
-        <p className="m-0 text-[12px] leading-relaxed text-[#4A4F7A]">Inquieta no es energía alta ni baja.</p>
+        <p className="m-0 text-[12px] leading-relaxed text-[#3E6466]">Inquieta no es energía alta ni baja.</p>
       </section>}
-      {step === 2 && <section className="flex flex-col gap-4 rounded-[20px] bg-white p-4">
+      {step === 2 && <section className="flex flex-col gap-4 rounded-[20px] bg-[#FFF8EE] p-4">
         <h2 className="m-0 text-base font-extrabold">Indicadores de hoy</h2>
         <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
           <legend className="p-0 text-sm font-extrabold">Fluido cervical</legend>
@@ -240,13 +264,13 @@ export default function DesignRegister({
               <Choice key={item.value} selected={fluid === item.value} onClick={() => setFluid((current) => current === item.value ? '' : item.value)}>{item.label}</Choice>
             ))}
           </div>
-          <p className="m-0 text-[12px] leading-relaxed text-[#4A4F7A]">Clara de huevo es una descripción. Muchas mujeres la asocian con días fértiles. Cyclia no calcula fertilidad.</p>
+          <p className="m-0 text-[12px] leading-relaxed text-[#3E6466]">Clara de huevo es una descripción. Muchas mujeres la asocian con días fértiles. Cyclia no calcula fertilidad.</p>
         </fieldset>
         <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
           <legend className="p-0 text-sm font-extrabold">Sensaciones</legend>
           {BODY.map((item) => (
             <div key={item.key} className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-bold text-[#3B4070]">{item.label}</span>
+              <span className="text-[13px] font-bold text-[#245456]">{item.label}</span>
               <div className="grid grid-cols-3 gap-1.5">
                 {LEVELS.map((level) => (
                   <Choice key={level.value} selected={body[item.key] === level.value} onClick={() => setBody((current) => ({ ...current, [item.key]: level.value }))}>{level.label}</Choice>
@@ -256,10 +280,10 @@ export default function DesignRegister({
           ))}
         </fieldset>
       </section>}
-      {step === 3 && <section className="flex flex-col gap-4 rounded-[20px] bg-white p-4">
+      {step === 3 && <section className="flex flex-col gap-4 rounded-[20px] bg-[#FFF8EE] p-4">
         {SCALES.map((scale) => (
           <fieldset key={scale.key} className="m-0 flex flex-col gap-2 border-0 p-0">
-            <legend className="p-0 text-sm font-extrabold">{scale.label} <span className="font-semibold text-[#4A4F7A]">· {scale.hint}</span></legend>
+            <legend className="p-0 text-sm font-extrabold">{scale.label} <span className="font-semibold text-[#3E6466]">· {scale.hint}</span></legend>
             <div className="grid grid-cols-5 gap-1.5">
               {[1, 2, 3, 4, 5].map((value) => {
                 const selected = values[scale.key] === value;
@@ -269,6 +293,7 @@ export default function DesignRegister({
                     type="button"
                     onClick={() => {
                       setValues((current) => ({ ...current, [scale.key]: value }));
+                      if (scale.key === 'sleepQuality') setMorning(value <= 2 ? 'bien' : value === 3 ? 'regular' : 'mal');
                       if (scale.key === 'energy') {
                         setEnergyBand(value <= 2 ? 'sin_energia' : 'con_energia');
                         setEnergyFeel((current) => {
@@ -277,8 +302,8 @@ export default function DesignRegister({
                         });
                       }
                     }}
-                    className="h-11 cursor-pointer rounded-xl text-[15px] font-extrabold text-[#1B1F5E]"
-                    style={{ background: selected ? '#F49A9E' : '#FFF6CF', border: `1.5px solid ${selected ? '#E57F86' : '#F6E27F'}` }}
+                    className="h-11 cursor-pointer rounded-xl text-[15px] font-extrabold text-[#153E40]"
+                    style={{ background: selected ? '#FF8243' : '#FFF6CF', border: `1.5px solid ${selected ? '#E56B28' : '#FCE883'}` }}
                   >
                     {value}
                   </button>
@@ -289,7 +314,7 @@ export default function DesignRegister({
         ))}
       </section>}
       {step === 4 && <>
-      <section className="rounded-[20px] bg-white p-4">
+      <section className="rounded-[20px] bg-[#FFF8EE] p-4">
         <h2 className="m-0 text-sm font-extrabold">Otros síntomas</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           {SYMPTOMS.filter((item) => showVasomotor || (item.code !== 'bochornos' && item.code !== 'sudores_nocturnos')).map((item) => {
@@ -300,19 +325,19 @@ export default function DesignRegister({
                 key={name}
                 type="button"
                 onClick={() => toggleSymptom(name)}
-                className="min-h-10 cursor-pointer rounded-full px-3.5 text-[13px] font-bold text-[#1B1F5E]"
-                style={{ background: selected ? '#F49A9E' : '#FFF6CF', border: `1.5px solid ${selected ? '#E57F86' : '#F6E27F'}` }}
+                className="min-h-10 cursor-pointer rounded-full px-3.5 text-[13px] font-bold text-[#153E40]"
+                style={{ background: selected ? '#FF8243' : '#FFF6CF', border: `1.5px solid ${selected ? '#E56B28' : '#FCE883'}` }}
               >
                 {name}
               </button>
             );
           })}
         </div>
-        <button type="button" onClick={() => setSpotting((current) => !current)} className="mt-3 min-h-10 cursor-pointer rounded-full px-3.5 text-[13px] font-bold text-[#1B1F5E]" style={{ background: spotting ? '#F49A9E' : '#FFF6CF', border: `1.5px solid ${spotting ? '#E57F86' : '#F6E27F'}` }}>
+        <button type="button" onClick={() => setSpotting((current) => !current)} className="mt-3 min-h-10 cursor-pointer rounded-full px-3.5 text-[13px] font-bold text-[#153E40]" style={{ background: spotting ? '#FF8243' : '#FFF6CF', border: `1.5px solid ${spotting ? '#E56B28' : '#FCE883'}` }}>
           {spotting ? 'Manchado o sangrado fuera de la regla' : 'Sin manchado fuera de la regla'}
         </button>
       </section>
-      <section className="flex flex-col gap-3 rounded-[20px] bg-white p-4">
+      <section className="flex flex-col gap-3 rounded-[20px] bg-[#FFF8EE] p-4">
         {([
           { label: '¿Cómo dormiste?', value: sleepDetails, set: setSleepDetails, placeholder: 'Ej.: 7 horas, me desperté una vez' },
           { label: 'Hábitos de hoy', value: behavior, set: setBehavior, placeholder: 'Ej.: caminé 30 min, mucho café' },
@@ -325,27 +350,27 @@ export default function DesignRegister({
               value={field.value}
               placeholder={field.placeholder}
               onChange={(event) => field.set(event.target.value)}
-              className="resize-none rounded-xl border-[1.5px] border-[#C9D3EF] bg-[#F8F9FE] p-2.5 text-sm font-normal text-[#1B1F5E] outline-none"
+              className="resize-none rounded-xl border-[1.5px] border-[#E7D3C6] bg-[#F8F9FE] p-2.5 text-sm font-normal text-[#153E40] outline-none"
             />
           </label>
         ))}
       </section>
       </>}
       <div className="flex gap-2">
-        {step > 0 && <button type="button" onClick={() => setStep((current) => current - 1)} className="h-12 flex-1 cursor-pointer rounded-full border border-[#C9D3EF] bg-white text-[15px] font-extrabold text-[#1B1F5E]">Atrás</button>}
-        {step < 4 && <button type="button" onClick={() => setStep((current) => current + 1)} className="h-12 flex-1 cursor-pointer rounded-full bg-[#3A44C4] text-[15px] font-extrabold text-white">Siguiente</button>}
+        {step > 0 && <button type="button" onClick={() => setStep((current) => current - 1)} className="h-12 flex-1 cursor-pointer rounded-full border border-[#E7D3C6] bg-[#FFF8EE] text-[15px] font-extrabold text-[#153E40]">Atrás</button>}
+        {step < 4 && <button type="button" onClick={() => setStep((current) => current + 1)} className="h-12 flex-1 cursor-pointer rounded-full bg-[#FF8243] text-base font-semibold text-[#153E40]">Siguiente</button>}
       </div>
-      {step === 4 && <button type="button" onClick={() => onSaveAndAnalyze(buildLog())} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-base font-extrabold text-[#1B1F5E]">Guardar y ver mi gráfica</button>}
-      {step === 4 && <button type="button" onClick={() => onSave(buildLog())} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-[15px] font-extrabold text-[#1B1F5E]">Solo guardar</button>}
+      {step === 4 && <button type="button" onClick={() => onSaveAndAnalyze(buildLog())} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-base font-extrabold text-[#153E40]">Guardar y ver mi gráfica</button>}
+      {step === 4 && <button type="button" onClick={() => onSave(buildLog())} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#FCE883] text-[15px] font-extrabold text-[#153E40]">Solo guardar</button>}
       {suggestion && onSchedule && (
-        <section className="flex flex-col gap-2 rounded-[20px] bg-white p-4" aria-labelledby="schedule-suggestion">
+        <section className="flex flex-col gap-2 rounded-[20px] bg-[#FFF8EE] p-4" aria-labelledby="schedule-suggestion">
           <h2 id="schedule-suggestion" className="m-0 text-base font-extrabold">Agendar una actividad para mí</h2>
-          <p className="m-0 text-sm text-[#3B4070]">Sugerencia opcional: <strong className="text-[#1B1F5E]">{suggestion.title}</strong></p>
-          <p className="m-0 text-sm text-[#3B4070]">{suggestion.note}</p>
-          <button type="button" onClick={() => onSchedule(suggestion.title)} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]">Agendar una actividad para mí</button>
+          <p className="m-0 text-sm text-[#245456]">Sugerencia opcional: <strong className="text-[#153E40]">{suggestion.title}</strong></p>
+          <p className="m-0 text-sm text-[#245456]">{suggestion.note}</p>
+          <button type="button" onClick={() => onSchedule(suggestion.title)} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-[15px] font-extrabold text-[#153E40]">Agendar una actividad para mí</button>
         </section>
       )}
-      <p className="m-0 px-1 text-[12px] leading-relaxed text-[#4A4F7A]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
+      <p className="m-0 px-1 text-[12px] leading-relaxed text-[#3E6466]">Las sugerencias aprenden de ti; no reemplazan consejo médico.</p>
     </div>
   );
 }
@@ -357,7 +382,7 @@ function Choice({ selected, onClick, children }: { selected: boolean; onClick: (
       aria-pressed={selected}
       onClick={onClick}
       className="flex min-h-12 cursor-pointer items-center justify-between gap-2 rounded-2xl px-3 text-left text-[15px] font-extrabold"
-      style={{ background: selected ? '#1B1F5E' : '#F8F9FE', color: selected ? '#FFFFFF' : '#1B1F5E', border: `1.5px solid ${selected ? '#1B1F5E' : '#E1E5F5'}` }}
+      style={{ background: selected ? '#153E40' : '#F8F9FE', color: selected ? '#FFFFFF' : '#153E40', border: `1.5px solid ${selected ? '#153E40' : '#EAD9CE'}` }}
     >
       <span>{children}</span>
       {selected && <span aria-hidden="true">✓</span>}

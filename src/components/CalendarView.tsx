@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { UserProfile } from '../types';
-import { dayWithinCycle, getCycleDay, getPhaseForDay, formatDateStr } from '../utils/cycle';
+import { dayWithinCycle, getCycleDay, getPhaseForDay, formatDateStr, PHASE_DETAILS } from '../utils/cycle';
 
 interface CalendarViewProps {
   profile: UserProfile;
   selectedDateStr: string;
   onSelectDate: (dateStr: string) => void;
+  /** Doble clic: abre el registro de cómo amaneció, el ánimo y la salud. */
+  onOpenRecord?: (dateStr: string) => void;
   activityDates?: string[];
+  /** Days that already have mood and behavior. Other days up to today show P. */
+  completeDates?: string[];
   showPhases?: boolean;
   cycleLength?: number;
   periodLength?: number;
@@ -17,7 +21,8 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
 
-export default function CalendarView({ profile, selectedDateStr, onSelectDate, activityDates = [], showPhases = true, cycleLength = profile.cycleLength, periodLength = profile.periodLength }: CalendarViewProps) {
+export default function CalendarView({ profile, selectedDateStr, onSelectDate, onOpenRecord, activityDates = [], completeDates = [], showPhases = true, cycleLength = profile.cycleLength, periodLength = profile.periodLength }: CalendarViewProps) {
+  const lastTap = useRef<{ date: string; at: number } | null>(null);
   const today = new Date();
   const todayStr = formatDateStr(today);
 
@@ -81,61 +86,74 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate, a
     const isSelected = selectedDateStr === dateStr;
     const isToday = todayStr === dateStr;
     const hasActivity = activityDates.includes(dateStr);
+    const due = dateStr <= todayStr;
+    const recorded = due && completeDates.includes(dateStr);
 
-    // Decide phase-based color classes matching the "Natural Tones" layout specification
-    let bgClass = "bg-gray-100 text-gray-500";
-    if (!showPhases) {
-      bgClass = "bg-[#E7EAF8] text-[#1B1F5E] hover:bg-[#D5DCF3]";
-    } else if (phase === 'Menstrual') {
-      bgClass = "bg-[#F49A9E] text-[#1B1F5E] hover:bg-[#E57F86]";
-    } else if (phase === 'Folicular') {
-      bgClass = "bg-[#A9C4F0] text-[#1B1F5E] hover:bg-[#96b4ea]";
-    } else if (phase === 'Ovulacion') {
-      bgClass = "bg-[#F6E27F] text-[#1B1F5E] hover:bg-[#E8D46A]";
-    } else if (phase === 'Lutea') {
-      bgClass = "bg-[#3A44C4] text-white hover:bg-[#2E37B0]";
-    }
+    const tone = PHASE_DETAILS[phase];
+    const phaseName = tone?.badge || 'Sin fase';
 
     gridCells.push(
       <button
         key={`day-${d}`}
         id={`calendar-day-${d}`}
-        onClick={() => onSelectDate(dateStr)}
-        className={`aspect-square flex flex-col items-center justify-center rounded-2xl font-semibold text-sm transition-all relative cursor-pointer ${bgClass} ${
-          isSelected ? 'ring-4 ring-[#1B1F5E] scale-105 z-10 font-bold shadow-md' : ''
-        } ${
-          isToday ? 'border-2 border-dashed border-[#1B1F5E]' : ''
-        }`}
-        title={`Día ${d}: Día ${cycleDay} del ciclo (${phase})`}
+        type="button"
+        onClick={() => {
+          const now = Date.now();
+          const previous = lastTap.current;
+          lastTap.current = { date: dateStr, at: now };
+          onSelectDate(dateStr);
+          if (previous && previous.date === dateStr && now - previous.at < 500) onOpenRecord?.(dateStr);
+        }}
+        onDoubleClick={() => { onSelectDate(dateStr); onOpenRecord?.(dateStr); }}
+        aria-pressed={isSelected}
+        aria-current={isToday ? 'date' : undefined}
+        className={`relative flex aspect-square min-w-0 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl text-[13px] font-semibold @[380px]:rounded-2xl @[380px]:text-sm ${
+          isSelected ? 'z-10' : ''
+        } ${isToday ? 'font-bold' : ''}`}
+        style={{
+          background: showPhases ? tone.cellHex : '#FFF1E8',
+          color: showPhases ? tone.textHex : '#153E40',
+          outline: isSelected ? '2px solid #153E40' : undefined,
+          outlineOffset: isSelected ? '1px' : undefined,
+        }}
+        title={`Día ${d}: Día ${cycleDay} del ciclo, fase ${phaseName}${isToday ? ', hoy' : ''}${isSelected ? ', seleccionado' : ''}. Doble clic para registrar cómo amaneciste, el ánimo y la salud.${due ? (recorded ? ' Ánimo y comportamiento registrados.' : ' Pendiente: falta ánimo o comportamiento.') : ''}`}
       >
         <span>{d}</span>
+        {due && (
+          <span
+            className="absolute left-0.5 top-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-[#FFF8EE] text-[8px] font-extrabold leading-none text-[#153E40]"
+            aria-hidden="true"
+          >
+            {recorded ? '✓' : 'P'}
+          </span>
+        )}
         {isToday && (
-          <span className="absolute bottom-1 w-1.5 h-1.5 bg-[#1B1F5E] rounded-full"></span>
+          <span className="absolute bottom-1 w-1.5 h-1.5 bg-[#153E40] rounded-full"></span>
         )}
         {hasActivity && (
-          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-white ring-2 ring-[#1B1F5E]" title="Actividad agendada"></span>
+          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#FFF8EE] ring-2 ring-[#153E40]" title="Actividad agendada"></span>
         )}
       </button>
     );
   }
 
   return (
-    <div className="flex h-full flex-col rounded-3xl bg-white px-3 py-4">
+    <div className="@container flex h-full min-w-0 flex-col overflow-x-clip rounded-[20px] bg-[#FFF8EE] px-4 py-4">
       {/* Month Selector & Navigation */}
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={prevMonth}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-lg font-extrabold text-[#1B1F5E]"
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-lg font-semibold text-[#153E40]"
           title="Mes Anterior"
         >
           ‹
         </button>
-        <h3 className="text-lg font-extrabold text-[#1B1F5E]">
+        <h3 className="m-0 text-2xl leading-[1.2] text-[#153E40]">
           {MONTH_NAMES[currentMonth]} {currentYear}
         </h3>
         <button
           onClick={nextMonth}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-lg font-extrabold text-[#1B1F5E]"
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-lg font-semibold text-[#153E40]"
           title="Mes Siguiente"
         >
           ›
@@ -143,38 +161,33 @@ export default function CalendarView({ profile, selectedDateStr, onSelectDate, a
       </div>
 
       {/* Weekday Labels */}
-      <div className="grid grid-cols-7 gap-2 text-center mb-3">
-        {["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"].map((dayLabel, idx) => (
-          <div key={idx} className="py-1 text-xs font-extrabold text-[#4A4F7A]">
+      <div className="mb-3 grid min-w-0 grid-cols-7 gap-1 text-center @[380px]:gap-2">
+        {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((dayLabel, idx) => (
+          <div key={idx} className="min-w-0 py-1 text-[10px] font-semibold text-[#153E40] @[380px]:text-xs">
             {dayLabel}
           </div>
         ))}
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-2 text-center flex-1">
+      <div className="grid min-w-0 flex-1 grid-cols-7 gap-1 text-center @[380px]:gap-2">
         {gridCells}
       </div>
+      <p className="m-0 mt-3 text-sm text-[#245456]">Un clic elige el día. Doble clic abre el registro: cómo amaneciste, ánimo y salud.</p>
 
       {/* Color Legend */}
-      {showPhases && <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-[#EFEFEF] justify-center sm:justify-start">
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#F49A9E] inline-block shadow-sm"></span>
-          <span>Menstrual</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#A9C4F0] inline-block shadow-sm"></span>
-          <span>Folicular</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#F6E27F] inline-block shadow-sm"></span>
-          <span>Ovulación</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#7A7A70]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#3A44C4] inline-block shadow-sm"></span>
-          <span>Lútea</span>
-        </div>
+      {showPhases && <div className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-[#E7D3C6] pt-4 sm:justify-start">
+        {(['Menstrual', 'Folicular', 'Ovulacion', 'Lutea'] as const).map((item) => (
+          <div key={item} className="flex items-center gap-1.5 text-sm text-[#153E40]">
+            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: PHASE_DETAILS[item].bgHex }} />
+            <span>{PHASE_DETAILS[item].badge}</span>
+          </div>
+        ))}
       </div>}
+      <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-[#3E6466]">
+        <span>✓ ánimo y comportamiento</span>
+        <span>P pendiente</span>
+      </div>
     </div>
   );
 }

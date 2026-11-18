@@ -16,7 +16,7 @@ export function usePlusNotice(): RequestPlus {
 /** Small "Plus" label for buttons and cards of paid features. */
 export function PlusBadge() {
   return (
-    <span className="inline-flex items-center rounded-full bg-[#1B1F5E] px-2 py-0.5 text-[11px] font-extrabold tracking-wide text-[#F6E27F]">PLUS</span>
+    <span className="inline-flex items-center rounded-full bg-[#153E40] px-2 py-0.5 text-[11px] font-extrabold tracking-wide text-[#FCE883]">PLUS</span>
   );
 }
 
@@ -68,23 +68,23 @@ export function PlusNoticeProvider({ children }: { children: React.ReactNode }) 
     <PlusNoticeContext.Provider value={requestPlus}>
       {children}
       {pending && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#1B1F5E]/50 px-4" role="presentation">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#153E40]/50 px-4" role="presentation">
           <div
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="plus-aviso-titulo"
             aria-describedby="plus-aviso-texto"
-            className="w-full max-w-[400px] rounded-[28px] bg-white px-5 pb-5 pt-6 text-center shadow-[0_16px_40px_rgba(27,31,94,0.25)]"
+            className="w-full max-w-[400px] rounded-[28px] bg-[#FFF8EE] px-5 pb-5 pt-6 text-center shadow-[0_16px_40px_rgba(27,31,94,0.25)]"
           >
-            <span className="inline-flex items-center rounded-full bg-[#F6E27F] px-3 py-1 text-xs font-extrabold tracking-wide text-[#1B1F5E]">CYCLIA PLUS</span>
-            <h2 id="plus-aviso-titulo" className="mb-0 mt-3 text-xl font-extrabold text-[#1B1F5E]">{PLUS_NOTICE_TITLE}</h2>
-            <p id="plus-aviso-texto" className="mb-0 mt-2 text-[15px] leading-relaxed text-[#3B4070]">{plusNoticeText(pending.feature)}</p>
-            <p className="mb-0 mt-2 text-sm leading-relaxed text-[#4A4F7A]">{PLUS_FEATURES[pending.feature].detail}</p>
+            <span className="inline-flex items-center rounded-full bg-[#FCE883] px-3 py-1 text-xs font-extrabold tracking-wide text-[#153E40]">CYCLIA PLUS</span>
+            <h2 id="plus-aviso-titulo" className="mb-0 mt-3 text-xl font-extrabold text-[#153E40]">{PLUS_NOTICE_TITLE}</h2>
+            <p id="plus-aviso-texto" className="mb-0 mt-2 text-[15px] leading-relaxed text-[#245456]">{plusNoticeText(pending.feature)}</p>
+            <p className="mb-0 mt-2 text-sm leading-relaxed text-[#3E6466]">{PLUS_FEATURES[pending.feature].detail}</p>
             <button
               ref={buttonRef}
               type="button"
               onClick={accept}
-              className="mt-5 flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-[15px] font-extrabold text-[#1B1F5E]"
+              className="mt-5 flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-[15px] font-extrabold text-[#153E40]"
             >
               OK, seguir
             </button>

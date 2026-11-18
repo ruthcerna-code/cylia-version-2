@@ -92,9 +92,9 @@ export function EntryFlow({
       </div>
       {entryNotice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(18, 22, 58, 0.72)' }}>
-          <div className="entry-dialog w-full max-w-sm rounded-[28px] bg-white p-6">
-            <h2 className="font-serif text-3xl font-semibold text-[#1B1F5E]">{entryNotice === 'created' ? 'Se creó una cuenta nueva' : 'Mostraremos tu calendario'}</h2>
-            <p className="mt-3 text-sm font-semibold leading-relaxed text-[#1B1F5E]">
+          <div className="entry-dialog w-full max-w-sm rounded-[28px] bg-[#FFF8EE] p-6">
+            <h2 className="font-serif text-3xl font-semibold text-[#153E40]">{entryNotice === 'created' ? 'Se creó una cuenta nueva' : 'Mostraremos tu calendario'}</h2>
+            <p className="mt-3 text-sm font-semibold leading-relaxed text-[#153E40]">
               {entryNotice === 'created' ? 'Tu usuario y tu contraseña ya quedaron guardados. Continúa para completar el registro.' : 'Esta cuenta ya existe. Al continuar verás tu calendario.'}
             </p>
             <button type="button" onClick={onContinue} disabled={processing} className="btn-fucsia mt-6 min-h-12 w-full rounded-full py-3 text-base font-extrabold cursor-pointer">Continuar</button>
@@ -166,11 +166,11 @@ export function MoodGrid({ current, onSave, onBack, onFull }: { current?: number
   return (
     <div className="flex flex-col gap-3">
       {onBack && (
-        <button type="button" onClick={onBack} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#3A44C4]">← Inicio</button>
+        <button type="button" onClick={onBack} className="w-fit cursor-pointer text-[15px] font-extrabold text-[#069494]">← Inicio</button>
       )}
-      <h1 className="m-0 font-serif text-[34px] font-normal text-[#3A44C4]">¿Cómo te sientes?</h1>
-      <p className="m-0 text-sm text-[#4A4F7A]">Tu elección actualiza el registro de hoy.</p>
-      <section className="grid grid-cols-2 gap-2.5 rounded-[22px] bg-white p-3.5">
+      <h1 className="m-0 font-serif text-[34px] font-normal text-[#069494]">¿Cómo te sientes?</h1>
+      <p className="m-0 text-sm text-[#3E6466]">Tu elección actualiza el registro de hoy.</p>
+      <section className="grid grid-cols-2 gap-2.5 rounded-[22px] bg-[#FFF8EE] p-3.5">
         {MOODS.map((mood) => {
           const on = selected === mood.value;
           return (
@@ -178,8 +178,8 @@ export function MoodGrid({ current, onSave, onBack, onFull }: { current?: number
               key={mood.value}
               type="button"
               onClick={() => setSelected(mood.value)}
-              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-[18px] text-sm font-extrabold text-[#1B1F5E]"
-              style={{ background: on ? '#F49A9E' : '#FFF6CF', border: `2px solid ${on ? '#E57F86' : '#F6E27F'}` }}
+              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-[18px] text-sm font-extrabold text-[#153E40]"
+              style={{ background: on ? '#FF8243' : '#FFF6CF', border: `2px solid ${on ? '#E56B28' : '#FCE883'}` }}
             >
               <span className="text-3xl">{mood.icon}</span>
               {mood.label}
@@ -187,7 +187,7 @@ export function MoodGrid({ current, onSave, onBack, onFull }: { current?: number
           );
         })}
       </section>
-      <section className="rounded-[20px] bg-white p-4">
+      <section className="rounded-[20px] bg-[#FFF8EE] p-4">
         <h2 className="m-0 text-sm font-extrabold">¿Qué está influyendo hoy?</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           {MOOD_TAGS.map((tag) => {
@@ -197,8 +197,8 @@ export function MoodGrid({ current, onSave, onBack, onFull }: { current?: number
                 key={tag}
                 type="button"
                 onClick={() => setTags((currentTags) => currentTags.includes(tag) ? currentTags.filter((item) => item !== tag) : [...currentTags, tag])}
-                className="min-h-10 cursor-pointer rounded-full px-3.5 text-[13px] font-bold text-[#1B1F5E]"
-                style={{ background: on ? '#F49A9E' : '#FFF6CF', border: `1.5px solid ${on ? '#E57F86' : '#F6E27F'}` }}
+                className="min-h-10 cursor-pointer rounded-full px-3.5 text-[13px] font-bold text-[#153E40]"
+                style={{ background: on ? '#FF8243' : '#FFF6CF', border: `1.5px solid ${on ? '#E56B28' : '#FCE883'}` }}
               >
                 {tag}
               </button>
@@ -206,9 +206,9 @@ export function MoodGrid({ current, onSave, onBack, onFull }: { current?: number
           })}
         </div>
       </section>
-      <button type="button" onClick={() => onSave(selected, tags)} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#F49A9E] text-base font-extrabold text-[#1B1F5E]">Guardar en mi registro</button>
+      <button type="button" onClick={() => onSave(selected, tags)} className="flex h-[52px] cursor-pointer items-center justify-center rounded-full bg-[#FF8243] text-base font-extrabold text-[#153E40]">Guardar en mi registro</button>
       {onFull && (
-        <button type="button" onClick={onFull} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#F6E27F] text-[15px] font-extrabold text-[#1B1F5E]">Hacer el registro completo</button>
+        <button type="button" onClick={onFull} className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-[#FCE883] text-[15px] font-extrabold text-[#153E40]">Hacer el registro completo</button>
       )}
     </div>
   );

@@ -10,7 +10,7 @@ interface OnboardingProps {
 }
 
 const FIELD_CLASS =
-  'w-full bg-[#F8F9FE] border-2 border-[#C9D3EF] rounded-2xl px-5 py-5 text-lg font-medium text-[#1B1F5E] outline-none transition focus:border-[#3A44C4] focus:ring-4 focus:ring-[#3A44C4]/15';
+  'w-full bg-[#F8F9FE] border-2 border-[#E7D3C6] rounded-2xl px-5 py-5 text-lg font-medium text-[#153E40] outline-none transition focus:border-[#069494] focus:ring-4 focus:ring-[#069494]/15';
 
 export default function Onboarding({ onComplete, accountEmail, onLeave }: OnboardingProps) {
   // Load existing profile from localStorage to pre-populate if they are starting over
@@ -216,7 +216,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               className={FIELD_CLASS}
               onKeyDown={(e) => e.key === 'Enter' && nextStep()}
             />
-            <p className="text-xs text-[#9A9A90] px-2">Texto: letras, espacios y guiones. Sin números.</p>
+            <p className="text-xs text-[#6E8C8E] px-2">Texto: letras, espacios y guiones. Sin números.</p>
           </div>
         );
       case 2:
@@ -235,14 +235,14 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               className={FIELD_CLASS}
               onKeyDown={(e) => e.key === 'Enter' && nextStep()}
             />
-            <p className="text-xs text-[#9A9A90] px-2">Va antes que la edad. Con esta fecha se calcula.</p>
+            <p className="text-xs text-[#6E8C8E] px-2">Va antes que la edad. Con esta fecha se calcula.</p>
           </div>
         );
       case 3:
         return (
           <div className="space-y-2">
-            <p className="rounded-2xl bg-[#F8F9FE] px-5 py-5 text-lg font-medium text-[#1B1F5E]">{age} años</p>
-            <p className="text-xs text-[#9A9A90] px-2">Número calculado. No se escribe a mano.</p>
+            <p className="rounded-2xl bg-[#F8F9FE] px-5 py-5 text-lg font-medium text-[#153E40]">{age} años</p>
+            <p className="text-xs text-[#6E8C8E] px-2">Número calculado. No se escribe a mano.</p>
           </div>
         );
       case 4:
@@ -291,7 +291,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               className={FIELD_CLASS}
               onKeyDown={(e) => e.key === 'Enter' && nextStep()}
             />
-            <p className="text-xs text-[#9A9A90] px-2">Opcional. Puedes dejarlo en blanco.</p>
+            <p className="text-xs text-[#6E8C8E] px-2">Opcional. Puedes dejarlo en blanco.</p>
           </div>
         );
       case 7:
@@ -305,7 +305,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               className={FIELD_CLASS}
               onKeyDown={(e) => e.key === 'Enter' && nextStep()}
             />
-            <p className="text-xs text-[#9A9A90] px-2">Primer día de tu última menstruación.</p>
+            <p className="text-xs text-[#6E8C8E] px-2">Primer día de tu última menstruación.</p>
           </div>
         );
       case 8:
@@ -325,8 +325,8 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               />
               <span className="text-lg font-medium text-[#1B4D3E]">días</span>
             </div>
-            <p className="text-xs text-[#9A9A90] px-2">De 1 a 10 días. Si no lo sabes, se usan 5.</p>
-            <button type="button" onClick={() => { setPeriodLength(5); setPeriodLengthKnown(false); setError(''); setStep(9); }} className="w-full rounded-2xl border-2 border-[#1E5631]/40 bg-white py-4 text-sm font-semibold text-[#1E5631] cursor-pointer">No sé</button>
+            <p className="text-xs text-[#6E8C8E] px-2">De 1 a 10 días. Si no lo sabes, se usan 5.</p>
+            <button type="button" onClick={() => { setPeriodLength(5); setPeriodLengthKnown(false); setError(''); setStep(9); }} className="w-full rounded-2xl border-2 border-[#1E5631]/40 bg-[#FFF8EE] py-4 text-sm font-semibold text-[#1E5631] cursor-pointer">No sé</button>
           </div>
         );
       case 9:
@@ -346,8 +346,8 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
               />
               <span className="text-lg font-medium text-[#1B4D3E]">días</span>
             </div>
-            <p className="text-xs text-[#9A9A90] px-2">De 21 a 45 días. Si no lo sabes, se usan 28.</p>
-            <button type="button" onClick={() => { setCycleLength(28); setCycleLengthKnown(false); setError(''); setStep(10); }} className="w-full rounded-2xl border-2 border-[#1E5631]/40 bg-white py-4 text-sm font-semibold text-[#1E5631] cursor-pointer">No sé</button>
+            <p className="text-xs text-[#6E8C8E] px-2">De 21 a 45 días. Si no lo sabes, se usan 28.</p>
+            <button type="button" onClick={() => { setCycleLength(28); setCycleLengthKnown(false); setError(''); setStep(10); }} className="w-full rounded-2xl border-2 border-[#1E5631]/40 bg-[#FFF8EE] py-4 text-sm font-semibold text-[#1E5631] cursor-pointer">No sé</button>
           </div>
         );
       case 10:
@@ -358,7 +358,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                 key={method}
                 type="button"
                 onClick={() => { setHormonalMethod(method); setError(''); setStep(11); }}
-                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${hormonalMethod === method ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-white text-[#1E5631]'}`}
+                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${hormonalMethod === method ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-[#FFF8EE] text-[#1E5631]'}`}
               >
                 {HORMONAL_LABELS[method]}
               </button>
@@ -378,7 +378,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                   if (situation !== 'ninguna') setIrregularCycles(null);
                   setStep(Number(age) >= 40 && situation === 'ninguna' ? 12 : 13);
                 }}
-                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${specialSituation === situation ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-white text-[#1E5631]'}`}
+                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${specialSituation === situation ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-[#FFF8EE] text-[#1E5631]'}`}
               >
                 {SITUATION_LABELS[situation]}
               </button>
@@ -397,7 +397,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                 key={value}
                 type="button"
                 onClick={() => { setIrregularCycles(value); setError(''); }}
-                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${irregularCycles === value ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-white text-[#1E5631]'}`}
+                className={`rounded-2xl border-2 px-5 py-4 text-left text-sm font-semibold cursor-pointer ${irregularCycles === value ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]' : 'border-[#1E5631]/40 bg-[#FFF8EE] text-[#1E5631]'}`}
               >
                 {label}
               </button>
@@ -415,7 +415,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                 className={`py-4 px-5 rounded-2xl border-2 text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                   isCeliac
                     ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]'
-                    : 'border-[#1E5631]/40 bg-white text-[#1E5631] hover:border-[#1E5631]'
+                    : 'border-[#1E5631]/40 bg-[#FFF8EE] text-[#1E5631] hover:border-[#1E5631]'
                 }`}
               >
                 <span>🌾 Celiaquía / Sensibilidad al gluten</span>
@@ -428,7 +428,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                 className={`py-4 px-5 rounded-2xl border-2 text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                   hasDiabetes
                     ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]'
-                    : 'border-[#1E5631]/40 bg-white text-[#1E5631] hover:border-[#1E5631]'
+                    : 'border-[#1E5631]/40 bg-[#FFF8EE] text-[#1E5631] hover:border-[#1E5631]'
                 }`}
               >
                 <span>🩸 Diabetes / Resistencia a la insulina</span>
@@ -441,7 +441,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                 className={`py-4 px-5 rounded-2xl border-2 text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                   hasObesity
                     ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]'
-                    : 'border-[#1E5631]/40 bg-white text-[#1E5631] hover:border-[#1E5631]'
+                    : 'border-[#1E5631]/40 bg-[#FFF8EE] text-[#1E5631] hover:border-[#1E5631]'
                 }`}
               >
                 <span>⚖️ Obesidad</span>
@@ -454,7 +454,7 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
                 className={`py-4 px-5 rounded-2xl border-2 text-sm font-semibold transition-all text-left flex justify-between items-center cursor-pointer ${
                   hasDepression
                     ? 'border-[#1E5631] bg-[#A8E0A2] text-[#1E5631]'
-                    : 'border-[#1E5631]/40 bg-white text-[#1E5631] hover:border-[#1E5631]'
+                    : 'border-[#1E5631]/40 bg-[#FFF8EE] text-[#1E5631] hover:border-[#1E5631]'
                 }`}
               >
                 <span>🧠 Depresión / Ansiedad persistente</span>
@@ -494,9 +494,9 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
     <div className="flex h-dvh justify-center bg-transparent">
       <div className="channel-frame !min-h-0 h-full flex flex-col">
         <header className="shrink-0 bg-transparent">
-          <div className="h-1.5 w-full bg-[#EFEFEF]">
+          <div className="h-1.5 w-full bg-[#EAD9CE]">
             <div
-              className="h-full bg-[#F49A9E] transition-all duration-300"
+              className="h-full bg-[#FF8243] transition-all duration-300"
               style={{ width: `${(stepPosition / stepTotal) * 100}%` }}
             />
           </div>
@@ -504,18 +504,18 @@ export default function Onboarding({ onComplete, accountEmail, onLeave }: Onboar
             <button
               type="button"
               onClick={prevStep}
-              className="text-sm font-semibold text-[#3A44C4] hover:text-[#1B1F5E] active:opacity-70 cursor-pointer"
+              className="text-sm font-semibold text-[#069494] hover:text-[#153E40] active:opacity-70 cursor-pointer"
             >
               ← Atrás
             </button>
-            <span className="text-xs font-semibold tracking-wide text-[#1B1F5E]">
+            <span className="text-xs font-semibold tracking-wide text-[#153E40]">
               Paso {stepPosition} de {stepTotal}
             </span>
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto px-5 pt-6 pb-4">
-          <h2 className="font-serif text-3xl text-[#1B1F5E] leading-tight mb-8">
+          <h2 className="font-serif text-3xl text-[#153E40] leading-tight mb-8">
             {getStepTitle()}
           </h2>
           {renderStepContent()}
