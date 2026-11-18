@@ -707,26 +707,6 @@ export default function App() {
     setTimeout(() => setShowNotification(false), 4000);
   };
 
-  // Open Daily Check-in modal to re-register symptoms and trigger a new analysis
-  const handleReRegister = () => {
-    setIsCheckinOpen(true);
-  };
-
-  // Detect Alerts (Consecutive high ratings in stress/pain/fatigue/poor sleep)
-  const checkAlerts = (): boolean => {
-    const logList = listLogs(logs).sort((a, b) => b.date.localeCompare(a.date));
-    if (logList.length < 3) return false;
-
-    // Check last 3 logs
-    const recent = logList.slice(0, 3);
-    const highStress = recent.every(l => l.stress >= 4);
-    const highPain = recent.every(l => l.pain >= 4);
-    const highFatigue = recent.every(l => l.fatigue >= 4);
-    const poorSleep = recent.every(l => l.sleepQuality >= 4);
-
-    return highStress || highPain || highFatigue || poorSleep;
-  };
-
   // Check if they registered a new period to recalculate lastPeriodDate
   const handleUpdatePeriodStart = async (newDateStr: string) => {
     if (!profile || !user) return;
@@ -985,47 +965,6 @@ export default function App() {
             onDeclinePerimenopause={() => { void choosePerimenopause('offered'); }}
           />
         )}
-        {false && appTab === 'inicio' && (
-          <article className="rounded-[32px] border border-[#d7e6d4] bg-white px-7 py-10 text-center shadow-[0_12px_40px_rgba(30,86,49,0.08)]">
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full text-4xl" style={{ background: 'var(--menthe)' }}>🌸</div>
-            <h2 className="font-serif text-4xl leading-tight text-[#1E5631]">Bienvenida a Cyclia</h2>
-            <p className="mt-4 text-[15px] leading-relaxed text-[#1B4D3E]">
-              Hola, {profile.name}. Tu canal de bienestar está listo para el registro de hoy.
-            </p>
-            <div className="mt-6 rounded-2xl px-4 py-4 text-left text-sm leading-relaxed text-[#1E5631]" style={{ background: 'var(--menthe)' }}>
-              <strong>Privacidad absoluta.</strong> Tus datos se almacenan de forma privada y solo se usan para personalizar tu bienestar.
-            </div>
-            <button type="button" onClick={() => setIsCheckinOpen(true)} className="btn-emeraude mt-8 w-full cursor-pointer rounded-full py-4 text-base font-semibold">
-              Comenzar registro
-            </button>
-          </article>
-        )}
-        {false && (
-          <div className="rounded-[28px] p-5 text-white" style={{ background: 'var(--emeraude)' }}>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-white/70">Progreso diario</p>
-            <div className="mt-2 flex items-end justify-between">
-              <h2 className="font-serif text-4xl">🔥 {Object.keys(logs).length}</h2>
-              <p className="text-xs text-white/80 text-right">registros<br />en tu historial</p>
-            </div>
-            <p className="text-sm mt-3 text-white/90">Hoy tu foco es {savedGoals.length ? savedGoals.join(', ') : 'bienestar'}.</p>
-          </div>
-        )}
-        {false && (
-          <div className="rounded-[28px] p-5" style={{ background: 'var(--menthe)' }}>
-            <h3 className="font-semibold" style={{ color: 'var(--emeraude)' }}>Hábitos de hoy</h3>
-            <ul className="mt-3 space-y-2">
-              {phaseDetails.tips.slice(0, 3).map((tip) => (
-                <li key={tip} className="flex items-start gap-2 text-sm" style={{ color: 'var(--emeraude-deep)' }}>
-                  <span>{activeLog ? '✓' : '○'}</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-            <button type="button" onClick={() => setAppTab('registro')} className="btn-fucsia mt-4 w-full rounded-full py-3 text-sm font-semibold cursor-pointer">
-              {activeLog ? 'Ver registro' : 'Registrar hoy'}
-            </button>
-          </div>
-        )}
         {appTab === 'foco' && (
           <OrganizaTuDia
             openToken={planOpenToken}
@@ -1137,110 +1076,6 @@ export default function App() {
         )}
         
         {/* Alert Banner Detection */}
-        {checkAlerts() && (
-          <div className="hidden bg-amber-50 border border-amber-200 p-4 rounded-2xl gap-3 text-amber-900 text-sm leading-relaxed">
-            <span>💡</span>
-            <div>
-              <strong>Aviso de Bienestar:</strong> He observado que durante varios días consecutivos has registrado indicadores de bienestar elevados (fatiga, dolor, estrés o descanso pobre). Si estos síntomas persisten o afectan tu calidad de vida, considera consultar con un profesional de la salud.
-            </div>
-          </div>
-        )}
-
-        {/* Column 1: Current Phase Details */}
-        <div className="hidden flex-col gap-4">
-          <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-[#EFEFEF] flex flex-col flex-1 min-h-[480px]">
-            <div className={`inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-4 w-fit ${phaseDetails.colorClass}`}>
-              {phaseDetails.badge}
-            </div>
-            
-            <h2 className="text-3xl md:text-4xl font-serif font-medium text-[#3A3A35] mb-2">
-              Día {selectedCycleDay} del Ciclo
-            </h2>
-            <p className="text-sm text-[#7A7A70] leading-relaxed mb-6">
-              {phaseDetails.description}
-            </p>
-
-            {/* Microhormonal details */}
-            <div className="bg-[#F5F6F8] p-4 rounded-2xl border border-[#d7e6d4] mb-6">
-              <p className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest mb-1">Estado Hormonal</p>
-              <p className="text-xs font-medium text-[#1E5631]">{phaseDetails.hormones}</p>
-            </div>
-
-            {/* Cognitive & Physical Stats Progress Bars */}
-            <div className="space-y-5">
-              <h4 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest">Referencia, no es tu registro</h4>
-              <div>
-                <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-[#9A9A90] mb-1.5">
-                  <span>Concentración</span>
-                  <span className="text-[#1E5631]">{phaseDetails.stats.concentration}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-[#EFEFEF] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#1E5631] rounded-full transition-all duration-500"
-                    style={{ width: `${phaseDetails.stats.concentration}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-[#9A9A90] mb-1.5">
-                  <span>Creatividad</span>
-                  <span className="text-[#1E5631]">{phaseDetails.stats.creativity}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-[#EFEFEF] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#1E5631] rounded-full transition-all duration-500"
-                    style={{ width: `${phaseDetails.stats.creativity}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest text-[#9A9A90] mb-1.5">
-                  <span>Energía Física</span>
-                  <span className="text-[#1E5631]">{phaseDetails.stats.physicalEnergy}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-[#EFEFEF] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#1E5631] rounded-full transition-all duration-500"
-                    style={{ width: `${phaseDetails.stats.physicalEnergy}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-
-            {/* Autocuidado Tips */}
-            <div className="mt-8 pt-6 border-t border-[#EFEFEF] space-y-3">
-              <h5 className="text-[10px] font-bold text-[#9A9A90] uppercase tracking-widest">Consejos de autocuidado</h5>
-              <ul className="space-y-1.5">
-                {phaseDetails.tips.slice(0, 2).map((tip, idx) => (
-                  <li key={idx} className="text-xs text-[#1E5631] flex items-start gap-1.5">
-                    <span className="text-rose-400">✨</span>
-                    <span>{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Force start of period & Re-register cycle buttons */}
-            <div className="mt-auto pt-6 flex flex-col gap-2.5">
-              <button
-                onClick={() => handleUpdatePeriodStart(selectedDateStr)}
-                className="w-full bg-[#F5F6F8] hover:bg-[#EFEFEF] border border-[#d7e6d4] text-[11px] font-bold uppercase tracking-wider py-3 rounded-full text-rose-500 hover:text-rose-600 transition-all cursor-pointer text-center"
-              >
-                🔴 Registrar Inicio de Periodo Hoy
-              </button>
-              <button
-                onClick={handleReRegister}
-                className="w-full bg-white hover:bg-rose-50/50 border border-dashed border-rose-300 text-[11px] font-bold uppercase tracking-wider py-3 rounded-full text-rose-600 hover:text-rose-700 transition-all cursor-pointer text-center"
-              >
-                🔄 Volver a Empezar (Check-In Diario)
-              </button>
-            </div>
-
-          </div>
-        </div>
-
         {/* Column 2: Calendar & Main Dashboard Cards */}
         <div className="flex flex-col gap-4">
           
