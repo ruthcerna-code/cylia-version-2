@@ -593,12 +593,15 @@ export default function App() {
     if (!user) return;
     if (!confirm("⚠️ ¿Deseas eliminar todo tu perfil y registros históricos para empezar de nuevo?")) return;
     try {
-      await deleteAccountData(user.id);
+      const { skipped } = await deleteAccountData(user.id);
       localStorage.removeItem(`cyclia_chat_${user.id}`);
       setProfile(null);
       setLogs({});
       setChatHistory([]);
       setSelectedDateStr(formatDateStr(new Date()));
+      if (skipped.length) {
+        showNotice('Se borraron tus datos. Algunas secciones nuevas no se pudieron borrar todavía; vuelve a intentarlo más tarde.');
+      }
     } catch (error) {
       console.error('No se pudieron borrar los datos:', error);
       showNotice('No se pudieron borrar los datos en Firebase.');
@@ -1642,7 +1645,7 @@ export default function App() {
                 showNotice(error instanceof Error ? error.message : 'No pudimos preparar tu archivo.');
               });
             }}
-            onDelete={() => { if (confirm('¿Eliminar los datos de esta cuenta en este dispositivo?')) handleResetAppData(); }}
+            onDelete={() => { if (confirm('¿Eliminar los datos de esta cuenta? Se borran de tu cuenta en Cyclia, no solo de este teléfono. Tu historial de consentimientos se conserva como respaldo legal.')) handleResetAppData(); }}
           />
         )}
         {appTab === 'perfil' && !profileSheet && (

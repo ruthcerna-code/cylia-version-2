@@ -15,8 +15,8 @@ Fecha: 17-11-2026 · Rama `reenfoque-energia` · Incluye el trabajo del día, qu
 
 | Área | Estado | Comentario |
 |------|--------|------------|
-| Funciones del plan gratis | 🟢 Casi completo | Falta que el recordatorio envíe avisos |
-| Funciones Plus del MVP | 🟢 Completas | Las 5 del MVP están construidas |
+| Funciones del plan gratis | 🟡 Incompleto | El recordatorio no avisa. El plan del día visible no ordena por plazo ni muestra «Puede esperar». Bochornos es sí/no, sin cantidad. La pregunta de perimenopausia no sale en cada ingreso. |
+| Funciones Plus del MVP | 🟢 Completas en pantalla | Las 5 del MVP están construidas. No hay cobro: cualquier cuenta las usa. |
 | Mecanismo de plan Plus | 🔴 No existe | Sin cobro ni restricción por función |
 | Seguridad de datos | 🟡 Buena, con brechas | Reglas por cuenta. Faltan el límite de uso de la IA y la edad mínima en las reglas |
 | Privacidad y aspectos legales | 🟡 En borrador | Consentimiento sólido, pero textos con campos pendientes y una exportación incompleta |
@@ -34,10 +34,12 @@ Fecha: 17-11-2026 · Rama `reenfoque-energia` · Incluye el trabajo del día, qu
 |---------|--------|-------|
 | Seguimiento del ciclo, fases y proyección de 3 ciclos | ✅ | `src/utils/cycle.ts`, `cycleModel.ts` |
 | Modos de etapa (natural, hormonal, pausa, perimenopausia, menopausia) y 8 alertas | ✅ | `src/utils/cycleModel.ts` |
-| Registro diario con indicadores, síntomas y bochornos | ✅ | `DesignRegister.tsx` |
+| Registro diario en cinco pasos | ✅ | `DesignRegister.tsx` |
+| Bochornos y sudores (cantidad e intensidad) | ⚠️ Solo sí o no | `DesignRegister.tsx`. Los campos de cantidad existen y ninguna pantalla los pide |
 | Evolución de bienestar de 7 días | ✅ | `SymptomChart.tsx` |
 | Fases y guía de bienestar | ✅ | `PhaseKnowledge.tsx`, `PhaseGuide.tsx` |
-| Organiza tu día | ✅ | `src/components/plan/` |
+| Organiza tu día (lista por hora) | ✅ | `src/components/plan/OrganizaTuDia.tsx` |
+| Orden del día por plazo, importancia, energía y «Puede esperar» | ⚠️ Código sin pantalla | `src/utils/dayPlan.ts`, `OrganizaDia.tsx` |
 | Cyclia te asiste (chat que guarda la conversación) | ✅ | `CycliaTeAsiste.tsx`, `src/plan/assist.ts` |
 | Hoy es un día difícil | ✅ | `src/plan/difficultDay.ts` |
 | Tu patrón propio | ✅ | `src/utils/ownPattern.ts` |
@@ -93,7 +95,7 @@ Ordenados por importancia. 🔴 Alta: resolver antes de cobrar o de tener usuari
 - **Riesgo:** el derecho de acceso a los datos no se cumple completo.
 - **Qué hacer:** decodificar `arrayValue` y `mapValue`, y recorrer todas las páginas.
 
-**A5. Las reglas de Firestore aceptan edades desde los 12 años.**
+**A5. Las reglas de Firestore aceptan edades desde los 12 años.** ✅ Corregido en el código el 18-11-2026 (`age >= 18`); falta publicar las reglas.
 - `firestore.rules:57`: `age >= 12`, pero la app exige 18 (`profileFields.ts`).
 - **Riesgo:** alguien que escriba directo en Firestore podría guardar datos de salud de una menor.
 - **Qué hacer:** cambiar a `age >= 18` y desplegar las reglas.
@@ -108,8 +110,9 @@ Ordenados por importancia. 🔴 Alta: resolver antes de cobrar o de tener usuari
 **M2. «Eliminar» y «Restaurar datos» no hacen lo que dicen.**
 - `App.tsx:1606` pregunta «¿Eliminar los datos de esta cuenta **en este dispositivo**?», pero `deleteAccountData` (`firebase.ts:419`) borra en Firebase.
 - La cuenta de Firebase Auth sigue existiendo. Las decisiones de consentimiento y las solicitudes de datos se conservan, lo que es correcto como respaldo legal, pero no se informa.
+- ✅ 18-11-2026: el texto ya no dice «en este dispositivo», explica que se conserva el historial de consentimientos, y el borrado ya no se corta si una colección opcional no se puede leer.
 - **Qué hacer:**
-  - corregir el texto;
+  - corregir el texto (hecho);
   - ofrecer «Eliminar mi cuenta», que también borre el usuario de Firebase Auth;
   - explicar qué se conserva y por qué.
 

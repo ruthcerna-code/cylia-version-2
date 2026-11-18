@@ -25,6 +25,7 @@ import {
 } from 'firebase/firestore';
 import type { ActivityEffort, ActivityImportance, ActivityKind, ActivityPlanStatus, ActivityStep, AssistChatTurn, BodyLevel, CervicalFluid, ChatMessage, CycleSymptom, DailyLog, EnergyFeel, FeltState, HormonalMethod, PeriodRecord, PerimenopauseMode, ScheduledActivity, SleepState, SpecialSituation, UserProfile } from './types';
 import { compareActivities } from './utils/activities';
+import { ACCOUNT_COLLECTIONS, deleteCollectionsTolerant, OPTIONAL_ACCOUNT_COLLECTIONS } from './utils/tolerantDelete';
 import type { BehaviorParams, BehaviorReport } from './utils/behavior';
 import { HORMONAL_LABELS, inferHormonalMethod, validateProfile } from './utils/profileFields';
 
@@ -417,17 +418,19 @@ async function deleteCollection(userId: string, name: string) {
   await Promise.all(snap.docs.map((item) => deleteDoc(item.ref)));
 }
 
-export async function deleteAccountData(userId: string) {
-  await guard('deleteAccountData', async () => {
-    await deleteCollection(userId, 'day_plans');
-    await deleteCollection(userId, 'activities');
-    await deleteCollection(userId, 'messages');
-    await deleteCollection(userId, 'period_records');
-    await deleteCollection(userId, 'daily_logs');
-    await deleteCollection(userId, 'focus');
-    await deleteCollection(userId, 'behavior');
-    await deleteCollection(userId, 'movement_days');
+/**
+ * Deletes the account data. An optional collection that cannot be read is skipped and reported,
+ * and the profile document is always deleted last. consent_events and data_requests stay as a legal record.
+ */
+export async function deleteAccountData(userId: string): Promise<{ skipped: string[] }> {
+  return guard('deleteAccountData', async () => {
+    const result = await deleteCollectionsTolerant(
+      ACCOUNT_COLLECTIONS,
+      OPTIONAL_ACCOUNT_COLLECTIONS,
+      (name) => deleteCollection(userId, name),
+    );
     await deleteDoc(userDoc(userId));
+    return result;
   });
 }
 

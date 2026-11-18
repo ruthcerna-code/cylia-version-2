@@ -156,22 +156,38 @@ export async function writeDataRequest(jwt: string, userId: string, kind: string
   }
 }
 
-/** Reads every page of a collection: the export must not stop at the first page. */
-async function readCollection(jwt: string, userId: string, name: string): Promise<Record<string, unknown>[]> {
+/**
+ * Reads every page of a collection: the export must not stop at the first page.
+ * An optional collection that Firestore refuses (403, for example when its rule is not published yet)
+ * is skipped and marked as omitted, instead of breaking the whole export.
+ */
+async function readCollection(
+  jwt: string,
+  userId: string,
+  name: string,
+  options: { optional?: boolean } = {},
+): Promise<{ rows: Record<string, unknown>[]; omitted: boolean }> {
   const rows: Record<string, unknown>[] = [];
   let pageToken = '';
   for (let page = 0; page < 200; page += 1) {
     const query = `pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
     const response = await firestore(jwt, `users/${userId}/${name}?${query}`);
-    if (response.status === 404) return rows;
+    if (response.status === 404) return { rows, omitted: false };
+    if (response.status === 403 && options.optional) {
+      console.warn('[Exportación] Sin permiso para leer', name, '- se omite.');
+      return { rows, omitted: true };
+    }
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new ConsentError(500, 'No pudimos preparar tu archivo. Inténtalo nuevamente.');
     rows.push(...((body.documents || []) as FirestoreDoc[]).map(decodeDoc));
     pageToken = typeof body.nextPageToken === 'string' ? body.nextPageToken : '';
     if (!pageToken) break;
   }
-  return rows;
+  return { rows, omitted: false };
 }
+
+/** Collections that can be missing from the export without failing it. */
+export const OPTIONAL_EXPORT_COLLECTIONS = ['focus', 'behavior', 'movement_days'] as const;
 
 export async function readExportBundle(jwt: string, userId: string) {
   const profileResponse = await firestore(jwt, `users/${userId}`);
@@ -180,17 +196,34 @@ export async function readExportBundle(jwt: string, userId: string) {
     throw new ConsentError(500, 'No pudimos preparar tu archivo. Inténtalo nuevamente.');
   }
   const profile = profileResponse.ok ? decodeDoc(profileBody as FirestoreDoc) : null;
+  // Required collections fail the export if they cannot be read. Optional ones are skipped and reported.
   const [dailyLogs, activities, messages, dataRequests, periodRecords, focusDocs, behavior, movementDays] = await Promise.all([
     readCollection(jwt, userId, 'daily_logs'),
     readCollection(jwt, userId, 'activities'),
     readCollection(jwt, userId, 'messages'),
     readCollection(jwt, userId, 'data_requests'),
     readCollection(jwt, userId, 'period_records'),
-    readCollection(jwt, userId, 'focus'),
-    readCollection(jwt, userId, 'behavior'),
-    readCollection(jwt, userId, 'movement_days'),
+    readCollection(jwt, userId, 'focus', { optional: true }),
+    readCollection(jwt, userId, 'behavior', { optional: true }),
+    readCollection(jwt, userId, 'movement_days', { optional: true }),
   ]);
-  return { profile, dailyLogs, activities, messages, dataRequests, periodRecords, behavior, movementDays, focus: focusDocs[0]?.payload ?? null };
+  const omitted = [
+    ['focus', focusDocs] as const,
+    ['behavior', behavior] as const,
+    ['movement_days', movementDays] as const,
+  ].filter(([, result]) => result.omitted).map(([name]) => name);
+  return {
+    profile,
+    dailyLogs: dailyLogs.rows,
+    activities: activities.rows,
+    messages: messages.rows,
+    dataRequests: dataRequests.rows,
+    periodRecords: periodRecords.rows,
+    behavior: behavior.rows,
+    movementDays: movementDays.rows,
+    focus: focusDocs.rows[0]?.payload ?? null,
+    omitted,
+  };
 }
 
 export function summarizeConsent(rows: ConsentRow[]) {

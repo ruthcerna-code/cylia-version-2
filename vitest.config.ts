@@ -8,5 +8,7 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     env: { TZ: 'America/Santiago' },
     restoreMocks: true,
+    // The first server test loads Express and every route; on a cold machine it can pass 5 seconds.
+    testTimeout: 15000,
   },
 });

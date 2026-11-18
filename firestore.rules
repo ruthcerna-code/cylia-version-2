@@ -54,7 +54,8 @@ service cloud.firestore {
         && request.resource.data.name.size() >= 2
         && request.resource.data.name.size() <= 80
         && request.resource.data.age is int
-        && request.resource.data.age >= 12
+        // Cyclia es para mayores de 18 años, igual que validateBirthDate en la app.
+        && request.resource.data.age >= 18
         && request.resource.data.age <= 100
         && isDate(request.resource.data.birthDate)
         && request.resource.data.weight is number
@@ -163,7 +164,7 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      // "Tu movimiento de hoy": the activities suggested, done and disliked each day.
+      // «Tu movimiento de hoy»: las actividades sugeridas, hechas y rechazadas de cada día.
       match /movement_days/{day} {
         allow read: if isOwner(uid);
         allow create, update: if isOwner(uid)
@@ -179,7 +180,7 @@ service cloud.firestore {
         allow delete: if isOwner(uid);
       }
 
-      // Monthly behavior parameters and the pattern Cyclia wrote from them (mes-1, mes-2, ...).
+      // «Tu patrón del mes»: parámetros de comportamiento de cada mes y el patrón que escribió Cyclia (mes-1, mes-2, ...).
       match /behavior/{id} {
         allow read: if isOwner(uid);
         allow create, update: if isOwner(uid)

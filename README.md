@@ -50,9 +50,25 @@ Scripts:
 
 El servidor lee el `.env` solo al arrancar: después de cambiar una variable o `server.ts`, hay que reiniciarlo.
 
+## Reglas de Firestore
+
+Las reglas viven en `firestore.rules` y **hay que publicarlas** para que valgan en Firebase. Se publican con:
+
+```bash
+npx firebase-tools login
+```
+
+```bash
+npx firebase-tools deploy --only firestore:rules --project cyclia-mvp
+```
+
+- **Cada colección nueva necesita su regla publicada.** En Firestore, lo que no tiene regla está prohibido: si se agrega una colección al código y no se publica su regla, Firebase rechaza leerla y escribirla.
+- **La versión publicada comparte la misma base de datos.** Las reglas actuales solo agregan permisos para `behavior` y `movement_days` y suben la edad mínima del perfil a 18 años, así que no rompen la app publicada.
+- **Antes de publicar** se pueden probar en la consola de Firebase: Firestore Database → Reglas → «Simulador de reglas».
+
 ## Pruebas
 
-157 pruebas automáticas en `tests/`, que cubren el cálculo del ciclo, los modos de etapa y las alertas, la validación del perfil, los datos que se envían a la IA, el consentimiento, la exportación, el plan del día, Tu patrón propio, Tu patrón del mes, Hoy es un día difícil, el aviso Plus, el catálogo y la selección de movimiento, y las rutas del servidor.
+166 pruebas automáticas en `tests/`, que cubren el cálculo del ciclo, los modos de etapa y las alertas, la validación del perfil, los datos que se envían a la IA, el consentimiento, la exportación, el plan del día, Tu patrón propio, Tu patrón del mes, Hoy es un día difícil, el aviso Plus, el catálogo y la selección de movimiento, la exportación y el borrado tolerantes, y las rutas del servidor.
 
 No llaman a Claude ni a Firebase: la IA y el consentimiento se simulan. No gastan créditos ni tocan datos reales. El detalle, los errores que encontraron y la lista de revisión manual están en [docs/pruebas.md](docs/pruebas.md).
 
@@ -266,6 +282,12 @@ Cada documento cuelga de `users/{uid}`, y solo esa persona lo lee o lo edita (`f
 | `movement_days` | `users/{uid}/movement_days/{fecha}` | Tu movimiento de hoy: `date`, `suggestedIds`, `doneIds`, `dislikedIds` y `updatedAt`. Solo la dueña lee y escribe |
 | `behavior` | `users/{uid}/behavior/mes-{N}` | Parámetros de comportamiento de cada mes y el patrón que escribió Cyclia |
 | `focus`, `day_plans` | `users/{uid}/...` | Datos de versiones anteriores (Mi Foco y el plan por minutos). La app actual ya no los escribe; se borran al eliminar la cuenta |
+
+**Exportación y borrado de la cuenta:**
+- `focus`, `behavior` y `movement_days` (y `day_plans` en el borrado) son **opcionales**. Si Firebase no permite leerlas, por ejemplo porque su regla aún no está publicada, la exportación las omite y lo indica en `omittedCollections` con una nota, y el borrado las salta y avisa en vez de fallar (`consentHttp.ts`, `src/utils/tolerantDelete.ts`).
+- Las demás colecciones son obligatorias: si no se pueden leer, la exportación falla.
+- `consent_events` y `data_requests` **nunca se borran**: se conservan como respaldo legal.
+- El perfil `users/{uid}` se borra siempre al final.
 
 ### Validación del perfil
 

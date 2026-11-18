@@ -1,6 +1,6 @@
 # Pruebas de Cyclia
 
-Creadas el 17-11-2026. **157 pruebas automáticas, todas pasan.**
+Creadas el 17-11-2026. **166 pruebas automáticas, todas pasan.** (Actualizado el 18-11-2026.)
 
 ## Cómo correrlas
 
@@ -19,8 +19,13 @@ npm run test:watch  # vuelve a correr al guardar un archivo
 |---|---|---|
 | `tests/ciclo.test.ts` | 26 | Día del ciclo, fases, ovulación, proyección de 3 ciclos, cambio de año y de hora. Modos de etapa: natural, hormonal, embarazo/lactancia, perimenopausia (activada y por 60 días sin regla desde los 40), menopausia. Las 8 alertas de salud. Validación del perfil y edad mínima de 18 años. |
 | `tests/registros.test.ts` | 16 | Lectura del sueño y la energía del registro. Qué datos se envían a la IA (**sin nombre, correo, peso ni fecha de nacimiento**). Días recientes del análisis. Energía para el plan. Consentimiento: obligatorias, opcional de IA, versión del texto, decisión más reciente, validación de lo que llega al servidor. |
-| `tests/plan.test.ts` | 32 | Propuesta de duración, con y sin IA. Cyclia te asiste: de 2 a 5 pasos, esfuerzo, duración y la pregunta cuando falta un dato. Horarios: término pasada la medianoche, choques, hueco libre, no agendar en el pasado. **Tu patrón propio**: espera 2 semanas, cuenta los registros, dice "no hay patrón", no usa fases con anticoncepción hormonal. **Hoy es un día difícil**: mantener, acortar, mover sin choques ni pasar la fecha límite, dependencias, cambiar de grupo. |
-| `tests/servidor.test.ts` | 27 | Las 4 rutas de IA: exigen la autorización del asistente, usan `claude-haiku-5-5` con esfuerzo bajo, envían las reglas de Cyclia, ordenan el historial del chat, reintentan cuando la IA no responde en formato, usan el respaldo local sin clave y responden mensajes claros ante una negativa o una clave inválida. Las rutas de cuenta exigen sesión. |
+| `tests/plan.test.ts` | 35 | Propuesta de duración, con y sin IA. Cyclia te asiste: de 2 a 5 pasos, esfuerzo, duración y la pregunta cuando falta un dato. Horarios: término pasada la medianoche, choques, hueco libre, no agendar en el pasado. **Tu patrón propio**: espera 2 semanas, cuenta los registros, dice "no hay patrón", no usa fases con anticoncepción hormonal. **Hoy es un día difícil**: mantener, acortar, mover sin choques ni pasar la fecha límite, dependencias, cambiar de grupo. |
+| `tests/exportacion.test.ts` | 4 | Exportación de datos: omite `behavior` y `movement_days` si Firebase no deja leerlas, sin fallar; con todo legible no omite nada; falla con 500 si una colección obligatoria no se puede leer; lee todas las páginas. |
+| `tests/borrado.test.ts` | 5 | Borrado de la cuenta: borra en orden; salta una colección opcional con permiso denegado y sigue; se detiene si la colección es obligatoria o si el error es otro; nunca borra consentimientos ni solicitudes de datos. |
+| `tests/comportamiento.test.ts` | 18 | **Tu patrón del mes**: meses de 30 días desde el primer registro, parámetros de comportamiento sin textos ni datos personales, patrón sin IA, menos de 10 registros sin patrón, comparación con el mes anterior y lectura de la respuesta de la IA. Exportación con listas y objetos anidados. |
+| `tests/plus.test.ts` | 4 | Aviso de funciones Plus: las 6 funciones, el texto «es de pago» y «activada temporalmente», una vez por función en la sesión. |
+| `tests/movimiento.test.ts` | 24 | Catálogo de 120 actividades y selección de **Tu movimiento de hoy**: energía, síntomas, sueño, tiempo, preferencias, variedad semanal, fase solo en modo natural, perimenopausia, azar reproducible, embarazo y «No me gusta». |
+| `tests/servidor.test.ts` | 34 | Las rutas de IA, incluida la del patrón del mes: exigen la autorización del asistente, usan `claude-haiku-5-5` con esfuerzo bajo, envían las reglas de Cyclia, ordenan el historial del chat, reintentan cuando la IA no responde en formato, usan el respaldo local sin clave y responden mensajes claros ante una negativa o una clave inválida. Las rutas de cuenta exigen sesión. |
 
 ## Errores que encontraron las pruebas (ya corregidos)
 

@@ -122,6 +122,11 @@ export function registerConsentRoutes(app: Express) {
           createdAt: row.created_at,
         })),
         dataRequests: bundle.dataRequests,
+        // Sections that could not be read this time. Empty when the export is complete.
+        omittedCollections: bundle.omitted,
+        ...(bundle.omitted.length
+          ? { note: 'Algunas secciones no se pudieron leer y no están en este archivo. Vuelve a exportar más tarde.' }
+          : {}),
         projections: {
           kind: 'estimate',
           generatedAt,
