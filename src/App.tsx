@@ -478,7 +478,7 @@ export default function App() {
 
   // Automatically trigger AI Analysis after check-in for deep insights
   const triggerAiAnalysis = async (currentLog: DailyLog, allLogs: Record<string, DailyLog>) => {
-    if (!user) return;
+    if (!user || !profile) return;
     if (!geminiEnabledRef.current) {
       showNotice('El registro se guardó. El análisis con inteligencia artificial no se envió porque esa autorización no está vigente.');
       return;
@@ -515,7 +515,7 @@ export default function App() {
 
   // Request analysis manually if cached analysis is empty
   const handleRequestAnalysisManually = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     const activeLog = logs[selectedDateStr];
     if (!activeLog) return;
 
